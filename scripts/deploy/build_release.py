@@ -39,7 +39,10 @@ def build_playground(cfg: dict, skip: bool, allow_failing_tests: bool = False) -
         assert dist.is_dir(), "playground/dist 不存在，无法跳过构建"
         return dist
     bun = os.environ.get("DEPLOY_BUN") or cfg.get("bun_path", "bun")
-    flags = cfg.get("playground_flags", {})
+    flags = dict(cfg.get("playground_flags", {}))
+    hidden = cfg.get("hidden_models")
+    if hidden:
+        flags["VITE_HIDDEN_IMAGE_MODELS"] = ",".join(hidden)
     test_result = run_command([bun, "run", "test"], cwd=ROOT / "playground", desc="playground vitest 门", check=False)
     if test_result.returncode != 0:
         if allow_failing_tests:

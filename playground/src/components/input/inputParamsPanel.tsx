@@ -116,6 +116,9 @@ export default function InputParamsPanel({
   poolProfileAvailable?: boolean
 }) {
   // Build combined image options: pool model names + external image profiles (both Gallery and Agent modes)
+  // 账号池可用时不再追加配置条目（本站账号池/默认与池模型指向同一资源，只保留池模型一项）；
+  // 池不可用时才列出外部配置作为后备入口。
+  const profileEntries = poolProfileAvailable ? [] : (agentImageProfiles ?? [])
   const combinedImageOptions = (poolProfileAvailable || (agentImageProfiles && agentImageProfiles.length > 0))
     ? [
         ...(availableModels ?? []).map((m) => {
@@ -127,7 +130,7 @@ export default function InputParamsPanel({
           else if (m.startsWith('gpt-image-2.5')) label = `${m} (Codex)`
           return { label, value: `${poolProfileAvailable ? 'pool' : 'model'}::${m}` }
         }),
-        ...(agentImageProfiles ?? []).map((p) => ({ label: p.name, value: `profile::${p.id}` })),
+        ...profileEntries.map((p) => ({ label: p.name, value: `profile::${p.id}` })),
       ]
     : undefined
 

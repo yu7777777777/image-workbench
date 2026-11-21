@@ -27,7 +27,7 @@ import DragUploadOverlay from './input/dragUploadOverlay'
 import InputBatchBars from './input/inputBatchBars'
 import InputParamsPanel from './input/inputParamsPanel'
 import { fetchQuotaData, type QuotaData } from '../lib/quota'
-import { fetchAvailableImageModels } from '../lib/modelsCatalog'
+import { fetchAvailableImageModels, filterHiddenImageModels } from '../lib/modelsCatalog'
 
 /** API 支持的最大参考图数量（超限图片保留并置灰，提交时拦截） */
 const API_MAX_IMAGES = getInputImageLimit()
@@ -483,7 +483,7 @@ export default function InputBar() {
   ), [activeProfile.id, settingsActiveProfile.id, settings])
 
   const [quotaData, setQuotaData] = useState<QuotaData | null>(null)
-  const [availableModels, setAvailableModels] = useState<string[]>(['gpt-image-2'])
+  const [availableModels, setAvailableModels] = useState<string[]>(filterHiddenImageModels(['gpt-image-2']))
 
   const isPoolProfile = isPoolProfileId(activeProfile.id)
   const isSharedProfile = activeProfile.id.startsWith('shared-')
@@ -526,7 +526,8 @@ export default function InputBar() {
       activeProfile.baseUrl,
       activeProfile.apiProxy,
     ).then((models) => {
-      if (models.length > 0) setAvailableModels(models)
+      const filtered = filterHiddenImageModels(models)
+      if (filtered.length > 0) setAvailableModels(filtered)
     })
   }, [activeProfile.apiKey, activeProfile.apiProxy, activeProfile.baseUrl, activeProfile.id])
 

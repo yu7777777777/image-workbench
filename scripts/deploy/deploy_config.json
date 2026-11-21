@@ -17,5 +17,6 @@
     "VITE_API_PROXY_AVAILABLE": "true",
     "VITE_SHOW_PRESET_CONFIG_ONLY": "true",
     "VITE_LOCK_PRESET_CONFIG_PARAMS": "true"
-  }
+  },
+  "hidden_models": ["pro-gpt-image-2", "gpt-image-2.5", "gpt-image-2.5-flare", "gpt-image-2.5-sunburst"]
 }

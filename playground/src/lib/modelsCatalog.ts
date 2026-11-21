@@ -16,6 +16,16 @@ export const DEFAULT_POOL_IMAGE_MODELS = [
   'gpt-image-2.5-sunburst',
 ]
 
+// 部署配置注入：从模型选择中隐藏号池无法使用的型号（构建期 VITE_HIDDEN_IMAGE_MODELS 注入，逗号分隔）。
+const HIDDEN_IMAGE_MODELS = (import.meta.env.VITE_HIDDEN_IMAGE_MODELS ?? '')
+  .split(',')
+  .map((id) => id.trim())
+  .filter(Boolean)
+
+export function filterHiddenImageModels(models: string[]): string[] {
+  return models.filter((id) => !HIDDEN_IMAGE_MODELS.includes(id))
+}
+
 export async function fetchAvailableImageModels(apiKey?: string, baseUrl = '', apiProxy = false): Promise<string[]> {
   try {
     // The pool build must read the pool catalog even when the currently
