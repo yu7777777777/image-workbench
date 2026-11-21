@@ -442,6 +442,31 @@ export async function deleteAccounts(tokens: string[]) {
   });
 }
 
+export type UpgradeStatusResponse = {
+  current_version: string;
+  latest_version: string | null;
+  request_pending: boolean;
+  last_result: {
+    status: string;
+    version: string;
+    error?: string;
+    image?: string;
+    elapsed_secs?: number;
+    [key: string]: unknown;
+  } | null;
+};
+
+export async function fetchUpgradeStatus() {
+  return httpRequest<UpgradeStatusResponse>("/api/system/upgrade/status");
+}
+
+export async function triggerUpgrade(version: string) {
+  return httpRequest<{ accepted: boolean; version: string; message: string }>("/api/system/upgrade", {
+    method: "POST",
+    body: { version },
+  });
+}
+
 export async function refreshAccounts(accessTokens: string[]) {
   return httpRequest<{ progress_id: string }>("/api/accounts/refresh", {
     method: "POST",

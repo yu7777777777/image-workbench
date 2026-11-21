@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import webConfig from "@/constants/common-env";
 import { useVersionCheck } from "@/hooks/use-version-check";
+import { getValidatedAuthSession } from "@/lib/auth-session";
 import { cn } from "@/lib/utils";
 
 function typeVariant(type: string): "success" | "danger" | "info" | "violet" | "outline" {
@@ -32,7 +33,17 @@ export function VersionReleaseDialog({ className }: { className?: string }) {
     checking,
     hasNewVersion,
     checkLatestRelease,
+    upgrading,
+    upgradeResult,
+    startUpgrade,
   } = useVersionCheck();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    void getValidatedAuthSession().then((session) => {
+      setIsAdmin(session?.role === "admin");
+    });
+  }, [open]);
 
   useEffect(() => {
     const handleOpen = () => openReleaseModal();
@@ -74,7 +85,7 @@ export function VersionReleaseDialog({ className }: { className?: string }) {
             <VersionCard label="当前版本" value={webConfig.appVersion} />
             <VersionCard
               label="最新版本"
-              value={latestVersion}
+              value={latestVersion ?? "检查中..."}
               action={
                 <button
                   type="button"
@@ -86,6 +97,33 @@ export function VersionReleaseDialog({ className }: { className?: string }) {
               }
             />
           </div>
+          {isAdmin && (
+            <div className="rounded-xl border border-stone-200 bg-stone-50/70 p-3 dark:border-white/10 dark:bg-white/[0.04]">
+              {upgrading ? (
+                <div className="text-sm text-stone-700 dark:text-stone-300">
+                  升级执行中（校验 → 快照 → 派生镜像 → 自检 → 切换），通常需要 1-2 分钟，完成后会提示刷新页面……
+                </div>
+              ) : upgradeResult?.status === "success" ? (
+                <div className="text-sm text-emerald-600 dark:text-emerald-400">
+                  已成功升级到 {upgradeResult.version}（耗时 {upgradeResult.elapsed_secs ?? "-"} 秒），请刷新页面使用新版本。
+                </div>
+              ) : upgradeResult?.status === "failed" ? (
+                <div className="text-sm text-red-600 dark:text-red-400">
+                  升级到 {upgradeResult.version} 失败：{upgradeResult.error ?? "未知原因"}（服务器已自动回滚）
+                </div>
+              ) : hasNewVersion && latestVersion ? (
+                <Button
+                  size="sm"
+                  className="w-full"
+                  onClick={() => void startUpgrade(latestVersion)}
+                >
+                  立即升级到 {latestVersion}
+                </Button>
+              ) : upgradeResult?.status === "success" ? null : (
+                <div className="text-xs text-stone-400 dark:text-gray-500">当前已是最新版本。</div>
+              )}
+            </div>
+          )}
           <div className="max-h-[56vh] space-y-5 overflow-y-auto pr-1">
             {releases.map((release) => (
               <div key={release.version} className="border-l border-stone-200 pl-4 dark:border-white/10">
