@@ -64,3 +64,6 @@ web/test-results/
 web/next-build.log
 .pytest_cache/
 playground/.tmp-helper.txt
+
+# 界面检查工具的临时输出
+*-check*.json
