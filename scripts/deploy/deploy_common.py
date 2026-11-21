@@ -52,11 +52,13 @@ def read_credentials(root: Path = ROOT, offset: int = 4) -> tuple[str, str, str,
     """读取 服务器连接.txt，兼容两种格式：
     - 旧格式：冒号分隔行（offset=4 取第 5-8 个字段 = 新机 host:port:user:password）
     - 现行格式：3 行 = host/user/password（端口默认 22）；4 行 = host/port/user/password
+    查找位置：项目根目录 或 本地资料/ 目录（1.16.1 起文件归入本地资料文件夹）。
     """
-    credentials_path = root / "服务器连接.txt"
-    if not credentials_path.is_file():
+    candidates = [root / "服务器连接.txt", root / "本地资料" / "服务器连接.txt"]
+    credentials_path = next((p for p in candidates if p.is_file()), None)
+    if credentials_path is None:
         raise FileNotFoundError(
-            "未找到 服务器连接.txt（项目根目录）。请恢复该文件后重试。"
+            "未找到 服务器连接.txt（项目根目录或 本地资料/ 目录）。请恢复该文件后重试。"
         )
     lines = [line.strip() for line in credentials_path.read_text(encoding="utf-8-sig").splitlines() if line.strip()]
     if any(":" in line or "：" in line for line in lines):

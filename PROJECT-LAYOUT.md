@@ -19,33 +19,45 @@
 | `PROJECT-LAYOUT.md` / `WORKFLOW.md` / `README.md` / `LICENSE` | 说明文档 |
 | `.github/workflows/release.yml` | 打 tag 自动构建并发布 GitHub Release |
 
-## 二、仅本地必留（不同步，删了会出事）
+## 二、留在项目根目录（工程运行必需，不同步）
 
-| 路径 | 内容 | 为什么必留 |
+这些目录/文件必须保持在根目录原位——Docker、uv、Next.js、应用运行时都按固定路径读写，**挪动会把项目搞坏**：
+
+| 路径 | 内容 | 说明 |
 |---|---|---|
-| `data/` | **生产数据库**（accounts.db 等）+ 生成的图片 | 全部用户数据与生图产物，误删不可恢复（部署工具会自动备份） |
-| `config.json` | 真实运行配置，含 **auth-key** | 登录与 API 鉴权凭据 |
-| `服务器连接.txt` | SSH 凭据（host/user/password） | 部署工具的连接来源；泄露=服务器被控制 |
-| `账号备份/` | 账号导出备份 | 手动备份的账号资产 |
-| `docs/deployment/`（123 份） | 历史部署/验收/事故记录（含服务器 IP） | 运维审计与复盘依据；含敏感信息故不入库 |
-| `docs/` 其余（DEVELOPMENT.md 等） | 开发约束、内部运维文档（含服务器信息） | 同上 |
-| `待上线与功能规划清单.md` / `项目结构.md` | 规划与结构文档（含服务器信息） | 内部工作文档 |
-| `agents.md` | AI 助手工作规则（含服务器信息） | 同上 |
+| `.git` / `.github` / `.gitignore` | 仓库本体与配置（历史都在 GitHub 上，本地 .git 删了也能重新 clone，但没必要） | |
+| `data/` | 运行时数据（本地为开发数据；**生产数据在服务器 `/opt/.../data/`**） | 应用运行时写入 |
+| `config.json` | 真实密钥（本地开发用；生产在服务器） | 容器挂载约定路径 |
+| `logs/` | 运行日志 | 应用运行时写入 |
+| `out/` | 部署打包产物（build_release 输出） | 可删，构建自动重建 |
+| `.venv` / `web/node_modules` / `playground/node_modules` | 依赖 | install 重建 |
+| `agents.md` | AI 助手工作规则 | 需在根目录（AI 工具按约定加载） |
+| `.env.local` | 本地开发代理密钥 | 本地开发用 |
+| `docker-compose.override.yml` | 本地模拟编排（约定路径） | |
 
-## 三、仅本地可删（随时可重新生成或为临时产物）
+## 三、本地资料/（不同步——工作文档、备份、凭据、历史归档）
 
-| 路径 | 内容 | 删除后果 |
-|---|---|---|
-| `web/out/`、`playground/dist/` | 前端构建产物 | `bun run build` 重新生成 |
-| `web/node_modules/`、`playground/node_modules/`、`.venv/` | 依赖 | `bun install` / `uv sync` 重新生成 |
-| `out/` | 部署打包产物与历史归档 | `deploy.py build` 重新生成；`03-部署中间产物/` 是历史归档，确认无用可删 |
-| `logs/` | 运行日志 | 可删（排障价值随时间降低） |
-| `pwrun/`、`.codex/`、`.zcode/` | AI 会话遗留脚本/状态 | 历史参考，可删 |
-| `r.txt`、`.task_*.md`、`.pytest_cache/` | 临时文件 | 可删 |
-| `web/.next/`、`web/test-results/`、`web/next-build.log` | 构建缓存/测试输出 | 可删 |
-| `data/upgrade/` | 升级触发/结果文件（升级器自动清理） | 可删（升级器自管） |
+本地资料已集中归入 **`本地资料/`** 文件夹（不同步 GitHub）：
 
-## 四、注意
+| 子目录/文件 | 内容 |
+|---|---|
+| `部署记录/` | 全部历史部署/验收/事故记录（123 份，含服务器 IP）+ DEVELOPMENT.md 等内部开发文档 |
+| `工作文档/` | 待上线与功能规划清单.md、项目结构.md、AI 任务简报 |
+| `账号备份/` | 手动导出的账号资产 |
+| `服务器连接.txt` | SSH 凭据（部署工具自动在此查找） |
+| `杂项归档/` | r.txt、pwrun、.codex 历史脚本、node_modules 孤儿等临时产物 |
 
-- `config.json` 与 `data/` 在 `.gitignore` 中，**永远不会**被提交——不要为了"备份到 GitHub"把它们加回跟踪（密钥泄露）。备份走 `账号备份/` 或部署工具的 SQLite 一致性备份。
-- `docs/` 整体不入库的原因：其中 123 份部署记录含服务器 IP 等敏感信息。若确有文档要公开，单独移到仓库白名单路径并在 `.gitignore` 加反排除。
+## 四、可随时删除的（重新生成即可）
+
+- `web/out/`、`playground/dist/` —— 前端构建产物，`bun run build` 重建
+- `web/node_modules/`、`playground/node_modules/`、`.venv/` —— 依赖，install 重建
+- `out/deploy/` —— 发布包，`deploy.py build` 重建
+- `logs/` —— 运行日志（排障价值随时间降低）
+- `本地资料/杂项归档/` —— 历史遗留，确认无用可删
+- `data/upgrade/` —— 升级触发/结果文件（升级器自管）
+
+## 五、注意
+
+- **`config.json` 与 `data/` 永远不要加进 Git 跟踪**（密钥与数据泄露）——备份走 `本地资料/账号备份/` 或部署工具的 SQLite 一致性备份
+- **生产数据与配置在服务器** `/opt/chatgpt2api-trial-20261029/`（data/、config.json），本地仅是开发副本
+- 分不清就跑 `git status`——干净 = 该同步的都同步了
