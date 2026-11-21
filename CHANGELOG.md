@@ -1,5 +1,14 @@
 # 1.15.0
 
+## 修复「尚未完成 API 配置」误报与提交禁用（全新浏览器/设置页保存后触发）
+
+- 现象：全新浏览器/无痕环境进入画廊即出现「尚未完成 API 配置，请在右上角设置中进行」，提交按钮禁用、部分模型条目无法切换；在设置页保存过的浏览器同样触发。该 bug 在 1.14.1 前端即潜伏存在（经 1.14.1 前端回滚 + 全新环境对照实验确认），非 1.15.0 部署引入。
+- 根因：`getActiveApiProfile` 用 settings 上的旧版扁平字段（apiKey/model/baseUrl）无条件覆盖 `profiles` 数组里解析出的激活配置；预设锁定模式下设置页保存/失焦会把表单显示的空 Key + 预设模型写进扁平字段，覆盖账号池凭据。
+- 修复：扁平字段仅在「无 profiles 数组」的遗留状态下生效；profiles 存在时一律以解析出的激活配置为准。新增 2 项回归测试（apiProfiles 82 项全部通过）。
+- 验证：浏览器自动化在全新环境复现 → 修复 → 前端重新发布 → UI 级端到端真实生成成功（本站账号池 gpt-image-2，27 秒出图，额度正常扣减），模型下拉可正常选择。
+
+## 一键部署工具（scripts/deploy/）
+
 ## 一键部署工具（scripts/deploy/）
 
 - 新增统一部署入口 `deploy.py`（check/build/package/upload/release/rollback/status/all），终结 100+ 个一次性字符串派生脚本；远端执行器 `deploy_host.py` 为进 git 的稳定文件（骨架移植自 apply_pool_release_host.py）。

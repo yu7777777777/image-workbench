@@ -39,7 +39,7 @@ python scripts/deploy/deploy.py all --yes      # 一条龙（破坏性阶段跳�
 | readiness 用 `/health?format=json` + 容器内 `/app/VERSION` 指纹 | `/api/version` 返回 SPA HTML 的假通过 |
 | config.json 哈希断言不变 | 1.14.0 inode 锁定事故 |
 | 任一步失败自动回滚 + `deployment-result.json` 证据包 | 人工点检差错面（1.14.1 当天两次统计口径撤回） |
-| 镜像保留策略（默认保留最近 3 个未使用镜像） | 磁盘耗尽（30G 盘曾剩 9.8G） |
+| 镜像保留策略：部署成功后仅保留当前运行镜像（代码在 GitHub，长周期回滚走「检出旧提交→重新构建→部署」） | 磁盘耗尽（30G 盘曾剩 9.8G） |
 
 ## 产物与证据
 
