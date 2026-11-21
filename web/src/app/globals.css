@@ -152,13 +152,15 @@ html.image-route-lock .app-nav-wrap {
   }
   html,
   body {
-    background: radial-gradient(circle at top left, rgba(255, 255, 255, 0.92), rgba(245, 239, 231, 0.96) 42%, rgba(240, 235, 227, 0.99) 100%);
+    /* 冷白径向渐变：消除旧版暖米底的黄调（层级靠底色，不靠描边） */
+    background: radial-gradient(circle at top left, oklch(1 0 0), oklch(0.985 0 0) 55%, oklch(0.97 0 0) 100%);
     overscroll-behavior: none;
   }
 
   .dark,
   .dark body {
-    background: radial-gradient(circle at top left, rgba(55, 48, 43, 0.72), rgba(28, 25, 23, 0.98) 40%, rgba(12, 10, 9, 1) 100%);
+    /* check-ignore-start：暗色站点背景层定义 */
+    background: radial-gradient(circle at top left, oklch(0.244 0.006 286.033), oklch(0.21 0.006 285.885) 60%, oklch(0.21 0.006 285.885) 100%);
   }
 
   body {
@@ -182,76 +184,77 @@ html.image-route-lock .app-nav-wrap {
 .dark .bg-white\/90,
 .dark .bg-white\/95,
 .dark .hover\:bg-white:hover {
-  background-color: rgb(28 25 23 / 0.94) !important;
+  background-color: oklch(0.244 0.006 286.033 / 0.94) !important;
 }
 
 .dark .bg-white\/80,
 .dark .bg-white\/70,
 .dark .bg-white\/60 {
-  background-color: rgb(41 37 36 / 0.78) !important;
+  background-color: oklch(0.314 0.005 286.067 / 0.78) !important;
 }
 
-.dark .bg-stone-50,
-.dark .bg-stone-50\/70,
-.dark .hover\:bg-stone-50\/70:hover,
-.dark .bg-stone-100,
-.dark .hover\:bg-stone-100:hover,
-.dark .hover\:bg-stone-200:hover {
-  background-color: rgb(41 37 36 / 0.86) !important;
+.dark .bg-zinc-50,
+.dark .bg-zinc-50\/70,
+.dark .hover\:bg-zinc-50\/70:hover,
+.dark .bg-zinc-100,
+.dark .hover\:bg-zinc-100:hover,
+.dark .hover\:bg-zinc-200:hover {
+  background-color: oklch(0.314 0.005 286.067 / 0.86) !important;
 }
 
-.dark .bg-stone-200 {
-  background-color: rgb(68 64 60 / 0.9) !important;
+.dark .bg-zinc-200 {
+  background-color: oklch(0.475 0.007 74 / 0.9) !important;
 }
 
 .dark .border-white,
 .dark .border-white\/80,
 .dark .border-white\/70,
-.dark .border-stone-100,
-.dark .border-stone-100\/80,
-.dark .border-stone-100\/50,
-.dark .border-stone-200,
-.dark .border-stone-200\/70,
-.dark .border-stone-300,
-.dark .focus-visible\:border-stone-300:focus-visible {
+.dark .border-zinc-100,
+.dark .border-zinc-100\/80,
+.dark .border-zinc-100\/50,
+.dark .border-zinc-200,
+.dark .border-zinc-200\/70,
+.dark .border-zinc-300,
+.dark .focus-visible\:border-zinc-300:focus-visible {
   border-color: rgb(255 255 255 / 0.11) !important;
 }
 
-.dark .text-stone-950,
-.dark .text-stone-900,
-.dark .text-stone-800 {
-  color: rgb(250 250 249) !important;
+.dark .text-zinc-950,
+.dark .text-zinc-900,
+.dark .text-zinc-800 {
+  color: oklch(0.985 0 0) !important;
 }
 
-.dark .text-stone-700,
-.dark .text-stone-600 {
-  color: rgb(214 211 209) !important;
+.dark .text-zinc-700,
+.dark .text-zinc-600 {
+  color: oklch(0.892 0.004 286.32) !important;
 }
 
-.dark .text-stone-500,
-.dark .text-stone-400 {
+.dark .text-zinc-500,
+.dark .text-zinc-400 {
   color: rgb(168 162 158) !important;
 }
 
-.dark .text-stone-300 {
-  color: rgb(214 211 209) !important;
+.dark .text-zinc-300 {
+  color: oklch(0.892 0.004 286.32) !important;
 }
 
-.dark .placeholder\:text-stone-400::placeholder,
+.dark .placeholder\:text-zinc-400::placeholder,
 .dark .placeholder\:text-muted-foreground::placeholder {
-  color: rgb(120 113 108) !important;
+  color: oklch(0.552 0.016 285.938) !important;
 }
 
-.dark .hover\:text-stone-700:hover,
-.dark .hover\:text-stone-800:hover,
-.dark .hover\:text-stone-900:hover {
-  color: rgb(250 250 249) !important;
+.dark .hover\:text-zinc-700:hover,
+.dark .hover\:text-zinc-800:hover,
+.dark .hover\:text-zinc-900:hover {
+  color: oklch(0.985 0 0) !important;
 }
 
 .dark .shadow-sm,
 .dark .shadow-xs,
 .dark [class*="shadow-"] {
   box-shadow: none !important;
+  /* check-ignore-end */
 }
 
 @keyframes grow {

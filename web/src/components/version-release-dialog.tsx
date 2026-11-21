@@ -65,7 +65,7 @@ export function VersionReleaseDialog({ className }: { className?: string }) {
       <button
         type="button"
         className={cn(
-          "relative inline-flex items-center rounded-full border border-stone-200/90 bg-stone-50/90 px-2 py-0.5 text-[11px] font-semibold text-stone-600 transition hover:border-stone-300 hover:bg-stone-100 hover:text-stone-900 dark:border-white/10 dark:bg-white/[0.05] dark:text-stone-300 dark:hover:bg-white/[0.1] dark:hover:text-white cursor-pointer select-none",
+          "relative inline-flex items-center rounded-full border border-zinc-200/90 bg-zinc-50/90 px-2 py-0.5 text-[11px] font-semibold text-zinc-600 transition hover:border-zinc-300 hover:bg-zinc-100 hover:text-zinc-900 dark:border-white/10 dark:bg-white/[0.05] dark:text-zinc-300 dark:hover:bg-white/[0.1] dark:hover:text-white cursor-pointer select-none",
           className,
         )}
         onClick={openReleaseModal}
@@ -73,7 +73,7 @@ export function VersionReleaseDialog({ className }: { className?: string }) {
       >
         v{webConfig.appVersion}
         {hasNewVersion ? (
-          <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-stone-900" />
+          <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-zinc-900" />
         ) : null}
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
@@ -89,7 +89,7 @@ export function VersionReleaseDialog({ className }: { className?: string }) {
               action={
                 <button
                   type="button"
-                  className="text-[11px] text-stone-400 underline-offset-2 hover:text-stone-700 hover:underline dark:hover:text-stone-200"
+                  className="text-[11px] text-zinc-400 underline-offset-2 hover:text-zinc-700 hover:underline dark:hover:text-zinc-200"
                   onClick={() => void checkLatestRelease(true)}
                 >
                   {checking ? "检查中..." : "检查更新"}
@@ -98,9 +98,9 @@ export function VersionReleaseDialog({ className }: { className?: string }) {
             />
           </div>
           {isAdmin && (
-            <div className="rounded-xl border border-stone-200 bg-stone-50/70 p-3 dark:border-white/10 dark:bg-white/[0.04]">
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50/70 p-3 dark:border-white/10 dark:bg-white/[0.04]">
               {upgrading ? (
-                <div className="text-sm text-stone-700 dark:text-stone-300">
+                <div className="text-sm text-zinc-700 dark:text-zinc-300">
                   升级执行中（校验 → 快照 → 派生镜像 → 自检 → 切换），通常需要 1-2 分钟，完成后会提示刷新页面……
                 </div>
               ) : upgradeResult?.status === "success" ? (
@@ -120,24 +120,24 @@ export function VersionReleaseDialog({ className }: { className?: string }) {
                   立即升级到 {latestVersion}
                 </Button>
               ) : upgradeResult?.status === "success" ? null : (
-                <div className="text-xs text-stone-400 dark:text-gray-500">当前已是最新版本。</div>
+                <div className="text-xs text-zinc-400 dark:text-gray-500">当前已是最新版本。</div>
               )}
             </div>
           )}
           <div className="max-h-[56vh] space-y-5 overflow-y-auto pr-1">
             {releases.map((release) => (
-              <div key={release.version} className="border-l border-stone-200 pl-4 dark:border-white/10">
+              <div key={release.version} className="border-l border-zinc-200 pl-4 dark:border-white/10">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-semibold text-stone-950 dark:text-stone-100">
+                  <span className="text-sm font-semibold text-zinc-950 dark:text-zinc-100">
                     {release.version === "Unreleased" ? "未发布" : release.version}
                   </span>
-                  <span className="text-xs text-stone-500 dark:text-stone-400">{release.date}</span>
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400">{release.date}</span>
                   {release.version === latestVersion ? <Badge variant="success">最新</Badge> : null}
                   {release.version === webConfig.appVersion ? <Badge variant="outline">当前</Badge> : null}
                 </div>
                 <div className="mt-2 space-y-1.5">
                   {release.items.map((item, index) => (
-                    <div key={index} className="flex items-start gap-2 text-sm leading-6 text-stone-700 dark:text-stone-300">
+                    <div key={index} className="flex items-start gap-2 text-sm leading-6 text-zinc-700 dark:text-zinc-300">
                       <Badge variant={typeVariant(item.type)} className="mt-0.5 shrink-0">
                         {item.type}
                       </Badge>
@@ -167,12 +167,12 @@ function VersionCard({
   action?: ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-stone-200 bg-white/55 p-3 dark:border-white/10 dark:bg-white/5">
+    <div className="rounded-xl border border-zinc-200 bg-white/55 p-3 dark:border-white/10 dark:bg-white/5">
       <div className="flex items-center justify-between gap-2">
-        <div className="text-xs text-stone-500 dark:text-stone-400">{label}</div>
+        <div className="text-xs text-zinc-500 dark:text-zinc-400">{label}</div>
         {action}
       </div>
-      <div className="mt-1 text-base font-semibold text-stone-950 dark:text-stone-100">{value}</div>
+      <div className="mt-1 text-base font-semibold text-zinc-950 dark:text-zinc-100">{value}</div>
     </div>
   );
 }

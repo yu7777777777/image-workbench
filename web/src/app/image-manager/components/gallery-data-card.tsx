@@ -120,23 +120,23 @@ export function GalleryDataCard() {
     <Card className="rounded-2xl border-white/80 bg-white/90 shadow-sm">
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
-          <HardDrive className="size-5 text-stone-700" />
+          <HardDrive className="size-5 text-zinc-700" />
           <CardTitle className="text-base font-semibold">本地画廊数据管理</CardTitle>
         </div>
-        <CardDescription className="text-xs text-stone-500">
+        <CardDescription className="text-xs text-zinc-500">
           管理当前浏览器保存在本地的画廊历史记录、任务图片以及个人偏好配置，支持全量备份与迁移。
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="grid gap-4 md:grid-cols-3">
           {/* 导出 */}
-          <div className="flex flex-col justify-between rounded-xl border border-stone-200 bg-stone-50/50 p-4">
+          <div className="flex flex-col justify-between rounded-xl border border-zinc-200 bg-zinc-50/50 p-4">
             <div className="space-y-3">
-              <div className="flex items-center gap-2 font-medium text-stone-800 text-sm">
+              <div className="flex items-center gap-2 font-medium text-zinc-800 text-sm">
                 <Download className="size-4 text-blue-600" />
                 导出画廊数据
               </div>
-              <p className="text-xs text-stone-500 leading-5">
+              <p className="text-xs text-zinc-500 leading-5">
                 将当前浏览器的画廊任务、生成的图片以及偏好配置打包下载为 ZIP 备份文件。
               </p>
               <div className="flex flex-wrap gap-4 pt-1 text-xs">
@@ -151,7 +151,7 @@ export function GalleryDataCard() {
               </div>
             </div>
             <Button
-              className="mt-4 h-9 w-full rounded-xl bg-stone-900 text-xs text-white hover:bg-stone-800"
+              className="mt-4 h-9 w-full rounded-xl bg-zinc-900 text-xs text-white hover:bg-zinc-800"
               onClick={handleExport}
               disabled={isExporting || (!exportConfig && !exportTasks)}
             >
@@ -161,13 +161,13 @@ export function GalleryDataCard() {
           </div>
 
           {/* 导入 */}
-          <div className="flex flex-col justify-between rounded-xl border border-stone-200 bg-stone-50/50 p-4">
+          <div className="flex flex-col justify-between rounded-xl border border-zinc-200 bg-zinc-50/50 p-4">
             <div className="space-y-3">
-              <div className="flex items-center gap-2 font-medium text-stone-800 text-sm">
+              <div className="flex items-center gap-2 font-medium text-zinc-800 text-sm">
                 <Upload className="size-4 text-emerald-600" />
                 导入备份恢复
               </div>
-              <p className="text-xs text-stone-500 leading-5">
+              <p className="text-xs text-zinc-500 leading-5">
                 从先前导出的 ZIP 备份文件中恢复历史生图任务与偏好设置。
               </p>
               <div className="flex flex-wrap gap-4 pt-1 text-xs">
@@ -190,7 +190,7 @@ export function GalleryDataCard() {
             />
             <Button
               variant="outline"
-              className="mt-4 h-9 w-full rounded-xl border-stone-300 bg-white text-xs text-stone-800 hover:bg-stone-100"
+              className="mt-4 h-9 w-full rounded-xl border-zinc-300 bg-white text-xs text-zinc-800 hover:bg-zinc-100"
               onClick={() => fileInputRef.current?.click()}
               disabled={isImporting}
             >

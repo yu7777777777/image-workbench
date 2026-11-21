@@ -157,22 +157,22 @@ function LogsContent() {
     <section className="space-y-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="space-y-1">
-          <div className="text-xs font-semibold tracking-[0.18em] text-stone-500 uppercase">Logs</div>
+          <div className="text-xs font-semibold tracking-[0.18em] text-zinc-500 uppercase">Logs</div>
           <h1 className="text-2xl font-semibold tracking-tight">日志管理</h1>
         </div>
         <div className="flex flex-wrap gap-2">
           <Select value={type} onValueChange={setType}>
-            <SelectTrigger className="h-10 w-[150px] rounded-xl border-stone-200 bg-white"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-10 w-[150px] rounded-xl border-zinc-200 bg-white"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value={LogType.Call}>调用日志</SelectItem>
               <SelectItem value={LogType.Account}>账号管理日志</SelectItem>
             </SelectContent>
           </Select>
           <DateRangeFilter startDate={startDate} endDate={endDate} onChange={(start, end) => { setStartDate(start); setEndDate(end); }} />
-          <Button variant="outline" onClick={clearFilters} className="h-10 rounded-xl border-stone-200 bg-white px-4 text-stone-700">
+          <Button variant="outline" onClick={clearFilters} className="h-10 rounded-xl border-zinc-200 bg-white px-4 text-zinc-700">
             清除筛选条件
           </Button>
-          <Button onClick={() => void loadLogs()} disabled={isLoading} className="h-10 rounded-xl bg-stone-950 px-4 text-white hover:bg-stone-800">
+          <Button onClick={() => void loadLogs()} disabled={isLoading} className="h-10 rounded-xl bg-zinc-950 px-4 text-white hover:bg-zinc-800">
             {isLoading ? <LoaderCircle className="size-4 animate-spin" /> : <Search className="size-4" />}
             查询
           </Button>
@@ -181,8 +181,8 @@ function LogsContent() {
 
       <Card className="overflow-hidden rounded-2xl border-white/80 bg-white/90 shadow-sm">
         <CardContent className="p-0">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 px-5 py-4">
-            <div className="flex flex-wrap items-center gap-3 text-sm text-stone-600">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-5 py-4">
+            <div className="flex flex-wrap items-center gap-3 text-sm text-zinc-600">
               <span>共 {items.length} 条</span>
               <label className="flex items-center gap-2">
                 <Checkbox checked={currentPageSelected} onCheckedChange={(checked) => toggleIds(currentRows.map((item) => item.id), Boolean(checked))} />
@@ -198,7 +198,7 @@ function LogsContent() {
               {type === LogType.Account ? (
                 <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1">
                   <span className="text-xs text-amber-800">清理</span>
-                  <input aria-label="清理多少天前的账号管理日志" type="number" min={1} value={cleanupDays} onChange={(event) => setCleanupDays(event.target.value)} className="h-7 w-16 rounded-md border border-amber-200 bg-white px-2 text-xs text-stone-700" />
+                  <input aria-label="清理多少天前的账号管理日志" type="number" min={1} value={cleanupDays} onChange={(event) => setCleanupDays(event.target.value)} className="h-7 w-16 rounded-md border border-amber-200 bg-white px-2 text-xs text-zinc-700" />
                   <span className="text-xs text-amber-800">天前</span>
                   <Button variant="outline" className="h-7 rounded-md border-amber-300 bg-white px-2 text-xs text-amber-800 hover:bg-amber-100" onClick={() => void cleanupOldAccountLogs()} disabled={isCleaning || isLoading}>
                     {isCleaning ? <LoaderCircle className="size-3 animate-spin" /> : null}
@@ -206,11 +206,11 @@ function LogsContent() {
                   </Button>
                 </div>
               ) : null}
-              <Button variant="ghost" className="h-8 rounded-lg px-3 text-stone-500" onClick={() => void loadLogs()} disabled={isLoading}>
+              <Button variant="ghost" className="h-8 rounded-lg px-3 text-zinc-500" onClick={() => void loadLogs()} disabled={isLoading}>
                 <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} />
                 刷新
               </Button>
-              <button type="button" className="text-sm text-stone-500 hover:text-stone-900 disabled:text-stone-300" onClick={() => setSelectedIds([])} disabled={selectedIds.length === 0 || isDeleting}>
+              <button type="button" className="text-sm text-zinc-500 hover:text-zinc-900 disabled:text-zinc-300" onClick={() => setSelectedIds([])} disabled={selectedIds.length === 0 || isDeleting}>
                 取消选择
               </button>
               <Button variant="outline" className="h-8 rounded-lg border-rose-200 bg-white px-3 text-rose-600 hover:bg-rose-50" onClick={() => setDeletingItems(items.filter((item) => selectedSet.has(item.id)))} disabled={selectedIds.length === 0 || isDeleting}>
@@ -238,7 +238,7 @@ function LogsContent() {
                 {currentRows.map((item) => {
                   const urls = getUrls(item);
                   return (
-                    <TableRow key={item.id} className="text-stone-600">
+                    <TableRow key={item.id} className="text-zinc-600">
                       <TableCell>
                         <Checkbox checked={selectedSet.has(item.id)} onCheckedChange={(checked) => toggleIds([item.id], Boolean(checked))} />
                       </TableCell>
@@ -261,27 +261,27 @@ function LogsContent() {
                                 <button
                                   key={`${url}-${imageIndex}`}
                                   type="button"
-                                  className="relative size-9 overflow-hidden rounded-lg border border-stone-200 bg-stone-100"
+                                  className="relative size-9 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-100"
                                   onClick={() => openLogImage(item, imageIndex)}
                                   title="预览图片"
                                 >
                                   <ImageThumbnail src={url} thumbnailSrc={getImageThumbnailUrl(url)} className="h-full w-full" />
                                 </button>
                               ))}
-                              {urls.length > 3 ? <span className="text-xs text-stone-400">+{urls.length - 3}</span> : null}
+                              {urls.length > 3 ? <span className="text-xs text-zinc-400">+{urls.length - 3}</span> : null}
                             </div>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-xs text-stone-400">
+                            <span className="inline-flex items-center gap-1 text-xs text-zinc-400">
                               <ImageIcon className="size-3.5" />
                               -
                             </span>
                           )}
                         </TableCell>
                       ) : null}
-                      <TableCell className="max-w-[420px] truncate text-stone-500">{item.summary || "-"}</TableCell>
+                      <TableCell className="max-w-[420px] truncate text-zinc-500">{item.summary || "-"}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <Button variant="ghost" className="h-8 rounded-lg px-3 text-stone-600" onClick={() => openDetail(item)}>
+                          <Button variant="ghost" className="h-8 rounded-lg px-3 text-zinc-600" onClick={() => openDetail(item)}>
                             查看详情
                           </Button>
                           <Button variant="ghost" className="h-8 rounded-lg px-3 text-rose-600 hover:bg-rose-50 hover:text-rose-700" onClick={() => setDeletingItems([item])}>
@@ -295,32 +295,32 @@ function LogsContent() {
               </TableBody>
             </Table>
           </div>
-          <div className="flex items-center justify-end gap-2 border-t border-stone-100 px-4 py-3 text-sm text-stone-500">
+          <div className="flex items-center justify-end gap-2 border-t border-zinc-100 px-4 py-3 text-sm text-zinc-500">
             <span>第 {safePage} / {pageCount} 页，共 {items.length} 条</span>
-            <Button variant="outline" size="icon" className="size-9 rounded-lg border-stone-200 bg-white" disabled={safePage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>
+            <Button variant="outline" size="icon" className="size-9 rounded-lg border-zinc-200 bg-white" disabled={safePage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>
               <ChevronLeft className="size-4" />
             </Button>
-            <Button variant="outline" size="icon" className="size-9 rounded-lg border-stone-200 bg-white" disabled={safePage >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>
+            <Button variant="outline" size="icon" className="size-9 rounded-lg border-zinc-200 bg-white" disabled={safePage >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>
               <ChevronRight className="size-4" />
             </Button>
           </div>
-          {!isLoading && items.length === 0 ? <div className="px-6 py-14 text-center text-sm text-stone-500">没有找到日志</div> : null}
+          {!isLoading && items.length === 0 ? <div className="px-6 py-14 text-center text-sm text-zinc-500">没有找到日志</div> : null}
         </CardContent>
       </Card>
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
         <DialogContent className="flex h-[min(88vh,860px)] w-[min(92vw,920px)] flex-col overflow-hidden rounded-2xl p-0">
-          <DialogHeader className="shrink-0 border-b border-stone-100 px-6 py-5">
+          <DialogHeader className="shrink-0 border-b border-zinc-100 px-6 py-5">
             <DialogTitle>日志详情</DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto px-6 py-5">
             <div className="space-y-4">
-              <div className="grid gap-3 rounded-xl border border-stone-200 bg-white p-4 text-sm text-stone-600 md:grid-cols-2">
+              <div className="grid gap-3 rounded-xl border border-zinc-200 bg-white p-4 text-sm text-zinc-600 md:grid-cols-2">
                 {Object.entries(detailLog?.detail || {})
                   .filter(([key, value]) => key !== "urls" && typeof value !== "object")
                   .map(([key, value]) => (
                     <div key={key} className="flex items-start justify-between gap-4">
-                      <span className="text-stone-400">{key}</span>
-                      <span className="text-right font-medium break-all text-stone-700">{String(value)}</span>
+                      <span className="text-zinc-400">{key}</span>
+                      <span className="text-right font-medium break-all text-zinc-700">{String(value)}</span>
                     </div>
                   ))}
               </div>
@@ -330,7 +330,7 @@ function LogsContent() {
                     <button
                       key={url}
                       type="button"
-                      className="aspect-square overflow-hidden rounded-xl border border-stone-200 bg-stone-100"
+                      className="aspect-square overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100"
                       onClick={() => {
                         setLightboxIndex(index);
                         setLightboxOpen(true);
@@ -341,7 +341,7 @@ function LogsContent() {
                   ))}
                 </div>
               ) : null}
-              <pre className="max-h-[72vh] overflow-auto rounded-xl border border-stone-200 bg-stone-50 p-4 text-xs leading-6 text-stone-700">
+              <pre className="max-h-[72vh] overflow-auto rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-xs leading-6 text-zinc-700">
                 {JSON.stringify(detailLog?.detail || {}, null, 2)}
               </pre>
             </div>
@@ -381,7 +381,7 @@ function LogsContent() {
 export default function LogsPage() {
   const { isCheckingAuth, session } = useAuthGuard(["admin"]);
   if (isCheckingAuth || !session || session.role !== "admin") {
-    return <div className="flex min-h-[40vh] items-center justify-center"><LoaderCircle className="size-5 animate-spin text-stone-400" /></div>;
+    return <div className="flex min-h-[40vh] items-center justify-center"><LoaderCircle className="size-5 animate-spin text-zinc-400" /></div>;
   }
   return <LogsContent />;
 }

@@ -26,6 +26,7 @@ export const CanvasAgentPanel = memo(function CanvasAgentPanel({ isOpen, onClose
         <button
           type="button"
           onClick={onClose}
+          aria-label="关闭 AI 助手"
           className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
         >
           <CloseIcon />
@@ -57,6 +58,7 @@ export const CanvasAgentPanel = memo(function CanvasAgentPanel({ isOpen, onClose
           />
           <button
             type="button"
+            aria-label="发送消息"
             className="p-2 rounded-xl bg-blue-500/80 text-white hover:bg-blue-500 transition-colors disabled:opacity-40"
             disabled={!inputValue.trim()}
           >

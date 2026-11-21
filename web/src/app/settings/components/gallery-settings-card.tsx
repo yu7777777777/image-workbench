@@ -162,7 +162,7 @@ export function GallerySettingsCard({ showSharedProfiles = true }: { showSharedP
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Palette className="size-5 text-stone-700" />
+              <Palette className="size-5 text-zinc-700" />
               <CardTitle className="text-base font-semibold">画廊生图习惯配置</CardTitle>
             </div>
             {isSaved && (
@@ -172,105 +172,105 @@ export function GallerySettingsCard({ showSharedProfiles = true }: { showSharedP
               </span>
             )}
           </div>
-          <CardDescription className="text-xs text-stone-500">
+          <CardDescription className="text-xs text-zinc-500">
             自定义画廊与 Agent 工作台的按键交互、输入框行为、重试及优化策略。
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="flex items-start gap-3 rounded-xl border border-stone-200 bg-stone-50/50 p-3.5 cursor-pointer transition hover:bg-stone-50">
+            <label className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50/50 p-3.5 cursor-pointer transition hover:bg-zinc-50">
               <Checkbox
                 checked={settings.enterSubmit}
                 onCheckedChange={(v) => updateSetting("enterSubmit", Boolean(v))}
                 className="mt-0.5"
               />
               <div className="space-y-1">
-                <span className="text-sm font-medium text-stone-800">按 Enter 发送提示词</span>
-                <p className="text-xs text-stone-500">
+                <span className="text-sm font-medium text-zinc-800">按 Enter 发送提示词</span>
+                <p className="text-xs text-zinc-500">
                   开启后按 Enter 直接提交生成，Shift + Enter 换行；关闭后按 Ctrl/Cmd + Enter 提交。
                 </p>
               </div>
             </label>
 
-            <label className="flex items-start gap-3 rounded-xl border border-stone-200 bg-stone-50/50 p-3.5 cursor-pointer transition hover:bg-stone-50">
+            <label className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50/50 p-3.5 cursor-pointer transition hover:bg-zinc-50">
               <Checkbox
                 checked={settings.clearInputAfterSubmit}
                 onCheckedChange={(v) => updateSetting("clearInputAfterSubmit", Boolean(v))}
                 className="mt-0.5"
               />
               <div className="space-y-1">
-                <span className="text-sm font-medium text-stone-800">提交任务后清空输入框</span>
-                <p className="text-xs text-stone-500">
+                <span className="text-sm font-medium text-zinc-800">提交任务后清空输入框</span>
+                <p className="text-xs text-zinc-500">
                   开启后，提交成功创建任务时会自动清空提示词和参考图。
                 </p>
               </div>
             </label>
 
-            <label className="flex items-start gap-3 rounded-xl border border-stone-200 bg-stone-50/50 p-3.5 cursor-pointer transition hover:bg-stone-50">
+            <label className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50/50 p-3.5 cursor-pointer transition hover:bg-zinc-50">
               <Checkbox
                 checked={settings.persistInputOnRestart}
                 onCheckedChange={(v) => updateSetting("persistInputOnRestart", Boolean(v))}
                 className="mt-0.5"
               />
               <div className="space-y-1">
-                <span className="text-sm font-medium text-stone-800">重启后加载上次的输入框</span>
-                <p className="text-xs text-stone-500">
+                <span className="text-sm font-medium text-zinc-800">重启后加载上次的输入框</span>
+                <p className="text-xs text-zinc-500">
                   关闭后不再持久化提示词与参考图，下次启动页面时将使用空输入框。
                 </p>
               </div>
             </label>
 
-            <label className="flex items-start gap-3 rounded-xl border border-stone-200 bg-stone-50/50 p-3.5 cursor-pointer transition hover:bg-stone-50">
+            <label className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50/50 p-3.5 cursor-pointer transition hover:bg-zinc-50">
               <Checkbox
                 checked={settings.reuseTaskApiProfileTemporarily}
                 onCheckedChange={(v) => updateSetting("reuseTaskApiProfileTemporarily", Boolean(v))}
                 className="mt-0.5"
               />
               <div className="space-y-1">
-                <span className="text-sm font-medium text-stone-800">复用配置时临时复用该任务的 API 配置</span>
-                <p className="text-xs text-stone-500">
+                <span className="text-sm font-medium text-zinc-800">复用配置时临时复用该任务的 API 配置</span>
+                <p className="text-xs text-zinc-500">
                   开启后复用历史任务时会临时使用该任务的 API 配置；关闭后继续使用当前的 API 配置。
                 </p>
               </div>
             </label>
 
-            <label className="flex items-start gap-3 rounded-xl border border-stone-200 bg-stone-50/50 p-3.5 cursor-pointer transition hover:bg-stone-50">
+            <label className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50/50 p-3.5 cursor-pointer transition hover:bg-zinc-50">
               <Checkbox
                 checked={settings.alwaysShowRetryButton}
                 onCheckedChange={(v) => updateSetting("alwaysShowRetryButton", Boolean(v))}
                 className="mt-0.5"
               />
               <div className="space-y-1">
-                <span className="text-sm font-medium text-stone-800">成功任务仍然展示重试按钮</span>
-                <p className="text-xs text-stone-500">
+                <span className="text-sm font-medium text-zinc-800">成功任务仍然展示重试按钮</span>
+                <p className="text-xs text-zinc-500">
                   开启后，即使任务成功生成，也会在任务卡片和详情页显示重试按钮。
                 </p>
               </div>
             </label>
 
-            <label className="flex items-start gap-3 rounded-xl border border-stone-200 bg-stone-50/50 p-3.5 cursor-pointer transition hover:bg-stone-50">
+            <label className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50/50 p-3.5 cursor-pointer transition hover:bg-zinc-50">
               <Checkbox
                 checked={settings.allowPromptRewrite}
                 onCheckedChange={(v) => updateSetting("allowPromptRewrite", Boolean(v))}
                 className="mt-0.5"
               />
               <div className="space-y-1">
-                <span className="text-sm font-medium text-stone-800">允许模型改写优化提示词</span>
-                <p className="text-xs text-stone-500">
+                <span className="text-sm font-medium text-zinc-800">允许模型改写优化提示词</span>
+                <p className="text-xs text-zinc-500">
                   开启后，不再附加防改写提示词，允许模型按服务商策略优化提示词生成效果。
                 </p>
               </div>
             </label>
 
-            <label className="flex items-start gap-3 rounded-xl border border-stone-200 bg-stone-50/50 p-3.5 cursor-pointer transition hover:bg-stone-50">
+            <label className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50/50 p-3.5 cursor-pointer transition hover:bg-zinc-50">
               <Checkbox
                 checked={settings.taskCompletionNotification}
                 onCheckedChange={(v) => updateSetting("taskCompletionNotification", Boolean(v))}
                 className="mt-0.5"
               />
               <div className="space-y-1">
-                <span className="text-sm font-medium text-stone-800">任务完成后发送系统通知</span>
-                <p className="text-xs text-stone-500">
+                <span className="text-sm font-medium text-zinc-800">任务完成后发送系统通知</span>
+                <p className="text-xs text-zinc-500">
                   开启后，图像生成完成或 Agent 回复结束时发送浏览器系统级通知提醒。
                 </p>
               </div>
@@ -286,18 +286,18 @@ export function GallerySettingsCard({ showSharedProfiles = true }: { showSharedP
             <Sparkles className="size-5 text-indigo-600" />
             <CardTitle className="text-base font-semibold">Agent 配置</CardTitle>
           </div>
-          <CardDescription className="text-xs text-stone-500">
+          <CardDescription className="text-xs text-zinc-500">
             配置 Agent 对话模式的接口方式、联网搜索与生图助手的执行轮次。具体使用哪个对话 / 生图模型，请在画廊「对话」模式的输入栏里选择。
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="space-y-2 max-w-md">
-            <Label className="text-xs font-medium text-stone-700">Agent API 模式</Label>
+            <Label className="text-xs font-medium text-zinc-700">Agent API 模式</Label>
             <Select
               value={settings.agentApiConfigMode}
               onValueChange={(val: "off" | "single" | "hybrid") => updateSetting("agentApiConfigMode", val)}
             >
-              <SelectTrigger className="h-9 rounded-xl border-stone-200 bg-white">
+              <SelectTrigger className="h-9 rounded-xl border-zinc-200 bg-white">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="rounded-xl">
@@ -306,13 +306,13 @@ export function GallerySettingsCard({ showSharedProfiles = true }: { showSharedP
                 <SelectItem value="off">关闭 Agent 独立接口</SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-xs text-stone-500">
+            <p className="text-xs text-zinc-500">
               默认混合模式：在画廊「对话」模式输入栏选择对话与生图模型，默认即「本站账号池 (Agent)」与「本站账号池」，直接用登录账号，无需填写 API Key。
             </p>
           </div>
 
-          <div className="space-y-1.5 max-w-md rounded-xl border border-stone-200 bg-stone-50/50 p-3.5">
-            <Label className="text-xs font-medium text-stone-700">可用对话模型</Label>
+          <div className="space-y-1.5 max-w-md rounded-xl border border-zinc-200 bg-zinc-50/50 p-3.5">
+            <Label className="text-xs font-medium text-zinc-700">可用对话模型</Label>
             {chatProfileNames.length > 0 ? (
               <div className="flex flex-wrap gap-1.5">
                 {chatProfileNames.map((name) => (
@@ -329,31 +329,31 @@ export function GallerySettingsCard({ showSharedProfiles = true }: { showSharedP
             )}
           </div>
 
-          <label className="flex items-start gap-3 rounded-xl border border-stone-200 bg-stone-50/50 p-3.5 cursor-pointer transition hover:bg-stone-50 max-w-md">
+          <label className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50/50 p-3.5 cursor-pointer transition hover:bg-zinc-50 max-w-md">
             <Checkbox
               checked={settings.agentWebSearch}
               onCheckedChange={(v) => updateSetting("agentWebSearch", Boolean(v))}
               className="mt-0.5"
             />
             <div className="space-y-1">
-              <span className="text-sm font-medium text-stone-800">Agent 联网搜索增强</span>
-              <p className="text-xs text-stone-500">
+              <span className="text-sm font-medium text-zinc-800">Agent 联网搜索增强</span>
+              <p className="text-xs text-zinc-500">
                 开启后，Agent 可在对话中联网检索最新画风、流行词及上下文参考资料。
               </p>
             </div>
           </label>
 
           <div className="space-y-2 max-w-md">
-            <Label className="text-xs font-medium text-stone-700">最大工具调用轮次</Label>
+            <Label className="text-xs font-medium text-zinc-700">最大工具调用轮次</Label>
             <Input
               type="number"
               min={1}
               max={30}
               value={settings.agentMaxToolRounds}
               onChange={(e) => updateSetting("agentMaxToolRounds", Number(e.target.value) || 10)}
-              className="h-9 rounded-xl border-stone-200 bg-white"
+              className="h-9 rounded-xl border-zinc-200 bg-white"
             />
-            <p className="text-xs text-stone-500">
+            <p className="text-xs text-zinc-500">
               单次任务中 Agent 连续调用工具（如修改提示词、二次出图）的最大次数，默认 10。
             </p>
           </div>
@@ -699,7 +699,7 @@ function SharedProfilesSection() {
                 {profiles.length} 个配置
               </Badge>
             </div>
-            <CardDescription className="text-xs text-stone-500">
+            <CardDescription className="text-xs text-zinc-500">
               管理员可在此配置供全站所有普通用户共用的外部对话或生图模型（支持 OpenAI 规范模型、Fal.ai FLUX / SD、三方中转等）。开启后普通用户免配置直接可选使用。
             </CardDescription>
           </div>
@@ -719,10 +719,10 @@ function SharedProfilesSection() {
               { label: "已启用", value: enabledCount, tone: "text-emerald-600" },
               { label: "对话", value: chatCount, tone: "text-blue-600" },
               { label: "生图", value: imageCount, tone: "text-purple-600" },
-              { label: "已停用", value: profiles.length - enabledCount, tone: "text-stone-500" },
+              { label: "已停用", value: profiles.length - enabledCount, tone: "text-zinc-500" },
             ].map((stat) => (
-              <div key={stat.label} className="rounded-lg border border-stone-100 bg-stone-50/70 px-3 py-2">
-                <p className="text-[10px] text-stone-400">{stat.label}</p>
+              <div key={stat.label} className="rounded-lg border border-zinc-100 bg-zinc-50/70 px-3 py-2">
+                <p className="text-[10px] text-zinc-400">{stat.label}</p>
                 <p className={`mt-0.5 text-lg font-semibold ${stat.tone}`}>{stat.value}</p>
               </div>
             ))}
@@ -731,10 +731,10 @@ function SharedProfilesSection() {
       </CardHeader>
       <CardContent>
         {profiles.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-stone-200 p-8 text-center bg-stone-50/50">
-            <Globe className="size-8 text-stone-300 mb-2" />
-            <p className="text-sm font-medium text-stone-600">暂未配置全站共享模型</p>
-            <p className="text-xs text-stone-400 mt-1 max-w-sm">
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-zinc-200 p-8 text-center bg-zinc-50/50">
+            <Globe className="size-8 text-zinc-300 mb-2" />
+            <p className="text-sm font-medium text-zinc-600">暂未配置全站共享模型</p>
+            <p className="text-xs text-zinc-400 mt-1 max-w-sm">
               添加后，所有普通用户登录系统后即可在画廊及 Agent 下拉菜单中直接选择使用。
             </p>
             <Button
@@ -752,7 +752,7 @@ function SharedProfilesSection() {
           <>
             <div className="mb-3 flex flex-col gap-2 sm:flex-row">
               <div className="relative flex-1">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-stone-400" />
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-zinc-400" />
                 <Input
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
@@ -793,25 +793,25 @@ function SharedProfilesSection() {
                 {isTestingVisible ? "测试中" : "测试当前列表"}
               </Button>
             </div>
-            <p className="mb-3 text-[11px] text-stone-400">
+            <p className="mb-3 text-[11px] text-zinc-400">
               测试会检查接口连通性和模型目录，不会实际发起对话或生图请求，也不会消耗额度。
             </p>
-            <div className="divide-y divide-stone-100 rounded-xl border border-stone-200 overflow-hidden bg-white">
+            <div className="divide-y divide-zinc-100 rounded-xl border border-zinc-200 overflow-hidden bg-white">
             {Object.entries(groupedProfiles).map(([groupName, entries]) => (
               <div key={groupName}>
-                <div className="flex items-center justify-between border-b border-stone-100 bg-stone-50/80 px-4 py-2">
+                <div className="flex items-center justify-between border-b border-zinc-100 bg-zinc-50/80 px-4 py-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-stone-700">{groupName}</span>
+                    <span className="text-xs font-semibold text-zinc-700">{groupName}</span>
                     <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">{entries.length}</Badge>
                   </div>
-                  <span className="text-[10px] text-stone-400">
+                  <span className="text-[10px] text-zinc-400">
                     {entries.filter(({ item }) => item.enabled !== false).length} 个启用
                   </span>
                 </div>
                 {entries.map(({ item, index: idx }) => (
               <div
                 key={item.id || idx}
-                className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 gap-3 hover:bg-stone-50/70 transition"
+                className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 gap-3 hover:bg-zinc-50/70 transition"
               >
                 <div className="flex items-start sm:items-center gap-3 min-w-0">
                   <div
@@ -823,7 +823,7 @@ function SharedProfilesSection() {
                   </div>
                   <div className="min-w-0 space-y-0.5">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium text-stone-800 truncate">{item.name}</span>
+                      <span className="text-sm font-medium text-zinc-800 truncate">{item.name}</span>
                       <Badge
                         variant="outline"
                         className={
@@ -834,14 +834,14 @@ function SharedProfilesSection() {
                       >
                         {item.role === "chat" ? "对话模型" : "生图模型"}
                       </Badge>
-                      <Badge variant="outline" className="text-stone-500 border-stone-200 text-[10px] px-1.5 py-0">
+                      <Badge variant="outline" className="text-zinc-500 border-zinc-200 text-[10px] px-1.5 py-0">
                         {item.provider === "fal" ? "Fal.ai" : item.provider === "custom" ? "自定义" : "OpenAI 兼容"}
                       </Badge>
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-stone-400 truncate">
-                      <span className="font-mono text-stone-500">{item.model}</span>
+                    <div className="flex items-center gap-3 text-xs text-zinc-400 truncate">
+                      <span className="font-mono text-zinc-500">{item.model}</span>
                       {item.base_url && <span className="truncate max-w-[200px]">{item.base_url}</span>}
-                      {item.description && <span className="text-stone-400">· {item.description}</span>}
+                      {item.description && <span className="text-zinc-400">· {item.description}</span>}
                     </div>
                     {testResults[item.id] && (
                       <p className={`text-[11px] ${testResults[item.id].ok ? "text-emerald-600" : "text-rose-500"}`}>
@@ -852,7 +852,7 @@ function SharedProfilesSection() {
                 </div>
 
                 <div className="flex items-center gap-3 self-end sm:self-auto shrink-0">
-                  <label className="flex items-center gap-1.5 text-xs text-stone-600 cursor-pointer select-none">
+                  <label className="flex items-center gap-1.5 text-xs text-zinc-600 cursor-pointer select-none">
                     <Checkbox
                       checked={item.enabled !== false}
                       onCheckedChange={() => handleToggleEnabled(idx)}
@@ -860,7 +860,7 @@ function SharedProfilesSection() {
                     <span>{item.enabled !== false ? "已启用" : "已禁用"}</span>
                   </label>
 
-                  <div className="h-4 w-px bg-stone-200" />
+                  <div className="h-4 w-px bg-zinc-200" />
 
                   <Button
                     type="button"
@@ -880,7 +880,7 @@ function SharedProfilesSection() {
                     variant="ghost"
                     size="sm"
                     onClick={() => handleOpenEdit(idx)}
-                    className="h-7 w-7 p-0 text-stone-500 hover:text-stone-800"
+                    className="h-7 w-7 p-0 text-zinc-500 hover:text-zinc-800"
                     title="编辑"
                   >
                     <Edit2 className="size-3.5" />
@@ -902,9 +902,9 @@ function SharedProfilesSection() {
             ))}
             {filteredProfiles.length === 0 && (
               <div className="px-4 py-8 text-center">
-                <Search className="mx-auto size-5 text-stone-300" />
-                <p className="mt-2 text-xs font-medium text-stone-600">没有匹配的共享模型</p>
-                <p className="mt-1 text-[11px] text-stone-400">试试清空搜索词或切换筛选条件。</p>
+                <Search className="mx-auto size-5 text-zinc-300" />
+                <p className="mt-2 text-xs font-medium text-zinc-600">没有匹配的共享模型</p>
+                <p className="mt-1 text-[11px] text-zinc-400">试试清空搜索词或切换筛选条件。</p>
               </div>
             )}
             </div>
@@ -992,7 +992,7 @@ function SharedProfilesSection() {
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label className="text-xs font-medium text-stone-700">
+                <Label className="text-xs font-medium text-zinc-700">
                   {showMultiSelect ? `模型列表（勾选要添加的，共 ${fetchedModels.length} 个）` : "模型名称 / ID (Model)"}
                 </Label>
                 <div className="flex items-center gap-2">
@@ -1000,7 +1000,7 @@ function SharedProfilesSection() {
                     <button
                       type="button"
                       onClick={() => setCustomModelInput(!customModelInput)}
-                      className="text-[11px] text-stone-500 hover:text-stone-800 underline"
+                      className="text-[11px] text-zinc-500 hover:text-zinc-800 underline"
                     >
                       {customModelInput ? "回到多选列表" : "手动输入单个"}
                     </button>
@@ -1024,10 +1024,10 @@ function SharedProfilesSection() {
               </div>
 
               {showMultiSelect ? (
-                <div className="rounded-lg border border-stone-200 overflow-hidden">
+                <div className="rounded-lg border border-zinc-200 overflow-hidden">
                   {/* 全选 bar */}
-                  <div className="flex items-center justify-between px-3 py-2 bg-stone-50 border-b border-stone-100">
-                    <label className="flex items-center gap-2 cursor-pointer text-xs text-stone-600 select-none">
+                  <div className="flex items-center justify-between px-3 py-2 bg-zinc-50 border-b border-zinc-100">
+                    <label className="flex items-center gap-2 cursor-pointer text-xs text-zinc-600 select-none">
                       <Checkbox
                         checked={allChecked}
                         onCheckedChange={handleToggleAll}
@@ -1039,29 +1039,29 @@ function SharedProfilesSection() {
                         </span>
                       )}
                     </label>
-                    <span className="text-[10px] text-stone-400">勾选 → 设置角色 → 保存</span>
+                    <span className="text-[10px] text-zinc-400">勾选 → 设置角色 → 保存</span>
                   </div>
                   {/* 模型列表 */}
-                  <div className="max-h-52 overflow-y-auto divide-y divide-stone-100">
+                  <div className="max-h-52 overflow-y-auto divide-y divide-zinc-100">
                     {fetchedModels.map((m) => {
                       const entry = multiSelect[m];
                       if (!entry) return null;
                       return (
                         <div
                           key={m}
-                          className={`flex items-center gap-2 px-3 py-2 transition ${entry.checked ? "bg-indigo-50/60" : "hover:bg-stone-50"}`}
+                          className={`flex items-center gap-2 px-3 py-2 transition ${entry.checked ? "bg-indigo-50/60" : "hover:bg-zinc-50"}`}
                         >
                           <Checkbox
                             checked={entry.checked}
                             onCheckedChange={() => handleToggleModel(m)}
                           />
-                          <span className="font-mono text-[11px] text-stone-700 flex-1 min-w-0 truncate" title={m}>{m}</span>
+                          <span className="font-mono text-[11px] text-zinc-700 flex-1 min-w-0 truncate" title={m}>{m}</span>
                           {entry.checked && (
                             <>
                               <select
                                 value={entry.role}
                                 onChange={(e) => handleMultiRole(m, e.target.value as "chat" | "image")}
-                                className="text-[10px] rounded border border-stone-200 px-1 py-0.5 bg-white text-stone-600 focus:outline-none focus:border-indigo-300 shrink-0"
+                                className="text-[10px] rounded border border-zinc-200 px-1 py-0.5 bg-white text-zinc-600 focus:outline-none focus:border-indigo-300 shrink-0"
                               >
                                 <option value="chat">对话</option>
                                 <option value="image">生图</option>
@@ -1070,7 +1070,7 @@ function SharedProfilesSection() {
                                 value={entry.displayName}
                                 onChange={(e) => handleMultiName(m, e.target.value)}
                                 placeholder="显示名称"
-                                className="text-[10px] rounded border border-stone-200 px-1.5 py-0.5 bg-white text-stone-700 w-28 shrink-0 focus:outline-none focus:border-indigo-300"
+                                className="text-[10px] rounded border border-zinc-200 px-1.5 py-0.5 bg-white text-zinc-700 w-28 shrink-0 focus:outline-none focus:border-indigo-300"
                               />
                             </>
                           )}
@@ -1113,13 +1113,13 @@ function SharedProfilesSection() {
                   )}
 
                   <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                    <span className="text-[10px] text-stone-400">常用推荐:</span>
+                    <span className="text-[10px] text-zinc-400">常用推荐:</span>
                     {(role === "chat" ? chatPresetModels : imagePresetModels).map((pm) => (
                       <button
                         key={pm}
                         type="button"
                         onClick={() => handleSelectModel(pm)}
-                        className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-stone-100 text-stone-600 hover:bg-indigo-50 hover:text-indigo-600 transition"
+                        className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-600 hover:bg-indigo-50 hover:text-indigo-600 transition"
                       >
                         {pm}
                       </button>
@@ -1172,7 +1172,7 @@ function SharedProfilesSection() {
                 checked={enabled}
                 onCheckedChange={(v) => setEnabled(Boolean(v))}
               />
-              <span className="text-xs font-medium text-stone-700">立即启用该共享模型给全站用户</span>
+              <span className="text-xs font-medium text-zinc-700">立即启用该共享模型给全站用户</span>
             </label>
 
             <DialogFooter className="pt-2">

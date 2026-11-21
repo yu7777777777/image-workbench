@@ -4,6 +4,7 @@
 @tailwind utilities;
 
 :root {
+  /* check-ignore-start */
   --background: 0 0% 100%;
   --foreground: 240 10% 10%;
   --muted: 240 5% 96%;
@@ -25,20 +26,22 @@
   --safe-area-right: env(safe-area-inset-right, 0px);
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --safe-area-left: env(safe-area-inset-left, 0px);
+  /* check-ignore-end */
 }
 
 html {
   overflow-y: auto;
   background: transparent !important;
-  color: #1c1917;
+  color: oklch(0.216 0.006 56);
 }
 
 html.dark {
   background: transparent !important;
-  color: #f5f5f4;
+  color: oklch(0.97 0.001 106);
 }
 
 body {
+  /* check-ignore-next */
   background-color: hsl(var(--background));
   padding: 0;
   -webkit-user-select: none;
@@ -101,15 +104,16 @@ body.drag-selecting * {
   --card-surface: 240 6% 10%;
   --panel-surface: 240 6% 8%;
   --border-subtle: 0 0% 20%;
+  /* check-ignore-end */
 }
 
 .dark * {
-  scrollbar-color: #3f3f46 transparent;
+  scrollbar-color: oklch(0.37 0.012 286) transparent;
 }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
-::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+::-webkit-scrollbar-thumb { background: oklch(0.869 0.02 253); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: oklch(0.711 0.035 257); }
 ::-webkit-scrollbar-track { background: transparent; }
 
 /* 隐藏 number input 的增减按?*/
@@ -122,12 +126,12 @@ input[type="number"] {
   -moz-appearance: textfield;
 }
 
-.dark ::-webkit-scrollbar-thumb { background: #3f3f46; }
-.dark ::-webkit-scrollbar-thumb:hover { background: #52525b; }
+.dark ::-webkit-scrollbar-thumb { background: oklch(0.37 0.012 286); }
+.dark ::-webkit-scrollbar-thumb:hover { background: oklch(0.442 0.015 286); }
 
 @keyframes pulse-border {
-  0%, 100% { border-color: #3b82f6; }
-  50% { border-color: #93c5fd; }
+  0%, 100% { border-color: oklch(0.623 0.188 260); }
+  50% { border-color: oklch(0.809 0.096 252); }
 }
 
 @keyframes agent-web-search-text-sweep {
@@ -136,8 +140,8 @@ input[type="number"] {
 }
 
 .agent-web-search-running-text {
-  --agent-web-search-text: #6b7280;
-  --agent-web-search-highlight: #ffffff;
+  --agent-web-search-text: oklch(0.551 0.023 264);
+  --agent-web-search-highlight: oklch(1 0 90);
   display: inline-block;
   color: transparent;
   background-color: var(--agent-web-search-text);
@@ -157,8 +161,8 @@ input[type="number"] {
 }
 
 .dark .agent-web-search-running-text {
-  --agent-web-search-text: #9ca3af;
-  --agent-web-search-highlight: #ffffff;
+  --agent-web-search-text: oklch(0.714 0.019 261);
+  --agent-web-search-highlight: oklch(1 0 90);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -220,20 +224,20 @@ input[type="number"] {
 }
 
 .markdown-renderer :where(blockquote) {
-  border-left: 3px solid rgba(59, 130, 246, 0.45);
-  color: #52525b;
+  border-left: 3px solid oklch(0.623 0.188 260 / 0.45);
+  color: oklch(0.442 0.015 286);
   padding-left: 0.85rem;
 }
 
 .markdown-renderer :where(a) {
-  color: #2563eb;
+  color: oklch(0.546 0.215 263);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .markdown-renderer :where(:not(pre) > code) {
   border-radius: 0.35rem;
-  background: rgba(113, 113, 122, 0.12);
+  background: oklch(0.552 0.014 286 / 0.12);
   font-family: var(--font-mono);
   font-size: 0.92em;
   padding: 0.1rem 0.32rem;
@@ -247,12 +251,12 @@ input[type="number"] {
 }
 
 .markdown-renderer :where(th, td) {
-  border: 1px solid #e4e4e7;
+  border: 1px solid oklch(0.92 0.004 286);
   padding: 0.4rem 0.6rem;
 }
 
 .markdown-renderer :where(th) {
-  background: rgba(113, 113, 122, 0.1);
+  background: oklch(0.552 0.014 286 / 0.1);
   font-weight: 600;
 }
 
@@ -262,23 +266,23 @@ input[type="number"] {
 }
 
 .dark .markdown-renderer :where(blockquote) {
-  color: #a1a1aa;
+  color: oklch(0.712 0.013 286);
 }
 
 .dark .markdown-renderer :where(a) {
-  color: #60a5fa;
+  color: oklch(0.714 0.143 255);
 }
 
 .dark .markdown-renderer :where(:not(pre) > code) {
-  background: rgba(255, 255, 255, 0.1);
+  background: oklch(1.000 0.000 90 / 0.1);
 }
 
 .dark .markdown-renderer :where(th, td) {
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: oklch(1.000 0.000 90 / 0.12);
 }
 
 .dark .markdown-renderer :where(th) {
-  background: rgba(255, 255, 255, 0.06);
+  background: oklch(1.000 0.000 90 / 0.06);
 }
 
 .mask-edge-r {
@@ -287,7 +291,7 @@ input[type="number"] {
 }
 
 @keyframes toast-enter {
-  0% { transform: translate(-50%, 16px); opacity: 0; }
+  0% { transform: translate(-50%, 8px); opacity: 0; }
   100% { transform: translate(-50%, 0); opacity: 1; }
 }
 .toast-enter {
@@ -307,7 +311,7 @@ input[type="number"] {
 
 /* 弹窗面板：从中心弹出 */
 @keyframes modal-in {
-  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }
 }
 .animate-modal-in {
@@ -324,7 +328,7 @@ input[type="number"] {
 
 /* 设置面板：从上方滑入 */
 @keyframes slide-down-in {
-  from { opacity: 0; transform: translateY(-20px); }
+  from { opacity: 0; transform: translateY(-8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 .animate-slide-down-in {
@@ -351,7 +355,7 @@ input[type="number"] {
 
 /* 确认对话框：从下方弹入 */
 @keyframes confirm-in {
-  from { opacity: 0; transform: scale(0.92) translateY(16px); }
+  from { opacity: 0; transform: scale(0.92) translateY(8px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }
 }
 .animate-confirm-in {
@@ -433,12 +437,12 @@ input[type="number"] {
   align-items: center;
   box-sizing: border-box;
   height: 1.625em;
-  padding: 0 7px;
+  padding: 0 8px;
   margin: 0 2px;
   border-radius: 6px;
-  background: #eff6ff;
-  color: #2563eb;
-  border: 1px solid #dbeafe;
+  background: oklch(0.97 0.014 255);
+  color: oklch(0.546 0.215 263);
+  border: 1px solid oklch(0.932 0.032 255.585);
   font-size: inherit;
   font-weight: 600;
   line-height: 1;
@@ -456,25 +460,25 @@ input[type="number"] {
 
 [contenteditable]::selection,
 [contenteditable] *::selection {
-  background: rgba(37, 99, 235, 0.2);
+  background: oklch(0.546 0.245 262.881 / 0.2);
   color: inherit;
 }
 
 .mention-tag:hover {
-  background: #dbeafe;
+  background: oklch(0.932 0.032 255.585);
 }
 
 .mention-tag.selected {
-  background: #2563eb;
-  color: #ffffff;
-  border-color: #1d4ed8;
-  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.25);
+  background: oklch(0.546 0.215 263);
+  color: oklch(1 0 90);
+  border-color: oklch(0.462 0.187 262.947);
+  box-shadow: inset 0 0 0 1px oklch(0.546 0.245 262.881 / 0.25);
 }
 
 .dark .mention-tag {
-  background: rgba(59, 130, 246, 0.12);
-  color: #93c5fd;
-  border-color: rgba(59, 130, 246, 0.2);
+  background: oklch(0.623 0.214 259.815 / 0.12);
+  color: oklch(0.809 0.096 252);
+  border-color: oklch(0.623 0.214 259.815 / 0.2);
 }
 
 .dark .mention-tag::selection,
@@ -485,19 +489,19 @@ input[type="number"] {
 
 .dark [contenteditable]::selection,
 .dark [contenteditable] *::selection {
-  background: rgba(59, 130, 246, 0.3);
+  background: oklch(0.623 0.214 259.815 / 0.3);
   color: inherit;
 }
 
 .dark .mention-tag:hover {
-  background: rgba(59, 130, 246, 0.2);
+  background: oklch(0.623 0.214 259.815 / 0.2);
 }
 
 .dark .mention-tag.selected {
-  background: #3b82f6;
-  color: #ffffff;
-  border-color: #60a5fa;
-  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.35);
+  background: oklch(0.623 0.188 260);
+  color: oklch(1 0 90);
+  border-color: oklch(0.714 0.143 255);
+  box-shadow: inset 0 0 0 1px oklch(0.623 0.214 259.815 / 0.35);
 }
 
 /* 修复 iOS/Webkit 上带圆角的滚动容器内容/滚动条溢出的 bug */

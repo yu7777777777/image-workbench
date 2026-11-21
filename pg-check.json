@@ -1,0 +1,2916 @@
+{
+  "pass": false,
+  "files": 61,
+  "missing": [],
+  "tokenFiles": [
+    "assets/tokens.css (bundled)"
+  ],
+  "contrastPairs": 168,
+  "contrast": [
+    {
+      "combo": "light",
+      "fg": "--label-primary",
+      "bg": "--bg-base",
+      "name": "正文",
+      "ratio": 18.58,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--label-secondary",
+      "bg": "--bg-base",
+      "name": "次要文字",
+      "ratio": 6.54,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--label-tertiary",
+      "bg": "--bg-base",
+      "name": "标注文字",
+      "ratio": 5.29,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-1",
+      "name": "层内次要文字",
+      "ratio": 6.16,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-1",
+      "name": "层内标注文字",
+      "ratio": 4.98,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-2",
+      "name": "层2次要文字",
+      "ratio": 5.74,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-2",
+      "name": "层2标注文字",
+      "ratio": 4.64,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--brand-text",
+      "bg": "--bg-base",
+      "name": "链接/强调文字",
+      "ratio": 6.42,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--brand-text",
+      "bg": "--bg-layer-1",
+      "name": "层内链接",
+      "ratio": 6.04,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--label-inverse",
+      "bg": "--brand",
+      "name": "主按钮文字",
+      "ratio": 5.86,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--label-inverse",
+      "bg": "--danger",
+      "name": "危险按钮文字",
+      "ratio": 5.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--danger-text",
+      "bg": "--bg-base",
+      "name": "错误文字",
+      "ratio": 6.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--warn-text",
+      "bg": "--bg-base",
+      "name": "警告文字",
+      "ratio": 5.93,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--success-text",
+      "bg": "--bg-base",
+      "name": "成功文字",
+      "ratio": 6.12,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--border-control",
+      "bg": "--bg-base",
+      "name": "控件边界",
+      "ratio": 3.76,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--border-control",
+      "bg": "--bg-layer-1",
+      "name": "层内控件边界",
+      "ratio": 3.54,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--chart-1",
+      "bg": "--bg-base",
+      "name": "图表1",
+      "ratio": 5.86,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--chart-2",
+      "bg": "--bg-base",
+      "name": "图表2",
+      "ratio": 6.73,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--chart-3",
+      "bg": "--bg-base",
+      "name": "图表3",
+      "ratio": 5.63,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--chart-4",
+      "bg": "--bg-base",
+      "name": "图表4",
+      "ratio": 6.42,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--chart-5",
+      "bg": "--bg-base",
+      "name": "图表5",
+      "ratio": 6.54,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--label-primary",
+      "bg": "--bg-base",
+      "name": "正文",
+      "ratio": 14.74,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--label-secondary",
+      "bg": "--bg-base",
+      "name": "次要文字",
+      "ratio": 6.8,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--label-tertiary",
+      "bg": "--bg-base",
+      "name": "标注文字",
+      "ratio": 5.8,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-1",
+      "name": "层内次要文字",
+      "ratio": 6.18,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-1",
+      "name": "层内标注文字",
+      "ratio": 5.27,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-2",
+      "name": "层2次要文字",
+      "ratio": 5.52,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-2",
+      "name": "层2标注文字",
+      "ratio": 4.7,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--brand-text",
+      "bg": "--bg-base",
+      "name": "链接/强调文字",
+      "ratio": 6.53,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--brand-text",
+      "bg": "--bg-layer-1",
+      "name": "层内链接",
+      "ratio": 5.93,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--label-inverse",
+      "bg": "--brand",
+      "name": "主按钮文字",
+      "ratio": 5.86,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--label-inverse",
+      "bg": "--danger",
+      "name": "危险按钮文字",
+      "ratio": 5.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--danger-text",
+      "bg": "--bg-base",
+      "name": "错误文字",
+      "ratio": 7.1,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--warn-text",
+      "bg": "--bg-base",
+      "name": "警告文字",
+      "ratio": 9.35,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--success-text",
+      "bg": "--bg-base",
+      "name": "成功文字",
+      "ratio": 8.9,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--border-control",
+      "bg": "--bg-base",
+      "name": "控件边界",
+      "ratio": 4.09,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--border-control",
+      "bg": "--bg-layer-1",
+      "name": "层内控件边界",
+      "ratio": 3.72,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--chart-1",
+      "bg": "--bg-base",
+      "name": "图表1",
+      "ratio": 6.53,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--chart-2",
+      "bg": "--bg-base",
+      "name": "图表2",
+      "ratio": 8.9,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--chart-3",
+      "bg": "--bg-base",
+      "name": "图表3",
+      "ratio": 9.35,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--chart-4",
+      "bg": "--bg-base",
+      "name": "图表4",
+      "ratio": 7.24,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--chart-5",
+      "bg": "--bg-base",
+      "name": "图表5",
+      "ratio": 6.8,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--label-primary",
+      "bg": "--bg-base",
+      "name": "正文",
+      "ratio": 18.58,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--label-secondary",
+      "bg": "--bg-base",
+      "name": "次要文字",
+      "ratio": 6.54,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--label-tertiary",
+      "bg": "--bg-base",
+      "name": "标注文字",
+      "ratio": 5.29,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-1",
+      "name": "层内次要文字",
+      "ratio": 6.16,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-1",
+      "name": "层内标注文字",
+      "ratio": 4.98,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-2",
+      "name": "层2次要文字",
+      "ratio": 5.74,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-2",
+      "name": "层2标注文字",
+      "ratio": 4.64,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--brand-text",
+      "bg": "--bg-base",
+      "name": "链接/强调文字",
+      "ratio": 6.42,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--brand-text",
+      "bg": "--bg-layer-1",
+      "name": "层内链接",
+      "ratio": 6.04,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--label-inverse",
+      "bg": "--brand",
+      "name": "主按钮文字",
+      "ratio": 5.86,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--label-inverse",
+      "bg": "--danger",
+      "name": "危险按钮文字",
+      "ratio": 5.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--danger-text",
+      "bg": "--bg-base",
+      "name": "错误文字",
+      "ratio": 6.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--warn-text",
+      "bg": "--bg-base",
+      "name": "警告文字",
+      "ratio": 5.93,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--success-text",
+      "bg": "--bg-base",
+      "name": "成功文字",
+      "ratio": 6.12,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--border-control",
+      "bg": "--bg-base",
+      "name": "控件边界",
+      "ratio": 3.76,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--border-control",
+      "bg": "--bg-layer-1",
+      "name": "层内控件边界",
+      "ratio": 3.54,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--chart-1",
+      "bg": "--bg-base",
+      "name": "图表1",
+      "ratio": 5.86,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--chart-2",
+      "bg": "--bg-base",
+      "name": "图表2",
+      "ratio": 6.73,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--chart-3",
+      "bg": "--bg-base",
+      "name": "图表3",
+      "ratio": 5.63,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--chart-4",
+      "bg": "--bg-base",
+      "name": "图表4",
+      "ratio": 6.42,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--chart-5",
+      "bg": "--bg-base",
+      "name": "图表5",
+      "ratio": 6.54,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--label-primary",
+      "bg": "--bg-base",
+      "name": "正文",
+      "ratio": 14.74,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--label-secondary",
+      "bg": "--bg-base",
+      "name": "次要文字",
+      "ratio": 6.8,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--label-tertiary",
+      "bg": "--bg-base",
+      "name": "标注文字",
+      "ratio": 5.8,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-1",
+      "name": "层内次要文字",
+      "ratio": 6.18,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-1",
+      "name": "层内标注文字",
+      "ratio": 5.27,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-2",
+      "name": "层2次要文字",
+      "ratio": 5.52,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-2",
+      "name": "层2标注文字",
+      "ratio": 4.7,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--brand-text",
+      "bg": "--bg-base",
+      "name": "链接/强调文字",
+      "ratio": 6.53,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--brand-text",
+      "bg": "--bg-layer-1",
+      "name": "层内链接",
+      "ratio": 5.93,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--label-inverse",
+      "bg": "--brand",
+      "name": "主按钮文字",
+      "ratio": 5.86,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--label-inverse",
+      "bg": "--danger",
+      "name": "危险按钮文字",
+      "ratio": 5.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--danger-text",
+      "bg": "--bg-base",
+      "name": "错误文字",
+      "ratio": 7.1,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--warn-text",
+      "bg": "--bg-base",
+      "name": "警告文字",
+      "ratio": 9.35,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--success-text",
+      "bg": "--bg-base",
+      "name": "成功文字",
+      "ratio": 8.9,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--border-control",
+      "bg": "--bg-base",
+      "name": "控件边界",
+      "ratio": 4.09,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--border-control",
+      "bg": "--bg-layer-1",
+      "name": "层内控件边界",
+      "ratio": 3.72,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--chart-1",
+      "bg": "--bg-base",
+      "name": "图表1",
+      "ratio": 6.53,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--chart-2",
+      "bg": "--bg-base",
+      "name": "图表2",
+      "ratio": 8.9,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--chart-3",
+      "bg": "--bg-base",
+      "name": "图表3",
+      "ratio": 9.35,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--chart-4",
+      "bg": "--bg-base",
+      "name": "图表4",
+      "ratio": 7.24,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--chart-5",
+      "bg": "--bg-base",
+      "name": "图表5",
+      "ratio": 6.8,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--label-primary",
+      "bg": "--bg-base",
+      "name": "正文",
+      "ratio": 18.58,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--label-secondary",
+      "bg": "--bg-base",
+      "name": "次要文字",
+      "ratio": 6.54,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--label-tertiary",
+      "bg": "--bg-base",
+      "name": "标注文字",
+      "ratio": 5.29,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-1",
+      "name": "层内次要文字",
+      "ratio": 6.16,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-1",
+      "name": "层内标注文字",
+      "ratio": 4.98,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-2",
+      "name": "层2次要文字",
+      "ratio": 5.74,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-2",
+      "name": "层2标注文字",
+      "ratio": 4.64,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--brand-text",
+      "bg": "--bg-base",
+      "name": "链接/强调文字",
+      "ratio": 5.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--brand-text",
+      "bg": "--bg-layer-1",
+      "name": "层内链接",
+      "ratio": 5.15,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--label-inverse",
+      "bg": "--brand",
+      "name": "主按钮文字",
+      "ratio": 5.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--label-inverse",
+      "bg": "--danger",
+      "name": "危险按钮文字",
+      "ratio": 5.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--danger-text",
+      "bg": "--bg-base",
+      "name": "错误文字",
+      "ratio": 6.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--warn-text",
+      "bg": "--bg-base",
+      "name": "警告文字",
+      "ratio": 5.93,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--success-text",
+      "bg": "--bg-base",
+      "name": "成功文字",
+      "ratio": 6.12,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--border-control",
+      "bg": "--bg-base",
+      "name": "控件边界",
+      "ratio": 3.76,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--border-control",
+      "bg": "--bg-layer-1",
+      "name": "层内控件边界",
+      "ratio": 3.54,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--chart-1",
+      "bg": "--bg-base",
+      "name": "图表1",
+      "ratio": 5.86,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--chart-2",
+      "bg": "--bg-base",
+      "name": "图表2",
+      "ratio": 6.73,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--chart-3",
+      "bg": "--bg-base",
+      "name": "图表3",
+      "ratio": 5.63,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--chart-4",
+      "bg": "--bg-base",
+      "name": "图表4",
+      "ratio": 6.42,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--chart-5",
+      "bg": "--bg-base",
+      "name": "图表5",
+      "ratio": 6.54,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--label-primary",
+      "bg": "--bg-base",
+      "name": "正文",
+      "ratio": 14.74,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--label-secondary",
+      "bg": "--bg-base",
+      "name": "次要文字",
+      "ratio": 6.8,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--label-tertiary",
+      "bg": "--bg-base",
+      "name": "标注文字",
+      "ratio": 5.8,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-1",
+      "name": "层内次要文字",
+      "ratio": 6.18,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-1",
+      "name": "层内标注文字",
+      "ratio": 5.27,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-2",
+      "name": "层2次要文字",
+      "ratio": 5.52,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-2",
+      "name": "层2标注文字",
+      "ratio": 4.7,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--brand-text",
+      "bg": "--bg-base",
+      "name": "链接/强调文字",
+      "ratio": 9.52,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--brand-text",
+      "bg": "--bg-layer-1",
+      "name": "层内链接",
+      "ratio": 8.65,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--label-inverse",
+      "bg": "--brand",
+      "name": "主按钮文字",
+      "ratio": 5.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--label-inverse",
+      "bg": "--danger",
+      "name": "危险按钮文字",
+      "ratio": 5.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--danger-text",
+      "bg": "--bg-base",
+      "name": "错误文字",
+      "ratio": 7.1,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--warn-text",
+      "bg": "--bg-base",
+      "name": "警告文字",
+      "ratio": 9.35,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--success-text",
+      "bg": "--bg-base",
+      "name": "成功文字",
+      "ratio": 8.9,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--border-control",
+      "bg": "--bg-base",
+      "name": "控件边界",
+      "ratio": 4.09,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--border-control",
+      "bg": "--bg-layer-1",
+      "name": "层内控件边界",
+      "ratio": 3.72,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--chart-1",
+      "bg": "--bg-base",
+      "name": "图表1",
+      "ratio": 6.53,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--chart-2",
+      "bg": "--bg-base",
+      "name": "图表2",
+      "ratio": 8.9,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--chart-3",
+      "bg": "--bg-base",
+      "name": "图表3",
+      "ratio": 9.35,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--chart-4",
+      "bg": "--bg-base",
+      "name": "图表4",
+      "ratio": 7.24,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--chart-5",
+      "bg": "--bg-base",
+      "name": "图表5",
+      "ratio": 6.8,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--label-primary",
+      "bg": "--bg-base",
+      "name": "正文",
+      "ratio": 18.58,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--label-secondary",
+      "bg": "--bg-base",
+      "name": "次要文字",
+      "ratio": 6.54,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--label-tertiary",
+      "bg": "--bg-base",
+      "name": "标注文字",
+      "ratio": 5.29,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-1",
+      "name": "层内次要文字",
+      "ratio": 6.16,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-1",
+      "name": "层内标注文字",
+      "ratio": 4.98,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-2",
+      "name": "层2次要文字",
+      "ratio": 5.74,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-2",
+      "name": "层2标注文字",
+      "ratio": 4.64,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--brand-text",
+      "bg": "--bg-base",
+      "name": "链接/强调文字",
+      "ratio": 7.77,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--brand-text",
+      "bg": "--bg-layer-1",
+      "name": "层内链接",
+      "ratio": 7.31,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--label-inverse",
+      "bg": "--brand",
+      "name": "主按钮文字",
+      "ratio": 6.42,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--label-inverse",
+      "bg": "--danger",
+      "name": "危险按钮文字",
+      "ratio": 5.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--danger-text",
+      "bg": "--bg-base",
+      "name": "错误文字",
+      "ratio": 6.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--warn-text",
+      "bg": "--bg-base",
+      "name": "警告文字",
+      "ratio": 5.93,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--success-text",
+      "bg": "--bg-base",
+      "name": "成功文字",
+      "ratio": 6.12,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--border-control",
+      "bg": "--bg-base",
+      "name": "控件边界",
+      "ratio": 3.76,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--border-control",
+      "bg": "--bg-layer-1",
+      "name": "层内控件边界",
+      "ratio": 3.54,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--chart-1",
+      "bg": "--bg-base",
+      "name": "图表1",
+      "ratio": 5.86,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--chart-2",
+      "bg": "--bg-base",
+      "name": "图表2",
+      "ratio": 6.73,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--chart-3",
+      "bg": "--bg-base",
+      "name": "图表3",
+      "ratio": 5.63,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--chart-4",
+      "bg": "--bg-base",
+      "name": "图表4",
+      "ratio": 6.42,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--chart-5",
+      "bg": "--bg-base",
+      "name": "图表5",
+      "ratio": 6.54,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--label-primary",
+      "bg": "--bg-base",
+      "name": "正文",
+      "ratio": 14.74,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--label-secondary",
+      "bg": "--bg-base",
+      "name": "次要文字",
+      "ratio": 6.8,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--label-tertiary",
+      "bg": "--bg-base",
+      "name": "标注文字",
+      "ratio": 5.8,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-1",
+      "name": "层内次要文字",
+      "ratio": 6.18,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-1",
+      "name": "层内标注文字",
+      "ratio": 5.27,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-2",
+      "name": "层2次要文字",
+      "ratio": 5.52,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-2",
+      "name": "层2标注文字",
+      "ratio": 4.7,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--brand-text",
+      "bg": "--bg-base",
+      "name": "链接/强调文字",
+      "ratio": 7.24,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--brand-text",
+      "bg": "--bg-layer-1",
+      "name": "层内链接",
+      "ratio": 6.57,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--label-inverse",
+      "bg": "--brand",
+      "name": "主按钮文字",
+      "ratio": 6.42,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--label-inverse",
+      "bg": "--danger",
+      "name": "危险按钮文字",
+      "ratio": 5.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--danger-text",
+      "bg": "--bg-base",
+      "name": "错误文字",
+      "ratio": 7.1,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--warn-text",
+      "bg": "--bg-base",
+      "name": "警告文字",
+      "ratio": 9.35,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--success-text",
+      "bg": "--bg-base",
+      "name": "成功文字",
+      "ratio": 8.9,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--border-control",
+      "bg": "--bg-base",
+      "name": "控件边界",
+      "ratio": 4.09,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--border-control",
+      "bg": "--bg-layer-1",
+      "name": "层内控件边界",
+      "ratio": 3.72,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--chart-1",
+      "bg": "--bg-base",
+      "name": "图表1",
+      "ratio": 6.53,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--chart-2",
+      "bg": "--bg-base",
+      "name": "图表2",
+      "ratio": 8.9,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--chart-3",
+      "bg": "--bg-base",
+      "name": "图表3",
+      "ratio": 9.35,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--chart-4",
+      "bg": "--bg-base",
+      "name": "图表4",
+      "ratio": 7.24,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--chart-5",
+      "bg": "--bg-base",
+      "name": "图表5",
+      "ratio": 6.8,
+      "min": 3,
+      "ok": true
+    }
+  ],
+  "tokenProblems": [],
+  "pathProblems": [],
+  "findings": [
+    {
+      "file": "playground\\src\\components\\AgentWorkspace.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #2A2D31，应改为 var(--token)",
+      "line": 824,
+      "snippet": "#2A2D31"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "body-bold",
+      "severity": "warn",
+      "message": "正文字号（13px）配了 600 字重：正文别加粗，靠字号与颜色拉层级",
+      "line": 128
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "body-bold",
+      "severity": "warn",
+      "message": "正文字号（13px）配了 600 字重：正文别加粗，靠字号与颜色拉层级",
+      "line": 155
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #f5f4f1，应改为 var(--token)",
+      "line": 2,
+      "snippet": "#f5f4f1"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #ffffff，应改为 var(--token)",
+      "line": 2,
+      "snippet": "#ffffff"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #292d30，应改为 var(--token)",
+      "line": 2,
+      "snippet": "#292d30"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #8b8e90，应改为 var(--token)",
+      "line": 2,
+      "snippet": "#8b8e90"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #e6e5e1，应改为 var(--token)",
+      "line": 2,
+      "snippet": "#e6e5e1"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #277969，应改为 var(--token)",
+      "line": 2,
+      "snippet": "#277969"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #eaf3ef，应改为 var(--token)",
+      "line": 2,
+      "snippet": "#eaf3ef"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #171a1b，应改为 var(--token)",
+      "line": 5,
+      "snippet": "#171a1b"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #222627，应改为 var(--token)",
+      "line": 5,
+      "snippet": "#222627"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #e5e8e6，应改为 var(--token)",
+      "line": 5,
+      "snippet": "#e5e8e6"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #858e8c，应改为 var(--token)",
+      "line": 5,
+      "snippet": "#858e8c"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #353b3b，应改为 var(--token)",
+      "line": 5,
+      "snippet": "#353b3b"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "另有 48 处字面色值未逐条列出（单文件最多列 12 条）"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "type-scale",
+      "severity": "error",
+      "message": "出现 13 档字号（上限 8）：10px / 9px / 12px / 8px / 16px / 11px / 17px / 29px / 13px / 21px / 14px / 24px / 23px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "focus-visible",
+      "severity": "error",
+      "message": "outline 被置空且同一规则内没有替代焦点样式，键盘用户会失去位置",
+      "line": 9
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "focus-visible",
+      "severity": "error",
+      "message": "outline 被置空且同一规则内没有替代焦点样式，键盘用户会失去位置",
+      "line": 234
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "motion-shift",
+      "severity": "warn",
+      "message": "位移 16px 超过 8px 上限",
+      "line": 231
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 7px 不在 4px 网格上",
+      "line": 6,
+      "snippet": "gap: 7px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 6px 不在 4px 网格上",
+      "line": 39,
+      "snippet": "gap: 6px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 14px 不在 4px 网格上",
+      "line": 39,
+      "snippet": "padding: 0 14px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 6px 不在 4px 网格上",
+      "line": 49,
+      "snippet": "padding: 1px 6px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 5px 不在 4px 网格上",
+      "line": 54,
+      "snippet": "padding: 5px 8px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 6px 不在 4px 网格上",
+      "line": 59,
+      "snippet": "gap: 6px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 10px 不在 4px 网格上",
+      "line": 59,
+      "snippet": "padding: 0 10px 7px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 3px 不在 4px 网格上",
+      "line": 60,
+      "snippet": "padding: 0 3px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 14px 不在 4px 网格上",
+      "line": 68,
+      "snippet": "padding: 14px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 10px 不在 4px 网格上",
+      "line": 68,
+      "snippet": "gap: 10px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 5px 不在 4px 网格上",
+      "line": 71,
+      "snippet": "gap: 5px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 7px 不在 4px 网格上",
+      "line": 72,
+      "snippet": "padding: 0 7px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 3px 不在 4px 网格上",
+      "line": 73,
+      "snippet": "gap: 3px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 7px 不在 4px 网格上",
+      "line": 75,
+      "snippet": "padding: 4px 7px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 10px 不在 4px 网格上",
+      "line": 79,
+      "snippet": "padding: 10px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 7px 不在 4px 网格上",
+      "line": 83,
+      "snippet": "padding: 4px 7px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 6px 不在 4px 网格上",
+      "line": 85,
+      "snippet": "gap: 6px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 10px 不在 4px 网格上",
+      "line": 86,
+      "snippet": "margin: 10px 10px 0"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 7px 不在 4px 网格上",
+      "line": 87,
+      "snippet": "gap: 7px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 7px 不在 4px 网格上",
+      "line": 88,
+      "snippet": "padding: 0 7px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 6px 不在 4px 网格上",
+      "line": 89,
+      "snippet": "gap: 6px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 5px 不在 4px 网格上",
+      "line": 93,
+      "snippet": "margin: -5px 0 0"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 9px 不在 4px 网格上",
+      "line": 97,
+      "snippet": "padding: 9px 12px 9px 10px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 10px 不在 4px 网格上",
+      "line": 97,
+      "snippet": "gap: 10px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 3px 不在 4px 网格上",
+      "line": 101,
+      "snippet": "margin-top: 3px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 7px 不在 4px 网格上",
+      "line": 102,
+      "snippet": "padding: 7px 10px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 3px 不在 4px 网格上",
+      "line": 103,
+      "snippet": "gap: 3px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 11px 不在 4px 网格上",
+      "line": 104,
+      "snippet": "padding: 8px 11px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 6px 不在 4px 网格上",
+      "line": 106,
+      "snippet": "padding: 6px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 5px 不在 4px 网格上",
+      "line": 107,
+      "snippet": "gap: 5px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 5px 不在 4px 网格上",
+      "line": 110,
+      "snippet": "padding: 5px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 3px 不在 4px 网格上",
+      "line": 110,
+      "snippet": "gap: 3px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 17px 不在 4px 网格上",
+      "line": 116,
+      "snippet": "margin: 17px 0 12px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 10px 不在 4px 网格上",
+      "line": 118,
+      "snippet": "padding: 10px 17px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 5px 不在 4px 网格上",
+      "line": 121,
+      "snippet": "padding: 5px 7px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 7px 不在 4px 网格上",
+      "line": 122,
+      "snippet": "padding: 0 7px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 3px 不在 4px 网格上",
+      "line": 123,
+      "snippet": "margin: 0 3px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 15px 不在 4px 网格上",
+      "line": 128,
+      "snippet": "margin-bottom: 15px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 5px 不在 4px 网格上",
+      "line": 130,
+      "snippet": "margin-top: 5px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 13px 不在 4px 网格上",
+      "line": 132,
+      "snippet": "margin-bottom: 13px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 6px 不在 4px 网格上",
+      "line": 138,
+      "snippet": "padding: 6px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 5px 不在 4px 网格上",
+      "line": 140,
+      "snippet": "padding-top: 5px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 5px 不在 4px 网格上",
+      "line": 144,
+      "snippet": "gap: 5px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 3px 不在 4px 网格上",
+      "line": 144,
+      "snippet": "margin: -3px 0 12px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 5px 不在 4px 网格上",
+      "line": 145,
+      "snippet": "padding: 5px 8px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 10px 不在 4px 网格上",
+      "line": 147,
+      "snippet": "inset: auto 10px 10px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 10px 不在 4px 网格上",
+      "line": 147,
+      "snippet": "gap: 10px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 13px 不在 4px 网格上",
+      "line": 147,
+      "snippet": "padding: 13px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 6px 不在 4px 网格上",
+      "line": 150,
+      "snippet": "padding: 6px 8px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 6px 不在 4px 网格上",
+      "line": 151,
+      "snippet": "gap: 6px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 6px 不在 4px 网格上",
+      "line": 152,
+      "snippet": "padding: 6px 10px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 15px 不在 4px 网格上",
+      "line": 155,
+      "snippet": "margin-bottom: 15px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 5px 不在 4px 网格上",
+      "line": 157,
+      "snippet": "margin-top: 5px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 10px 不在 4px 网格上",
+      "line": 160,
+      "snippet": "padding: 10px 0"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 5px 不在 4px 网格上",
+      "line": 161,
+      "snippet": "padding: 5px 7px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 10px 不在 4px 网格上",
+      "line": 163,
+      "snippet": "padding: 10px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 5px 不在 4px 网格上",
+      "line": 166,
+      "snippet": "margin: 5px 0"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 5px 不在 4px 网格上",
+      "line": 168,
+      "snippet": "gap: 5px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 9px 不在 4px 网格上",
+      "line": 168,
+      "snippet": "margin-top: 9px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 10px 不在 4px 网格上",
+      "line": 169,
+      "snippet": "inset: auto 10px 10px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 9px 不在 4px 网格上",
+      "line": 169,
+      "snippet": "gap: 9px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 13px 不在 4px 网格上",
+      "line": 169,
+      "snippet": "padding: 13px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 6px 不在 4px 网格上",
+      "line": 172,
+      "snippet": "padding: 6px 8px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 6px 不在 4px 网格上",
+      "line": 175,
+      "snippet": "gap: 6px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 6px 不在 4px 网格上",
+      "line": 176,
+      "snippet": "padding: 6px 10px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 6px 不在 4px 网格上",
+      "line": 181,
+      "snippet": "padding: 6px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 7px 不在 4px 网格上",
+      "line": 182,
+      "snippet": "padding: 7px 9px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 9px 不在 4px 网格上",
+      "line": 183,
+      "snippet": "padding: 9px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 15px 不在 4px 网格上",
+      "line": 192,
+      "snippet": "padding: 15px 17px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 14px 不在 4px 网格上",
+      "line": 195,
+      "snippet": "gap: 8px 14px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 17px 不在 4px 网格上",
+      "line": 195,
+      "snippet": "padding: 16px 17px 19px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 7px 不在 4px 网格上",
+      "line": 196,
+      "snippet": "padding: 4px 7px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 15px 不在 4px 网格上",
+      "line": 198,
+      "snippet": "gap: 15px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 9px 不在 4px 网格上",
+      "line": 199,
+      "snippet": "padding: 9px 15px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 7px 不在 4px 网格上",
+      "line": 202,
+      "snippet": "padding: 7px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 3px 不在 4px 网格上",
+      "line": 203,
+      "snippet": "padding: 1px 3px 5px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 14px 不在 4px 网格上",
+      "line": 211,
+      "snippet": "gap: 14px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 14px 不在 4px 网格上",
+      "line": 211,
+      "snippet": "padding: 14px 18px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 7px 不在 4px 网格上",
+      "line": 216,
+      "snippet": "gap: 7px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 10px 不在 4px 网格上",
+      "line": 216,
+      "snippet": "padding: 10px 14px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 5px 不在 4px 网格上",
+      "line": 217,
+      "snippet": "padding: 5px 10px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 6px 不在 4px 网格上",
+      "line": 219,
+      "snippet": "gap: 6px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 5px 不在 4px 网格上",
+      "line": 230,
+      "snippet": "padding: 5px 10px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 11px 不在 4px 网格上",
+      "line": 231,
+      "snippet": "padding: 11px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 7px 不在 4px 网格上",
+      "line": 233,
+      "snippet": "padding: 7px 8px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 7px 不在 4px 网格上",
+      "line": 235,
+      "snippet": "gap: 7px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 5px 不在 4px 网格上",
+      "line": 236,
+      "snippet": "padding: 5px 11px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 14px 不在 4px 网格上",
+      "line": 240,
+      "snippet": "padding: 8px 14px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 7px 不在 4px 网格上",
+      "line": 243,
+      "snippet": "padding: 7px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 7px 不在 4px 网格上",
+      "line": 243,
+      "snippet": "gap: 7px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 5px 不在 4px 网格上",
+      "line": 248,
+      "snippet": "padding: 8px 5px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 3px 不在 4px 网格上",
+      "line": 250,
+      "snippet": "padding: 3px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 6px 不在 4px 网格上",
+      "line": 257,
+      "snippet": "padding: 0 6px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 10px 不在 4px 网格上",
+      "line": 264,
+      "snippet": "padding: 10px"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\canvas.css",
+      "rule": "overflow-mask",
+      "severity": "warn",
+      "message": "在 html/body 上用 overflow-x:hidden 掩盖溢出，移动端真问题被藏起来了"
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\CanvasAgentPanel.tsx",
+      "rule": "a11y-name",
+      "severity": "error",
+      "message": "纯图标按钮缺少 aria-label",
+      "line": 26
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\CanvasAgentPanel.tsx",
+      "rule": "a11y-name",
+      "severity": "error",
+      "message": "纯图标按钮缺少 aria-label",
+      "line": 58
+    },
+    {
+      "file": "playground\\src\\components\\canvas\\CanvasGrid.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgba(255, 255, 255, ${opacity})，应改为 var(--token)",
+      "line": 18,
+      "snippet": "rgba(255, 255, 255, ${opacity})"
+    },
+    {
+      "file": "playground\\src\\components\\DetailModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #1c1c1e，应改为 var(--token)",
+      "line": 1220,
+      "snippet": "#1c1c1e"
+    },
+    {
+      "file": "playground\\src\\components\\DetailModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #1c1c1e，应改为 var(--token)",
+      "line": 1251,
+      "snippet": "#1c1c1e"
+    },
+    {
+      "file": "playground\\src\\components\\DetailModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #1c1c1e，应改为 var(--token)",
+      "line": 1298,
+      "snippet": "#1c1c1e"
+    },
+    {
+      "file": "playground\\src\\components\\DetailModal.tsx",
+      "rule": "a11y-alt",
+      "severity": "error",
+      "message": "<img> 缺少 alt（装饰图写 alt=\"\"）",
+      "line": 605
+    },
+    {
+      "file": "playground\\src\\components\\favorites\\FavoriteCollectionOverviewCard.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #2a2211，应改为 var(--token)",
+      "line": 38,
+      "snippet": "#2a2211"
+    },
+    {
+      "file": "playground\\src\\components\\favorites\\FavoriteCollectionPickerModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #333，应改为 var(--token)",
+      "line": 317,
+      "snippet": "#333"
+    },
+    {
+      "file": "playground\\src\\components\\favorites\\FavoriteCollectionPickerModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #333，应改为 var(--token)",
+      "line": 428,
+      "snippet": "#333"
+    },
+    {
+      "file": "playground\\src\\components\\favorites\\ManageCollectionsModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #333，应改为 var(--token)",
+      "line": 301,
+      "snippet": "#333"
+    },
+    {
+      "file": "playground\\src\\components\\favorites\\ManageCollectionsModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #333，应改为 var(--token)",
+      "line": 392,
+      "snippet": "#333"
+    },
+    {
+      "file": "playground\\src\\components\\HistoryModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #1c1c1e，应改为 var(--token)",
+      "line": 223,
+      "snippet": "#1c1c1e"
+    },
+    {
+      "file": "playground\\src\\components\\ImageAnnotatorModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #e4e4e7，应改为 var(--token)",
+      "line": 61,
+      "snippet": "#e4e4e7"
+    },
+    {
+      "file": "playground\\src\\components\\ImageAnnotatorModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #f4f4f5，应改为 var(--token)",
+      "line": 61,
+      "snippet": "#f4f4f5"
+    },
+    {
+      "file": "playground\\src\\components\\ImageAnnotatorModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgba(45, 212, 191, .55)，应改为 var(--token)",
+      "line": 82,
+      "snippet": "rgba(45, 212, 191, .55)"
+    },
+    {
+      "file": "playground\\src\\components\\ImageAnnotatorModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgba(0,0,0,.45)，应改为 var(--token)",
+      "line": 140,
+      "snippet": "rgba(0,0,0,.45)"
+    },
+    {
+      "file": "playground\\src\\components\\ImageAnnotatorModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgba(0,0,0,.46)，应改为 var(--token)",
+      "line": 174,
+      "snippet": "rgba(0,0,0,.46)"
+    },
+    {
+      "file": "playground\\src\\components\\ImageAnnotatorModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgba(59, 130, 246, .28)，应改为 var(--token)",
+      "line": 195,
+      "snippet": "rgba(59, 130, 246, .28)"
+    },
+    {
+      "file": "playground\\src\\components\\ImageAnnotatorModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgba(255, 255, 255, .85)，应改为 var(--token)",
+      "line": 203,
+      "snippet": "rgba(255, 255, 255, .85)"
+    },
+    {
+      "file": "playground\\src\\components\\ImageAnnotatorModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #1c1c1e，应改为 var(--token)",
+      "line": 530,
+      "snippet": "#1c1c1e"
+    },
+    {
+      "file": "playground\\src\\components\\ImageAnnotatorModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #1c1c1e，应改为 var(--token)",
+      "line": 632,
+      "snippet": "#1c1c1e"
+    },
+    {
+      "file": "playground\\src\\components\\ImageAnnotatorModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #26262a，应改为 var(--token)",
+      "line": 643,
+      "snippet": "#26262a"
+    },
+    {
+      "file": "playground\\src\\components\\InputBar.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgba(0,0,0,0.25)，应改为 var(--token)",
+      "line": 1399,
+      "snippet": "rgba(0,0,0,0.25)"
+    },
+    {
+      "file": "playground\\src\\components\\Lightbox.tsx",
+      "rule": "a11y-alt",
+      "severity": "error",
+      "message": "<img> 缺少 alt（装饰图写 alt=\"\"）",
+      "line": 708
+    },
+    {
+      "file": "playground\\src\\components\\MaskEditorModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgba(59, 130, 246, 0.58)，应改为 var(--token)",
+      "line": 283,
+      "snippet": "rgba(59, 130, 246, 0.58)"
+    },
+    {
+      "file": "playground\\src\\components\\MaskEditorModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgba(255, 255, 255, 0.9)，应改为 var(--token)",
+      "line": 328,
+      "snippet": "rgba(255, 255, 255, 0.9)"
+    },
+    {
+      "file": "playground\\src\\components\\MaskEditorModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgba(0, 0, 0, 0.4)，应改为 var(--token)",
+      "line": 331,
+      "snippet": "rgba(0, 0, 0, 0.4)"
+    },
+    {
+      "file": "playground\\src\\components\\MaskEditorModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgba(255, 255, 255, 0.95)，应改为 var(--token)",
+      "line": 341,
+      "snippet": "rgba(255, 255, 255, 0.95)"
+    },
+    {
+      "file": "playground\\src\\components\\MaskEditorModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgba(0, 0, 0, 0.55)，应改为 var(--token)",
+      "line": 349,
+      "snippet": "rgba(0, 0, 0, 0.55)"
+    },
+    {
+      "file": "playground\\src\\components\\MaskEditorModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #0f0f0f，应改为 var(--token)",
+      "line": 927,
+      "snippet": "#0f0f0f"
+    },
+    {
+      "file": "playground\\src\\components\\MaskEditorModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #232325，应改为 var(--token)",
+      "line": 929,
+      "snippet": "#232325"
+    },
+    {
+      "file": "playground\\src\\components\\MaskEditorModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #323338，应改为 var(--token)",
+      "line": 931,
+      "snippet": "#323338"
+    },
+    {
+      "file": "playground\\src\\components\\MaskEditorModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #8a8a8e，应改为 var(--token)",
+      "line": 931,
+      "snippet": "#8a8a8e"
+    },
+    {
+      "file": "playground\\src\\components\\MaskEditorModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #323338，应改为 var(--token)",
+      "line": 941,
+      "snippet": "#323338"
+    },
+    {
+      "file": "playground\\src\\components\\MaskEditorModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #8a8a8e，应改为 var(--token)",
+      "line": 941,
+      "snippet": "#8a8a8e"
+    },
+    {
+      "file": "playground\\src\\components\\MaskEditorModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #323338，应改为 var(--token)",
+      "line": 960,
+      "snippet": "#323338"
+    },
+    {
+      "file": "playground\\src\\components\\MaskEditorModal.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "另有 10 处字面色值未逐条列出（单文件最多列 12 条）"
+    },
+    {
+      "file": "playground\\src\\components\\TaskCard.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgba(0,0,0,0.25)，应改为 var(--token)",
+      "line": 402,
+      "snippet": "rgba(0,0,0,0.25)"
+    },
+    {
+      "file": "playground\\src\\components\\TaskCard.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #808080，应改为 var(--token)",
+      "line": 426,
+      "snippet": "#808080"
+    },
+    {
+      "file": "playground\\src\\components\\TaskCard.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #808080，应改为 var(--token)",
+      "line": 426,
+      "snippet": "#808080"
+    },
+    {
+      "file": "playground\\src\\components\\TaskCard.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #808080，应改为 var(--token)",
+      "line": 426,
+      "snippet": "#808080"
+    },
+    {
+      "file": "playground\\src\\components\\TaskCard.tsx",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #808080，应改为 var(--token)",
+      "line": 426,
+      "snippet": "#808080"
+    },
+    {
+      "file": "playground\\src\\index.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #1c1917，应改为 var(--token)",
+      "line": 33,
+      "snippet": "#1c1917"
+    },
+    {
+      "file": "playground\\src\\index.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #f5f5f4，应改为 var(--token)",
+      "line": 38,
+      "snippet": "#f5f5f4"
+    },
+    {
+      "file": "playground\\src\\index.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 hsl(var(--background)，应改为 var(--token)",
+      "line": 42,
+      "snippet": "hsl(var(--background)"
+    },
+    {
+      "file": "playground\\src\\index.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #3f3f46，应改为 var(--token)",
+      "line": 107,
+      "snippet": "#3f3f46"
+    },
+    {
+      "file": "playground\\src\\index.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #cbd5e1，应改为 var(--token)",
+      "line": 111,
+      "snippet": "#cbd5e1"
+    },
+    {
+      "file": "playground\\src\\index.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #94a3b8，应改为 var(--token)",
+      "line": 112,
+      "snippet": "#94a3b8"
+    },
+    {
+      "file": "playground\\src\\index.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #3f3f46，应改为 var(--token)",
+      "line": 125,
+      "snippet": "#3f3f46"
+    },
+    {
+      "file": "playground\\src\\index.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #52525b，应改为 var(--token)",
+      "line": 126,
+      "snippet": "#52525b"
+    },
+    {
+      "file": "playground\\src\\index.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #3b82f6，应改为 var(--token)",
+      "line": 129,
+      "snippet": "#3b82f6"
+    },
+    {
+      "file": "playground\\src\\index.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #93c5fd，应改为 var(--token)",
+      "line": 130,
+      "snippet": "#93c5fd"
+    },
+    {
+      "file": "playground\\src\\index.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #6b7280，应改为 var(--token)",
+      "line": 139,
+      "snippet": "#6b7280"
+    },
+    {
+      "file": "playground\\src\\index.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #ffffff，应改为 var(--token)",
+      "line": 140,
+      "snippet": "#ffffff"
+    },
+    {
+      "file": "playground\\src\\index.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "另有 31 处字面色值未逐条列出（单文件最多列 12 条）"
+    },
+    {
+      "file": "playground\\src\\index.css",
+      "rule": "motion-shift",
+      "severity": "warn",
+      "message": "位移 16px 超过 8px 上限",
+      "line": 290
+    },
+    {
+      "file": "playground\\src\\index.css",
+      "rule": "motion-shift",
+      "severity": "warn",
+      "message": "位移 10px 超过 8px 上限",
+      "line": 310
+    },
+    {
+      "file": "playground\\src\\index.css",
+      "rule": "motion-shift",
+      "severity": "warn",
+      "message": "位移 -20px 超过 8px 上限",
+      "line": 327
+    },
+    {
+      "file": "playground\\src\\index.css",
+      "rule": "motion-shift",
+      "severity": "warn",
+      "message": "位移 16px 超过 8px 上限",
+      "line": 354
+    },
+    {
+      "file": "playground\\src\\index.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 7px 不在 4px 网格上",
+      "line": 436,
+      "snippet": "padding: 0 7px"
+    }
+  ],
+  "stats": {
+    "ignoredRegions": 0,
+    "ignoredLines": 0
+  }
+}

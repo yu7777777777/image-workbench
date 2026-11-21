@@ -604,6 +604,7 @@ export default function DetailModal() {
             <>
               <img
                 src={currentOutputPreviewSrc}
+                alt={`生成结果预览 ${currentOutputSlot ? currentOutputSlot.requestIndex + 1 : ''}`}
                 data-image-id={currentOutputImageId}
                 className="saveable-image w-[calc(100%-2rem)] h-[calc(100%-2rem)] object-contain cursor-pointer"
                 onLoad={(e) => {
@@ -626,7 +627,6 @@ export default function DetailModal() {
                 onClick={() =>
                   setLightboxImageId(currentOutputImageId, task.outputImages)
                 }
-                alt=""
               />
               <div data-selectable-text className="absolute left-4 top-[15px] flex items-center gap-1.5">
                 {currentImageRatio && currentImageSize ? (
@@ -1217,7 +1217,7 @@ export default function DetailModal() {
             rawUrlsBackdropPointerDownRef.current = false
           }}
         >
-          <div ref={rawUrlsModalRef} className="flex w-full max-w-2xl max-h-[90vh] flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-[#1c1c1e]" onClick={(e) => e.stopPropagation()}>
+          <div ref={rawUrlsModalRef} className="flex w-full max-w-2xl max-h-[90vh] flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-[oklch(0.227 0.004 286)]" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-white/[0.08] shrink-0">
               <h3 className="text-base font-semibold text-gray-900 dark:text-white">原始图片链接 ({rawImageUrls.length})</h3>
               <div className="flex items-center gap-2">
@@ -1248,7 +1248,7 @@ export default function DetailModal() {
             <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-5 bg-gray-50/50 dark:bg-black/20 overscroll-contain">
               <div className="space-y-2.5">
                 {rawImageUrls.map((url, i) => (
-                  <div key={i} className="group flex items-center gap-3 p-3 sm:p-4 rounded-xl bg-white dark:bg-[#1c1c1e] border border-gray-100 dark:border-white/[0.06] shadow-sm hover:shadow-md transition-all">
+                  <div key={i} className="group flex items-center gap-3 p-3 sm:p-4 rounded-xl bg-white dark:bg-[oklch(0.227 0.004 286)] border border-gray-100 dark:border-white/[0.06] shadow-sm hover:shadow-md transition-all">
                     <div className="flex-1 min-w-0 flex flex-col gap-1">
                       <div className="text-xs font-medium text-gray-400 dark:text-gray-500">
                         图片 {i + 1}
@@ -1295,7 +1295,7 @@ export default function DetailModal() {
         >
           <div
             ref={rawResponseModalRef}
-            className="flex w-full max-w-3xl max-h-[90vh] flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-[#1c1c1e]"
+            className="flex w-full max-w-3xl max-h-[90vh] flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-[oklch(0.227 0.004 286)]"
             onPointerDown={(e) => {
               if (!(e.target as Element).closest('[data-selectable-text]')) clearTextSelection()
             }}

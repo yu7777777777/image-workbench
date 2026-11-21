@@ -1396,7 +1396,7 @@ export default function InputBar() {
       e.dataTransfer.effectAllowed = 'move'
       e.dataTransfer.setData('text/plain', String(idx))
       const preview = document.createElement('div')
-      preview.style.cssText = 'position:fixed;left:-1000px;top:-1000px;width:52px;height:52px;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.25);'
+      preview.style.cssText = 'position:fixed;left:-1000px;top:-1000px;width:52px;height:52px;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px oklch(0.000 0.000 0  / 0.25);'
       const previewImg = document.createElement('img')
       previewImg.src = displaySrc
       previewImg.style.cssText = 'width:52px;height:52px;object-fit:cover;display:block;'

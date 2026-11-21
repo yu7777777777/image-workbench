@@ -223,25 +223,25 @@ function TopNavInner() {
 
   return (
     <>
-      <header className="border-b border-stone-100/50 dark:border-white/10">
+      <header className="border-b border-zinc-100/50 dark:border-white/10">
         <div className="relative flex min-h-12 flex-col gap-1 px-3 py-2 sm:h-12 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-0">
           <div className="flex w-full items-center justify-between gap-2 xl:w-auto xl:justify-start xl:gap-3">
             <Sheet>
-              <SheetTrigger className="inline-flex size-8 items-center justify-center text-stone-700 transition hover:text-stone-950 xl:hidden dark:text-stone-200 dark:hover:text-white">
+              <SheetTrigger className="inline-flex size-8 items-center justify-center text-zinc-700 transition hover:text-zinc-950 xl:hidden dark:text-zinc-200 dark:hover:text-white">
                 <Menu className="size-4" />
                 <span className="sr-only">打开导航</span>
               </SheetTrigger>
               <SheetContent side="left">
                 <SheetHeader>
                   <SheetTitle className="text-base font-semibold">控制台</SheetTitle>
-                  <span className="text-xs text-stone-500 dark:text-stone-400">{roleLabel} · {displayName}</span>
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400">{roleLabel} · {displayName}</span>
                 </SheetHeader>
                 <nav className="mt-8 flex flex-col gap-1">
                   {canvasHref ? (
                     <SheetClose asChild>
                       <button
                         type="button"
-                        className="flex items-center rounded-xl px-3 py-2.5 text-left text-sm font-medium text-stone-600 transition hover:bg-stone-100 hover:text-stone-950 dark:text-stone-300 dark:hover:bg-white/10 dark:hover:text-white"
+                        className="flex items-center rounded-xl px-3 py-2.5 text-left text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white"
                         onClick={handleCanvasOpen}
                       >
                         无限画布
@@ -252,7 +252,7 @@ function TopNavInner() {
                     const active = isItemActive(item.href);
                     const className = cn(
                       "flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition",
-                      active ? "bg-stone-950 text-white dark:bg-white dark:text-stone-950" : "text-stone-600 hover:bg-stone-100 hover:text-stone-950 dark:text-stone-300 dark:hover:bg-white/10 dark:hover:text-white",
+                      active ? "bg-zinc-950 text-white dark:bg-white dark:text-zinc-950" : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white",
                     );
                     return (
                       <SheetClose asChild key={item.href}>
@@ -261,31 +261,31 @@ function TopNavInner() {
                     );
                   })}
                 </nav>
-                <SheetFooter className="mt-4 flex flex-col gap-2 border-t border-stone-100 pt-4 dark:border-white/10">
+                <SheetFooter className="mt-4 flex flex-col gap-2 border-t border-zinc-100 pt-4 dark:border-white/10">
                   <button
                     type="button"
-                    className="flex items-center gap-2.5 rounded-xl border border-stone-200 px-3 py-2.5 text-left text-sm font-medium text-stone-700 transition hover:bg-stone-50 dark:border-white/10 dark:text-stone-200 dark:hover:bg-white/10"
+                    className="flex items-center gap-2.5 rounded-xl border border-zinc-200 px-3 py-2.5 text-left text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/10"
                     onClick={() => setIsKeyDialogOpen(true)}
                   >
-                    <KeyRound className="size-4 text-stone-500" />
+                    <KeyRound className="size-4 text-zinc-500" />
                     修改个人密钥
                   </button>
                   <button
                     type="button"
-                    className="flex items-center gap-2.5 rounded-xl border border-stone-200 px-3 py-2.5 text-left text-sm font-medium text-stone-700 transition hover:bg-stone-50 dark:border-white/10 dark:text-stone-200 dark:hover:bg-white/10"
+                    className="flex items-center gap-2.5 rounded-xl border border-zinc-200 px-3 py-2.5 text-left text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/10"
                     onClick={() => setIsApiDocsDialogOpen(true)}
                   >
-                    <BookOpen className="size-4 text-stone-500" />
+                    <BookOpen className="size-4 text-zinc-500" />
                     接口接入说明
                   </button>
                   <button
                     type="button"
-                    className="flex items-center gap-2.5 rounded-xl border border-stone-200 px-3 py-2.5 text-left text-sm font-medium text-stone-700 transition hover:bg-stone-50 dark:border-white/10 dark:text-stone-200 dark:hover:bg-white/10"
+                    className="flex items-center gap-2.5 rounded-xl border border-zinc-200 px-3 py-2.5 text-left text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/10"
                     onClick={() => {
                       window.dispatchEvent(new CustomEvent("open-version-release"));
                     }}
                   >
-                    <Sparkles className="size-4 text-stone-500" />
+                    <Sparkles className="size-4 text-zinc-500" />
                     版本更新说明
                   </button>
                   <button
@@ -306,7 +306,7 @@ function TopNavInner() {
               <button
                 type="button"
                 onClick={handleCanvasOpen}
-                className="relative shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] font-medium text-stone-500 transition hover:text-stone-900 sm:rounded-none sm:px-0 sm:text-[15px] dark:text-stone-400 dark:hover:text-stone-100"
+                className="relative shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] font-medium text-zinc-500 transition hover:text-zinc-900 sm:rounded-none sm:px-0 sm:text-[15px] dark:text-zinc-400 dark:hover:text-zinc-100"
               >
                 无限画布
               </button>
@@ -320,12 +320,12 @@ function TopNavInner() {
                   className={cn(
                     "relative shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] font-medium transition sm:rounded-none sm:px-0 sm:text-[15px]",
                     active
-                      ? "bg-stone-950 text-white sm:bg-transparent sm:font-semibold sm:text-stone-950 dark:bg-white dark:text-stone-950 dark:sm:bg-transparent dark:sm:text-white"
-                      : "text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100",
+                      ? "bg-zinc-950 text-white sm:bg-transparent sm:font-semibold sm:text-zinc-950 dark:bg-white dark:text-zinc-950 dark:sm:bg-transparent dark:sm:text-white"
+                      : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100",
                   )}
                 >
                   {item.label}
-                  {active ? <span className="absolute inset-x-0 -bottom-[1px] hidden h-0.5 bg-stone-950 dark:bg-white sm:block" /> : null}
+                  {active ? <span className="absolute inset-x-0 -bottom-[1px] hidden h-0.5 bg-zinc-950 dark:bg-white sm:block" /> : null}
                 </Link>
               );
             })}
@@ -336,29 +336,29 @@ function TopNavInner() {
               <PopoverTrigger asChild>
                 <button
                   type="button"
-                  className="group flex items-center gap-2 rounded-full border border-stone-200/80 bg-white/70 py-1 pl-2.5 pr-3 text-xs font-medium text-stone-700 shadow-sm backdrop-blur-sm transition-all hover:border-stone-300 hover:bg-white dark:border-white/10 dark:bg-stone-900/70 dark:text-stone-200 dark:hover:bg-stone-800"
+                  className="group flex items-center gap-2 rounded-full border border-zinc-200/80 bg-white/70 py-1 pl-2.5 pr-3 text-xs font-medium text-zinc-700 shadow-sm backdrop-blur-sm transition-all hover:border-zinc-300 hover:bg-white dark:border-white/10 dark:bg-zinc-900/70 dark:text-zinc-200 dark:hover:bg-zinc-800"
                 >
-                  <div className="flex size-5 items-center justify-center rounded-full bg-stone-100 text-stone-600 dark:bg-white/10 dark:text-stone-300">
+                  <div className="flex size-5 items-center justify-center rounded-full bg-zinc-100 text-zinc-600 dark:bg-white/10 dark:text-zinc-300">
                     <User className="size-3" />
                   </div>
                   <span className="max-w-[120px] truncate">{displayName}</span>
-                  <span className="rounded-md bg-stone-100 px-1.5 py-0.5 text-[10px] text-stone-500 dark:bg-white/10 dark:text-stone-400">
+                  <span className="rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10px] text-zinc-500 dark:bg-white/10 dark:text-zinc-400">
                     {roleLabel}
                   </span>
                 </button>
               </PopoverTrigger>
               <PopoverContent align="end" sideOffset={8} className="w-56 p-2 rounded-2xl shadow-xl">
-                <div className="border-b border-stone-100 px-2.5 py-2 dark:border-white/10">
-                  <p className="text-xs font-semibold text-stone-900 dark:text-stone-100 truncate">{displayName}</p>
-                  <p className="mt-0.5 text-[11px] text-stone-400">{roleLabel} 账户</p>
+                <div className="border-b border-zinc-100 px-2.5 py-2 dark:border-white/10">
+                  <p className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 truncate">{displayName}</p>
+                  <p className="mt-0.5 text-[11px] text-zinc-400">{roleLabel} 账户</p>
                 </div>
                 <div className="py-1 space-y-0.5">
                   <Link
                     href="/settings"
                     onClick={() => setIsPopoverOpen(false)}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-stone-700 hover:bg-stone-100 dark:text-stone-200 dark:hover:bg-white/10 transition-colors"
+                    className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-white/10 transition-colors"
                   >
-                    <Settings className="size-3.5 text-stone-500" />
+                    <Settings className="size-3.5 text-zinc-500" />
                     设置
                   </Link>
                   <button
@@ -367,9 +367,9 @@ function TopNavInner() {
                       setIsPopoverOpen(false);
                       setIsKeyDialogOpen(true);
                     }}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-stone-700 hover:bg-stone-100 dark:text-stone-200 dark:hover:bg-white/10 transition-colors"
+                    className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-white/10 transition-colors"
                   >
-                    <KeyRound className="size-3.5 text-stone-500" />
+                    <KeyRound className="size-3.5 text-zinc-500" />
                     修改个人密钥
                   </button>
                   <button
@@ -378,9 +378,9 @@ function TopNavInner() {
                       setIsPopoverOpen(false);
                       setIsApiDocsDialogOpen(true);
                     }}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-stone-700 hover:bg-stone-100 dark:text-stone-200 dark:hover:bg-white/10 transition-colors"
+                    className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-white/10 transition-colors"
                   >
-                    <BookOpen className="size-3.5 text-stone-500" />
+                    <BookOpen className="size-3.5 text-zinc-500" />
                     接口接入说明
                   </button>
                   <button
@@ -389,13 +389,13 @@ function TopNavInner() {
                       setIsPopoverOpen(false);
                       window.dispatchEvent(new CustomEvent("open-version-release"));
                     }}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-stone-700 hover:bg-stone-100 dark:text-stone-200 dark:hover:bg-white/10 transition-colors"
+                    className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-white/10 transition-colors"
                   >
-                    <Sparkles className="size-3.5 text-stone-500" />
+                    <Sparkles className="size-3.5 text-zinc-500" />
                     版本更新说明
                   </button>
                 </div>
-                <div className="border-t border-stone-100 pt-1 dark:border-white/10">
+                <div className="border-t border-zinc-100 pt-1 dark:border-white/10">
                   <button
                     type="button"
                     onClick={() => void handleLogout()}
@@ -419,18 +419,18 @@ function TopNavInner() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <div className="text-xs font-medium text-stone-500">完整跳转地址</div>
-            <div className="max-h-28 overflow-auto break-all rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 font-mono text-xs leading-5 text-stone-700">
+            <div className="text-xs font-medium text-zinc-500">完整跳转地址</div>
+            <div className="max-h-28 overflow-auto break-all rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 font-mono text-xs leading-5 text-zinc-700">
               {canvasDisplayHref}
             </div>
           </div>
           <DialogFooter className="pt-2">
             <DialogClose asChild>
-              <Button type="button" variant="outline" className="rounded-xl border-stone-200 bg-white text-stone-700">
+              <Button type="button" variant="outline" className="rounded-xl border-zinc-200 bg-white text-zinc-700">
                 取消
               </Button>
             </DialogClose>
-            <Button type="button" className="rounded-xl bg-stone-950 text-white hover:bg-stone-800" onClick={confirmCanvasOpen}>
+            <Button type="button" className="rounded-xl bg-zinc-950 text-white hover:bg-zinc-800" onClick={confirmCanvasOpen}>
               继续跳转
             </Button>
           </DialogFooter>
@@ -451,7 +451,7 @@ function TopNavInner() {
           </DialogHeader>
           <form onSubmit={handleKeyChangeSubmit} className="space-y-4 pt-2">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-stone-600 dark:text-stone-400">当前旧密钥</label>
+              <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">当前旧密钥</label>
               <Input
                 type="password"
                 value={oldKey}
@@ -463,7 +463,7 @@ function TopNavInner() {
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-stone-600 dark:text-stone-400">新密钥</label>
+              <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">新密钥</label>
               <Input
                 type="password"
                 value={newKey}
@@ -475,7 +475,7 @@ function TopNavInner() {
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-stone-600 dark:text-stone-400">确认新密钥</label>
+              <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">确认新密钥</label>
               <Input
                 type="password"
                 value={confirmKey}
@@ -490,7 +490,7 @@ function TopNavInner() {
               <Button
                 type="button"
                 variant="outline"
-                className="rounded-xl border-stone-200"
+                className="rounded-xl border-zinc-200"
                 onClick={() => {
                   setIsKeyDialogOpen(false);
                   setOldKey("");
@@ -503,7 +503,7 @@ function TopNavInner() {
               </Button>
               <Button
                 type="submit"
-                className="rounded-xl bg-stone-950 text-white hover:bg-stone-800"
+                className="rounded-xl bg-zinc-950 text-white hover:bg-zinc-800"
                 disabled={isSubmittingKey}
               >
                 {isSubmittingKey ? <LoaderCircle className="mr-1.5 size-4 animate-spin" /> : null}
@@ -528,49 +528,49 @@ function TopNavInner() {
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs font-medium text-stone-600 dark:text-stone-400">
+              <div className="flex items-center justify-between text-xs font-medium text-zinc-600 dark:text-zinc-400">
                 <span>API 接口地址 (Base URL)</span>
                 <button
                   type="button"
                   onClick={() => void copyToClipboard(`${baseUrl}/v1`, "base-url")}
-                  className="flex items-center gap-1 text-[11px] text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
+                  className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
                 >
                   {copiedField === "base-url" ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
                   复制地址
                 </button>
               </div>
-              <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 font-mono text-xs text-stone-800 dark:border-white/10 dark:bg-stone-900/50 dark:text-stone-200">
+              <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 font-mono text-xs text-zinc-800 dark:border-white/10 dark:bg-zinc-900/50 dark:text-zinc-200">
                 {baseUrl}/v1
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs font-medium text-stone-600 dark:text-stone-400">
+              <div className="flex items-center justify-between text-xs font-medium text-zinc-600 dark:text-zinc-400">
                 <span>您的专属 API 密钥 (API Key)</span>
                 <button
                   type="button"
                   onClick={() => void copyToClipboard(session?.key || "", "api-key")}
-                  className="flex items-center gap-1 text-[11px] text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
+                  className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
                 >
                   {copiedField === "api-key" ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
                   复制密钥
                 </button>
               </div>
-              <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 font-mono text-xs text-stone-800 dark:border-white/10 dark:bg-stone-900/50 dark:text-stone-200 truncate">
+              <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 font-mono text-xs text-zinc-800 dark:border-white/10 dark:bg-zinc-900/50 dark:text-zinc-200 truncate">
                 {session?.key}
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <span className="text-xs font-medium text-stone-600 dark:text-stone-400">支持模型</span>
+              <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">支持模型</span>
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="rounded-xl border border-stone-200/80 p-2.5 dark:border-white/10">
-                  <div className="font-semibold text-stone-800 dark:text-stone-200">gpt-image-2</div>
-                  <div className="mt-0.5 text-[11px] text-stone-400">文生图 / 图像编辑</div>
+                <div className="rounded-xl border border-zinc-200/80 p-2.5 dark:border-white/10">
+                  <div className="font-semibold text-zinc-800 dark:text-zinc-200">gpt-image-2</div>
+                  <div className="mt-0.5 text-[11px] text-zinc-400">文生图 / 图像编辑</div>
                 </div>
-                <div className="rounded-xl border border-stone-200/80 p-2.5 dark:border-white/10">
-                  <div className="font-semibold text-stone-800 dark:text-stone-200">auto / gpt-4o</div>
-                  <div className="mt-0.5 text-[11px] text-stone-400">智能对话 / 联网搜索</div>
+                <div className="rounded-xl border border-zinc-200/80 p-2.5 dark:border-white/10">
+                  <div className="font-semibold text-zinc-800 dark:text-zinc-200">auto / gpt-4o</div>
+                  <div className="mt-0.5 text-[11px] text-zinc-400">智能对话 / 联网搜索</div>
                 </div>
               </div>
             </div>
@@ -578,7 +578,7 @@ function TopNavInner() {
           <DialogFooter className="pt-3">
             <Button
               type="button"
-              className="rounded-xl bg-stone-950 text-white hover:bg-stone-800"
+              className="rounded-xl bg-zinc-950 text-white hover:bg-zinc-800"
               onClick={() => setIsApiDocsDialogOpen(false)}
             >
               我知道了
@@ -592,7 +592,7 @@ function TopNavInner() {
 
 export function TopNav() {
   return (
-    <Suspense fallback={<header className="border-b border-stone-100/50 dark:border-white/10 min-h-12" />}>
+    <Suspense fallback={<header className="border-b border-zinc-100/50 dark:border-white/10 min-h-12" />}>
       <TopNavInner />
     </Suspense>
   );

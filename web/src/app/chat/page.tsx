@@ -256,7 +256,7 @@ export default function ChatPage() {
           ))}
         {!chat.threads.some((t) =>
           t.title.toLowerCase().includes(query.toLowerCase()),
-        ) && <p className="p-3 text-sm text-stone-500">没有找到相关对话</p>}
+        ) && <p className="p-3 text-sm text-zinc-500">没有找到相关对话</p>}
       </div>
       <div className="chat-local-note">
         仅保存在此浏览器
@@ -788,7 +788,7 @@ function Composer({
               <ImagePlus size={18} />
             )}
           </button>
-          <span className="hidden text-xs text-stone-400 sm:inline">
+          <span className="hidden text-xs text-zinc-400 sm:inline">
             Enter 发送 · Shift + Enter 换行
           </span>
           <span className="ml-auto" />

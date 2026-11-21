@@ -115,17 +115,17 @@ export function AccountSettingsCard({ session, onSessionChange }: AccountSetting
       <Card className="rounded-2xl border-white/80 bg-white/90 shadow-sm">
         <CardHeader>
           <div className="flex items-center gap-2">
-            <User className="size-5 text-stone-700" />
+            <User className="size-5 text-zinc-700" />
             <CardTitle className="text-base font-semibold">账号信息</CardTitle>
           </div>
-          <CardDescription className="text-xs text-stone-500">
+          <CardDescription className="text-xs text-zinc-500">
             当前登录角色：{roleLabel}。修改名称后立即生效。
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleNameSubmit} className="max-w-md space-y-3">
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-stone-700">账号名称</Label>
+              <Label className="text-xs font-medium text-zinc-700">账号名称</Label>
               <Input
                 value={name}
                 onChange={(event) => setName(event.target.value)}
@@ -136,7 +136,7 @@ export function AccountSettingsCard({ session, onSessionChange }: AccountSetting
             <Button
               type="submit"
               disabled={isSavingName}
-              className="rounded-xl bg-stone-950 text-white hover:bg-stone-800"
+              className="rounded-xl bg-zinc-950 text-white hover:bg-zinc-800"
             >
               {isSavingName ? <LoaderCircle className="mr-1.5 size-4 animate-spin" /> : null}
               保存名称
@@ -151,14 +151,14 @@ export function AccountSettingsCard({ session, onSessionChange }: AccountSetting
             <KeyRound className="size-5 text-amber-500" />
             <CardTitle className="text-base font-semibold">修改个人密钥</CardTitle>
           </div>
-          <CardDescription className="text-xs text-stone-500">
+          <CardDescription className="text-xs text-zinc-500">
             该密钥同时用于登录和调用 API，修改成功后会自动使用新密钥。
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleKeySubmit} className="max-w-md space-y-3">
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-stone-700">当前密钥</Label>
+              <Label className="text-xs font-medium text-zinc-700">当前密钥</Label>
               <Input
                 type="password"
                 value={oldKey}
@@ -169,7 +169,7 @@ export function AccountSettingsCard({ session, onSessionChange }: AccountSetting
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-stone-700">新密钥</Label>
+              <Label className="text-xs font-medium text-zinc-700">新密钥</Label>
               <Input
                 type="password"
                 value={newKey}
@@ -180,7 +180,7 @@ export function AccountSettingsCard({ session, onSessionChange }: AccountSetting
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-stone-700">确认新密钥</Label>
+              <Label className="text-xs font-medium text-zinc-700">确认新密钥</Label>
               <Input
                 type="password"
                 value={confirmKey}
@@ -193,7 +193,7 @@ export function AccountSettingsCard({ session, onSessionChange }: AccountSetting
             <Button
               type="submit"
               disabled={isSavingKey}
-              className="rounded-xl bg-stone-950 text-white hover:bg-stone-800"
+              className="rounded-xl bg-zinc-950 text-white hover:bg-zinc-800"
             >
               {isSavingKey ? <LoaderCircle className="mr-1.5 size-4 animate-spin" /> : null}
               确认修改
@@ -208,40 +208,40 @@ export function AccountSettingsCard({ session, onSessionChange }: AccountSetting
             <KeyRound className="size-5 text-indigo-500" />
             <CardTitle className="text-base font-semibold">接口接入信息</CardTitle>
           </div>
-          <CardDescription className="text-xs text-stone-500">
+          <CardDescription className="text-xs text-zinc-500">
             可在任意兼容 OpenAI 的客户端中填入以下地址和密钥。
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs font-medium text-stone-600">
+            <div className="flex items-center justify-between text-xs font-medium text-zinc-600">
               <span>Base URL</span>
               <button
                 type="button"
                 onClick={() => void copyToClipboard(baseUrl, "base-url")}
-                className="flex items-center gap-1 text-[11px] text-stone-500 hover:text-stone-800"
+                className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-800"
               >
                 {copiedField === "base-url" ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
                 复制地址
               </button>
             </div>
-            <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 font-mono text-xs text-stone-800">
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 font-mono text-xs text-zinc-800">
               {baseUrl}
             </div>
           </div>
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs font-medium text-stone-600">
+            <div className="flex items-center justify-between text-xs font-medium text-zinc-600">
               <span>API Key</span>
               <button
                 type="button"
                 onClick={() => void copyToClipboard(session.key, "api-key")}
-                className="flex items-center gap-1 text-[11px] text-stone-500 hover:text-stone-800"
+                className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-800"
               >
                 {copiedField === "api-key" ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
                 复制密钥
               </button>
             </div>
-            <div className="truncate rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 font-mono text-xs text-stone-800">
+            <div className="truncate rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 font-mono text-xs text-zinc-800">
               {session.key}
             </div>
           </div>

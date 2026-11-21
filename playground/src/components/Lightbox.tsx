@@ -708,9 +708,9 @@ function LightboxInner({ src, imageId, maskPreviewSrc, onClose, showNav, current
           <img
             src={src}
             data-image-id={imageId}
+            alt="图片预览"
             className="saveable-image max-w-[90vw] max-h-[70vh] sm:max-w-[85vw] sm:max-h-[75vh] object-contain rounded-lg shadow-2xl"
             onDragStart={(e) => e.preventDefault()}
-            alt=""
           />
           {maskPreviewSrc && (
             <img

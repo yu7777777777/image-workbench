@@ -220,7 +220,7 @@ export default function HistoryModal({ onClose, ignoreOutsideClickRef }: History
   return (
     <div 
       ref={modalRef}
-      className="absolute top-12 left-0 w-80 sm:w-96 max-w-[calc(100vw-2rem)] max-h-[70vh] bg-white dark:bg-[#1c1c1e] rounded-xl shadow-2xl overflow-hidden flex flex-col border border-gray-200 dark:border-white/10 z-50 text-gray-900 dark:text-gray-200 animate-dropdown-down"
+      className="absolute top-12 left-0 w-80 sm:w-96 max-w-[calc(100vw-2rem)] max-h-[70vh] bg-white dark:bg-[oklch(0.227 0.004 286)] rounded-xl shadow-2xl overflow-hidden flex flex-col border border-gray-200 dark:border-white/10 z-50 text-gray-900 dark:text-gray-200 animate-dropdown-down"
     >
       <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-white/10 shrink-0">
         <input 

@@ -178,7 +178,7 @@ export default function SettingsPage() {
   if (isCheckingAuth || !activeSession) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
-        <LoaderCircle className="size-5 animate-spin text-stone-400" />
+        <LoaderCircle className="size-5 animate-spin text-zinc-400" />
       </div>
     );
   }

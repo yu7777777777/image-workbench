@@ -56,9 +56,9 @@ export interface ImageAnnotatorModalProps {
 const APPLY_LABEL_FALLBACK = '应用'
 
 const CANVAS_BG_STYLE = {
-  backgroundColor: '#f4f4f5',
+  backgroundColor: 'oklch(0.967 0.001 286)',
   backgroundImage:
-    'repeating-conic-gradient(#e4e4e7 0% 25%, #f4f4f5 0% 50%)',
+    'repeating-conic-gradient(oklch(0.92 0.004 286) 0% 25%, oklch(0.967 0.001 286) 0% 50%)',
   backgroundSize: '22px 22px',
 } as const
 
@@ -75,11 +75,11 @@ const FOOTER_BUTTON_PRIMARY = 'bg-blue-500 text-white hover:bg-blue-600 disabled
 const FIELD_INPUT_CLASS =
   'h-7 w-14 rounded-md border border-zinc-200 bg-white px-2 text-[11px] text-zinc-700 outline-none focus:border-blue-400 dark:border-white/[0.12] dark:bg-white/[0.06] dark:text-zinc-200'
 const COMMENT_ANCHOR_FONT = `600 ${ANCHOR_RADIUS}px system-ui`
-const COMMENT_ANCHOR_FILL = '#2563eb'
-const COMMENT_ANCHOR_TEXT = '#ffffff'
-const HIGHLIGHT_COLOR = '#3b82f6'
-const GUIDE_COLOR = '#3b82f6'
-const MASK_STROKE_COLOR = 'rgba(45, 212, 191, .55)'
+const COMMENT_ANCHOR_FILL = 'oklch(0.546 0.215 263)'
+const COMMENT_ANCHOR_TEXT = 'oklch(1 0 90)'
+const HIGHLIGHT_COLOR = 'oklch(0.623 0.188 260)'
+const GUIDE_COLOR = 'oklch(0.623 0.188 260)'
+const MASK_STROKE_COLOR = 'oklch(0.785 0.133 182  / .55)'
 /** 评论输入框与锚点之间的间距、与视口边缘的安全距离（视口像素） */
 const COMMENT_FORM_GAP = 12
 const COMMENT_FORM_MARGIN = 8
@@ -105,7 +105,7 @@ export function ImageAnnotatorModal({ imageId, onClose, onApply, applyLabel, tit
   const [activeCommentIndex, setActiveCommentIndex] = useState<number | null>(null)
   const [crop, setCrop] = useState({ x: 0, y: 0, width: 1, height: 1 })
   const [brushSize, setBrushSize] = useState(18)
-  const [brushColor, setBrushColor] = useState('#2563eb')
+  const [brushColor, setBrushColor] = useState('oklch(0.546 0.215 263)')
   const [strokes, setStrokes] = useState<ImageAnnotatorPoint[][]>([])
   const [currentStroke, setCurrentStroke] = useState<ImageAnnotatorPoint[]>([])
   const [scale, setScale] = useState(1)
@@ -137,7 +137,7 @@ export function ImageAnnotatorModal({ imageId, onClose, onApply, applyLabel, tit
     const rect = { x: crop.x * canvas.width, y: crop.y * canvas.height, width: crop.width * canvas.width, height: crop.height * canvas.height }
     if (mode === 'crop') {
       ctx.save()
-      ctx.fillStyle = 'rgba(0,0,0,.45)'
+      ctx.fillStyle = 'oklch(0.000 0.000 0  / .45)'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
       ctx.clearRect(rect.x, rect.y, rect.width, rect.height)
       ctx.drawImage(image, rect.x, rect.y, rect.width, rect.height, rect.x, rect.y, rect.width, rect.height)
@@ -171,7 +171,7 @@ export function ImageAnnotatorModal({ imageId, onClose, onApply, applyLabel, tit
     }
     if (mode === 'resize') {
       ctx.save()
-      ctx.fillStyle = 'rgba(0,0,0,.46)'
+      ctx.fillStyle = 'oklch(0.000 0.000 0  / .46)'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
       ctx.fillStyle = '#fff'
       ctx.font = '600 18px system-ui'
@@ -192,7 +192,7 @@ export function ImageAnnotatorModal({ imageId, onClose, onApply, applyLabel, tit
         if (activeCommentIndex === index) {
           ctx.beginPath()
           ctx.arc(x, y, ANCHOR_RADIUS + 6, 0, Math.PI * 2)
-          ctx.fillStyle = 'rgba(59, 130, 246, .28)'
+          ctx.fillStyle = 'oklch(0.623 0.188 260  / .28)'
           ctx.fill()
         }
         ctx.beginPath()
@@ -200,7 +200,7 @@ export function ImageAnnotatorModal({ imageId, onClose, onApply, applyLabel, tit
         ctx.fillStyle = COMMENT_ANCHOR_FILL
         ctx.fill()
         ctx.lineWidth = 2
-        ctx.strokeStyle = 'rgba(255, 255, 255, .85)'
+        ctx.strokeStyle = 'oklch(1.000 0.000 90  / .85)'
         ctx.stroke()
         ctx.fillStyle = COMMENT_ANCHOR_TEXT
         ctx.fillText(String(index + 1), x, y + 1)
@@ -527,7 +527,7 @@ export function ImageAnnotatorModal({ imageId, onClose, onApply, applyLabel, tit
       onPointerDown={(event) => { if (event.target === event.currentTarget && !saving) onClose() }}
     >
       <section
-        className="flex max-h-[94vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white text-zinc-900 shadow-2xl dark:border-white/[0.08] dark:bg-[#1c1c1e] dark:text-zinc-100"
+        className="flex max-h-[94vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white text-zinc-900 shadow-2xl dark:border-white/[0.08] dark:bg-[oklch(0.227 0.004 286)] dark:text-zinc-100"
         onPointerDown={(event) => event.stopPropagation()}
       >
         <header className="flex shrink-0 items-start justify-between gap-3 border-b border-zinc-100 px-4 py-3 dark:border-white/[0.08] sm:px-5">
@@ -629,7 +629,7 @@ export function ImageAnnotatorModal({ imageId, onClose, onApply, applyLabel, tit
             {/* 加载/错误覆盖层：只盖画布本身，层级(z-20)低于评论输入框(z-[95])，且 pointer-events-none，
                 保证「正在读取图片…」永远挡不住也不能截断输入框的焦点与点击 */}
             {(loading || error) && (
-              <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-white/80 backdrop-blur-[1px] dark:bg-[#1c1c1e]/80">
+              <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-white/80 backdrop-blur-[1px] dark:bg-[oklch(0.227 0.004 286)]/80">
                 <p className={error ? 'text-xs text-red-500 dark:text-red-400' : 'text-xs text-zinc-500 dark:text-zinc-400'}>
                   {error || '正在读取图片…'}
                 </p>
@@ -640,7 +640,7 @@ export function ImageAnnotatorModal({ imageId, onClose, onApply, applyLabel, tit
             {mode === 'comment' && draftComment && createPortal(
               <form
                 ref={commentFormRef}
-                className="fixed z-[95] flex max-h-[min(60vh,22rem)] w-64 flex-col gap-2 overflow-auto rounded-xl border border-zinc-200 bg-white p-3 shadow-2xl dark:border-white/[0.1] dark:bg-[#26262a]"
+                className="fixed z-[95] flex max-h-[min(60vh,22rem)] w-64 flex-col gap-2 overflow-auto rounded-xl border border-zinc-200 bg-white p-3 shadow-2xl dark:border-white/[0.1] dark:bg-[oklch(0.27 0.007 286)]"
                 style={{ left: 0, top: 0 }}
                 onSubmit={(event) => { event.preventDefault(); saveDraftComment() }}
               >

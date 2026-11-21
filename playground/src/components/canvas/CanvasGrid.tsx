@@ -15,7 +15,7 @@ export const CanvasGrid = memo(function CanvasGrid({ transform, visible }: Canva
     <div
       className="absolute inset-0 pointer-events-none"
       style={{
-        backgroundImage: `radial-gradient(circle, rgba(255, 255, 255, ${opacity}) 1px, transparent 1px)`,
+        backgroundImage: `radial-gradient(circle, oklch(1 0 0 / ${opacity}) 1px, transparent 1px)`,
         backgroundSize: `${spacing}px ${spacing}px`,
         backgroundPosition: `${transform.x % spacing}px ${transform.y % spacing}px`,
       }}

@@ -75,13 +75,13 @@ const fileNameOf = (url: string) => {
 function ResultFile({ href, icon, label }: { href?: string; icon: ReactNode; label: string }) {
   if (!href) return null;
   return (
-    <div className="flex items-center gap-3 rounded-md border border-stone-200 bg-stone-50/80 px-3 py-3 dark:border-white/10 dark:bg-white/[0.04]">
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-white text-stone-700 shadow-sm dark:bg-white/10 dark:text-stone-200">
+    <div className="flex items-center gap-3 rounded-md border border-zinc-200 bg-zinc-50/80 px-3 py-3 dark:border-white/10 dark:bg-white/[0.04]">
+      <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-white text-zinc-700 shadow-sm dark:bg-white/10 dark:text-zinc-200">
         {icon}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="text-sm font-semibold text-stone-950 dark:text-stone-50">{label}</div>
-        <div className="truncate text-xs text-stone-500 dark:text-stone-400">{fileNameOf(href)}</div>
+        <div className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">{label}</div>
+        <div className="truncate text-xs text-zinc-500 dark:text-zinc-400">{fileNameOf(href)}</div>
       </div>
       <Button size="sm" asChild>
         <a href={href} target="_blank" rel="noreferrer">下载</a>
@@ -272,21 +272,21 @@ export function EditableFilePanel({ title, kind, endpoint, defaultPrompt, imageR
 
   return (
     <>
-    <div className="grid h-full min-h-[calc(100vh-148px)] overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm dark:border-white/10 dark:bg-stone-950 lg:grid-cols-[288px_420px_minmax(0,1fr)]">
-      <aside className="flex min-h-0 flex-col border-b border-stone-200 bg-stone-50/70 dark:border-white/10 dark:bg-white/[0.02] lg:border-r lg:border-b-0">
-        <div className="flex h-14 items-center justify-between border-b border-stone-200 px-4 dark:border-white/10">
-          <div className="flex items-center gap-2 text-sm font-semibold text-stone-950 dark:text-stone-50">
+    <div className="grid h-full min-h-[calc(100vh-148px)] overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-white/10 dark:bg-zinc-950 lg:grid-cols-[288px_420px_minmax(0,1fr)]">
+      <aside className="flex min-h-0 flex-col border-b border-zinc-200 bg-zinc-50/70 dark:border-white/10 dark:bg-white/[0.02] lg:border-r lg:border-b-0">
+        <div className="flex h-14 items-center justify-between border-b border-zinc-200 px-4 dark:border-white/10">
+          <div className="flex items-center gap-2 text-sm font-semibold text-zinc-950 dark:text-zinc-50">
             <History className="size-4" />
             历史记录
           </div>
           <div className="flex gap-1">
-            <Button size="sm" variant="ghost" onClick={createDraft}>
+            <Button size="sm" variant="ghost" aria-label="新建任务" onClick={createDraft}>
               <Plus />
             </Button>
-            <Button size="sm" variant="ghost" onClick={refreshAll} disabled={polling}>
+            <Button size="sm" variant="ghost" aria-label="刷新任务列表" onClick={refreshAll} disabled={polling}>
               {polling ? <LoaderCircle className="animate-spin" /> : <RefreshCw />}
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setDeleteConfirm({ type: "all", ids: tasks.filter((task) => task.kind === kind).map(taskIdOf).filter(Boolean) })} disabled={!visibleTasks.length}>
+            <Button size="sm" variant="ghost" aria-label="清空全部任务" onClick={() => setDeleteConfirm({ type: "all", ids: tasks.filter((task) => task.kind === kind).map(taskIdOf).filter(Boolean) })} disabled={!visibleTasks.length}>
               <Trash2 />
             </Button>
           </div>
@@ -296,7 +296,7 @@ export function EditableFilePanel({ title, kind, endpoint, defaultPrompt, imageR
             const id = taskIdOf(task);
             const taskTitle = drafts[id]?.title || titleOfPrompt(task.prompt_preview || drafts[id]?.prompt || "", task.kind?.toUpperCase() || title);
             return (
-              <div key={id} className={cn("group mb-2 rounded-md border px-3 py-2.5 transition", selectedId === id ? "border-stone-950 bg-white shadow-sm dark:border-white/60 dark:bg-white/10" : "border-transparent bg-transparent hover:border-stone-200 hover:bg-white dark:hover:border-white/10 dark:hover:bg-white/[0.05]")}>
+              <div key={id} className={cn("group mb-2 rounded-md border px-3 py-2.5 transition", selectedId === id ? "border-zinc-950 bg-white shadow-sm dark:border-white/60 dark:bg-white/10" : "border-transparent bg-transparent hover:border-zinc-200 hover:bg-white dark:hover:border-white/10 dark:hover:bg-white/[0.05]")}>
                 <div className="flex items-start gap-2">
                   <button type="button" onClick={() => selectTask(id)} className="min-w-0 flex-1 text-left">
                     <div className="flex min-w-0 items-center justify-between gap-2">
@@ -310,26 +310,26 @@ export function EditableFilePanel({ title, kind, endpoint, defaultPrompt, imageR
                             if (event.key === "Escape") setRenamingId("");
                           }}
                           onClick={(event) => event.stopPropagation()}
-                          className="min-w-0 flex-1 rounded border border-stone-300 bg-white px-2 py-1 text-sm font-semibold outline-none focus:border-stone-500 dark:border-white/15 dark:bg-stone-950"
+                          className="min-w-0 flex-1 rounded border border-zinc-300 bg-white px-2 py-1 text-sm font-semibold outline-none focus:border-zinc-500 dark:border-white/15 dark:bg-zinc-950"
                           autoFocus
                         />
                       ) : (
-                        <span className="truncate text-sm font-semibold text-stone-950 dark:text-stone-50">{taskTitle}</span>
+                        <span className="truncate text-sm font-semibold text-zinc-950 dark:text-zinc-50">{taskTitle}</span>
                       )}
                       <span className={cn("shrink-0 rounded-full border px-2 py-0.5 text-[11px]", statusClass(task.status))}>{statusText(task.status)}</span>
                     </div>
-                    <div className="mt-2 flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400">
+                    <div className="mt-2 flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
                       <Clock3 className="size-3.5" />
                       <span className="tabular-nums">{formatElapsed(elapsedOf(task))}</span>
                       <span className="truncate">{task.created_at || id}</span>
                     </div>
-                    {(task.prompt_preview || drafts[id]?.prompt) ? <div className="mt-2 line-clamp-2 text-xs leading-5 text-stone-500 dark:text-stone-400">{task.prompt_preview || drafts[id]?.prompt}</div> : null}
+                    {(task.prompt_preview || drafts[id]?.prompt) ? <div className="mt-2 line-clamp-2 text-xs leading-5 text-zinc-500 dark:text-zinc-400">{task.prompt_preview || drafts[id]?.prompt}</div> : null}
                   </button>
                   <div className="flex shrink-0 opacity-100 sm:opacity-0 sm:transition sm:group-hover:opacity-100">
                     <Button size="sm" variant="ghost" onClick={() => startRename(id)} className="size-7 px-0">
                       <Pencil className="size-3.5" />
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setDeleteConfirm({ type: "one", id })} className="size-7 px-0 text-stone-400 hover:text-rose-500">
+                    <Button size="sm" variant="ghost" onClick={() => setDeleteConfirm({ type: "one", id })} className="size-7 px-0 text-zinc-400 hover:text-rose-500">
                       <Trash2 className="size-3.5" />
                     </Button>
                   </div>
@@ -337,14 +337,14 @@ export function EditableFilePanel({ title, kind, endpoint, defaultPrompt, imageR
               </div>
             );
           }) : (
-            <div className="flex h-full items-center justify-center text-sm text-stone-400 dark:text-stone-500">暂无记录</div>
+            <div className="flex h-full items-center justify-center text-sm text-zinc-400 dark:text-zinc-500">暂无记录</div>
           )}
         </div>
       </aside>
 
-      <section className="flex min-h-0 flex-col border-b border-stone-200 dark:border-white/10 lg:border-r lg:border-b-0">
-        <div className="flex h-14 items-center justify-between border-b border-stone-200 px-5 dark:border-white/10">
-          <h2 className="text-sm font-semibold text-stone-950 dark:text-stone-50">{title}</h2>
+      <section className="flex min-h-0 flex-col border-b border-zinc-200 dark:border-white/10 lg:border-r lg:border-b-0">
+        <div className="flex h-14 items-center justify-between border-b border-zinc-200 px-5 dark:border-white/10">
+          <h2 className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">{title}</h2>
           <Button size="sm" onClick={() => void submit()} disabled={submitting || running}>
             {submitting ? <LoaderCircle className="animate-spin" /> : <Play />}
             生成
@@ -352,15 +352,15 @@ export function EditableFilePanel({ title, kind, endpoint, defaultPrompt, imageR
         </div>
         <div className="min-h-0 flex-1 space-y-5 overflow-auto p-5">
           <div className="space-y-2">
-            <Label htmlFor={`${endpoint}-prompt`} className="text-xs font-semibold text-stone-700 dark:text-stone-300">需求</Label>
-            <Textarea id={`${endpoint}-prompt`} value={prompt} onChange={(event) => setPrompt(event.target.value)} className="min-h-56 rounded-md border-stone-200 bg-white text-sm leading-6 shadow-none dark:border-white/10 dark:bg-white/[0.03]" />
+            <Label htmlFor={`${endpoint}-prompt`} className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">需求</Label>
+            <Textarea id={`${endpoint}-prompt`} value={prompt} onChange={(event) => setPrompt(event.target.value)} className="min-h-56 rounded-md border-zinc-200 bg-white text-sm leading-6 shadow-none dark:border-white/10 dark:bg-white/[0.03]" />
           </div>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label className="text-xs font-semibold text-stone-700 dark:text-stone-300">参考图</Label>
-              <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-500 dark:bg-white/10 dark:text-stone-400">{images.length}</span>
+              <Label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">参考图</Label>
+              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500 dark:bg-white/10 dark:text-zinc-400">{images.length}</span>
             </div>
-            <label className="group flex h-24 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-stone-300 bg-stone-50 text-sm font-medium text-stone-600 transition hover:border-stone-950 hover:bg-white dark:border-white/15 dark:bg-white/[0.03] dark:text-stone-300 dark:hover:border-white/50">
+            <label className="group flex h-24 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-zinc-300 bg-zinc-50 text-sm font-medium text-zinc-600 transition hover:border-zinc-950 hover:bg-white dark:border-white/15 dark:bg-white/[0.03] dark:text-zinc-300 dark:hover:border-white/50">
               <ImagePlus className="size-4 transition group-hover:scale-110" />
               上传图片
               <Input type="file" accept="image/*" multiple onChange={(event) => void appendFiles(event.target.files)} className="hidden" />
@@ -368,7 +368,7 @@ export function EditableFilePanel({ title, kind, endpoint, defaultPrompt, imageR
             {images.length ? (
               <div className="grid grid-cols-4 gap-2">
                 {images.slice(0, 8).map((src, index) => (
-                  <img key={`${src.slice(0, 28)}-${index}`} src={src} alt="" className="aspect-square rounded-md border border-stone-200 object-cover dark:border-white/10" />
+                  <img key={`${src.slice(0, 28)}-${index}`} src={src} alt="" className="aspect-square rounded-md border border-zinc-200 object-cover dark:border-white/10" />
                 ))}
               </div>
             ) : null}
@@ -384,34 +384,34 @@ export function EditableFilePanel({ title, kind, endpoint, defaultPrompt, imageR
       </section>
 
       <section className="flex min-h-0 flex-col">
-        <div className="flex h-14 items-center justify-between border-b border-stone-200 px-5 dark:border-white/10">
-          <h2 className="text-sm font-semibold text-stone-950 dark:text-stone-50">生成状态</h2>
+        <div className="flex h-14 items-center justify-between border-b border-zinc-200 px-5 dark:border-white/10">
+          <h2 className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">生成状态</h2>
           {selectedTask ? <span className={cn("rounded-full border px-2.5 py-1 text-xs", statusClass(selectedTask.status))}>{statusText(selectedTask.status)}</span> : null}
         </div>
         <div className="min-h-0 flex-1 overflow-auto p-5">
           {selectedTask ? (
             <div className="space-y-5">
               <div className="grid gap-3 sm:grid-cols-[150px_150px_minmax(0,1fr)]">
-                <div className="rounded-md border border-stone-200 bg-stone-50 p-4 dark:border-white/10 dark:bg-white/[0.03]">
-                  <div className="text-xs text-stone-500 dark:text-stone-400">状态</div>
-                  <div className="mt-2 flex items-center gap-2 text-sm font-semibold text-stone-950 dark:text-stone-50">
+                <div className="rounded-md border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+                  <div className="text-xs text-zinc-500 dark:text-zinc-400">状态</div>
+                  <div className="mt-2 flex items-center gap-2 text-sm font-semibold text-zinc-950 dark:text-zinc-50">
                     {selectedTask.status === "success" ? <CheckCircle2 className="size-4 text-emerald-500" /> : selectedTask.status === "error" ? <XCircle className="size-4 text-rose-500" /> : <LoaderCircle className="size-4 animate-spin text-amber-500" />}
                     {statusText(selectedTask.status)}
                   </div>
                 </div>
-                <div className="rounded-md border border-stone-200 bg-stone-50 p-4 dark:border-white/10 dark:bg-white/[0.03]">
-                  <div className="text-xs text-stone-500 dark:text-stone-400">已执行</div>
-                  <div className="mt-2 text-2xl font-semibold tabular-nums text-stone-950 dark:text-stone-50">{formatElapsed(elapsedOf(selectedTask))}</div>
+                <div className="rounded-md border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+                  <div className="text-xs text-zinc-500 dark:text-zinc-400">已执行</div>
+                  <div className="mt-2 text-2xl font-semibold tabular-nums text-zinc-950 dark:text-zinc-50">{formatElapsed(elapsedOf(selectedTask))}</div>
                 </div>
-                <div className="rounded-md border border-stone-200 bg-stone-50 p-4 dark:border-white/10 dark:bg-white/[0.03]">
-                  <div className="text-xs text-stone-500 dark:text-stone-400">Task ID</div>
-                  <div className="mt-2 truncate font-mono text-xs text-stone-700 dark:text-stone-300">{taskIdOf(selectedTask)}</div>
+                <div className="rounded-md border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+                  <div className="text-xs text-zinc-500 dark:text-zinc-400">Task ID</div>
+                  <div className="mt-2 truncate font-mono text-xs text-zinc-700 dark:text-zinc-300">{taskIdOf(selectedTask)}</div>
                 </div>
               </div>
 
               {selectedTask.result ? (
-                <div className="space-y-3 rounded-md border border-stone-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.03]">
-                  <div className="text-sm font-semibold text-stone-950 dark:text-stone-50">生成结果</div>
+                <div className="space-y-3 rounded-md border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.03]">
+                  <div className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">生成结果</div>
                   <ResultFile href={selectedTask.result.primary_url} icon={<FileText className="size-4" />} label={kind === "ppt" ? "PPT 文件" : "PSD 文件"} />
                   <ResultFile href={selectedTask.result.zip_url} icon={<FileArchive className="size-4" />} label="素材包" />
                 </div>
@@ -420,7 +420,7 @@ export function EditableFilePanel({ title, kind, endpoint, defaultPrompt, imageR
               {selectedTask.error ? <div className="rounded-md border border-rose-200 bg-rose-50/70 px-3 py-2 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-rose-300">{selectedTask.error}</div> : null}
             </div>
           ) : (
-            <div className="flex h-full min-h-80 items-center justify-center text-sm text-stone-400 dark:text-stone-500">暂无任务</div>
+            <div className="flex h-full min-h-80 items-center justify-center text-sm text-zinc-400 dark:text-zinc-500">暂无任务</div>
           )}
         </div>
       </section>

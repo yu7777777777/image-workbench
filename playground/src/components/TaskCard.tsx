@@ -399,7 +399,7 @@ export default function TaskCard({
           // Optionally set drag image if we have thumbSrc
           if (thumbSrc) {
             const preview = document.createElement('div');
-            preview.style.cssText = 'position:fixed;left:-1000px;top:-1000px;width:100px;height:100px;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.25);';
+            preview.style.cssText = 'position:fixed;left:-1000px;top:-1000px;width:100px;height:100px;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px oklch(0.000 0.000 0  / 0.25);';
             const previewImg = document.createElement('img');
             previewImg.src = thumbSrc;
             previewImg.style.cssText = 'width:100px;height:100px;object-fit:cover;display:block;';
@@ -423,7 +423,7 @@ export default function TaskCard({
         <div
           className="w-40 min-w-[10rem] h-full bg-gray-100 dark:bg-black/20 relative flex items-center justify-center overflow-hidden flex-shrink-0"
           style={isTransparentOutput ? {
-            backgroundImage: 'linear-gradient(45deg, #808080 25%, transparent 25%), linear-gradient(-45deg, #808080 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #808080 75%), linear-gradient(-45deg, transparent 75%, #808080 75%)',
+            backgroundImage: 'linear-gradient(45deg, oklch(0.6 0 90) 25%, transparent 25%), linear-gradient(-45deg, oklch(0.6 0 90) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, oklch(0.6 0 90) 75%), linear-gradient(-45deg, transparent 75%, oklch(0.6 0 90) 75%)',
             backgroundSize: '16px 16px',
             backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0px',
           } : undefined}

@@ -81,7 +81,7 @@ export const ComparisonSlider = memo(function ComparisonSlider({
       >
         {/* 拖拽手柄 */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 shadow-lg flex items-center justify-center">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="#333" className="w-4 h-4">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="oklch(0.321 0 90)" className="w-4 h-4">
             <path fillRule="evenodd" d="M6.28 10.53a.75.75 0 0 1 0-1.06l3-3a.75.75 0 1 1 1.06 1.06L8.56 9.25h2.88l-1.78-1.72a.75.75 0 0 1 1.06-1.06l3 3a.75.75 0 0 1 0 1.06l-3 3a.75.75 0 1 1-1.06-1.06l1.78-1.72H8.56l1.78 1.72a.75.75 0 1 1-1.06 1.06l-3-3Z" clipRule="evenodd" />
           </svg>
         </div>

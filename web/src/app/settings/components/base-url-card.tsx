@@ -23,12 +23,12 @@ export function BaseUrlCard() {
       <CardContent className="space-y-6 p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-stone-100">
-              <Globe className="size-5 text-stone-600" />
+            <div className="flex size-10 items-center justify-center rounded-xl bg-zinc-100">
+              <Globe className="size-5 text-zinc-600" />
             </div>
             <div>
               <h2 className="text-lg font-semibold tracking-tight">基础地址</h2>
-              <p className="text-sm text-stone-500">设置服务接口基础地址（API Base URL），保存后立即生效。</p>
+              <p className="text-sm text-zinc-500">设置服务接口基础地址（API Base URL），保存后立即生效。</p>
             </div>
           </div>
           <Badge variant={baseUrl.trim() ? "success" : "secondary"} className="w-fit rounded-md px-2.5 py-1">
@@ -38,24 +38,24 @@ export function BaseUrlCard() {
 
         {isLoadingConfig ? (
           <div className="flex items-center justify-center py-10">
-            <LoaderCircle className="size-5 animate-spin text-stone-400" />
+            <LoaderCircle className="size-5 animate-spin text-zinc-400" />
           </div>
         ) : (
           <>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-stone-700">Base URL</label>
+              <label className="text-sm font-medium text-zinc-700">Base URL</label>
               <Input
                 value={baseUrl}
                 onChange={(event) => setBaseUrl(event.target.value)}
                 placeholder="https://example.com"
-                className="h-11 rounded-xl border-stone-200 bg-white"
+                className="h-11 rounded-xl border-zinc-200 bg-white"
               />
-              <p className="text-sm text-stone-500">留空则使用环境变量或默认值，保存时会自动去掉首尾空格。</p>
+              <p className="text-sm text-zinc-500">留空则使用环境变量或默认值，保存时会自动去掉首尾空格。</p>
             </div>
 
             <div className="flex justify-end">
               <Button
-                className="h-10 rounded-xl bg-stone-950 px-5 text-white hover:bg-stone-800"
+                className="h-10 rounded-xl bg-zinc-950 px-5 text-white hover:bg-zinc-800"
                 onClick={() => void saveConfig()}
                 disabled={isSavingConfig}
               >

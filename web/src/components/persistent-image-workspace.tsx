@@ -176,7 +176,7 @@ function PersistentImageWorkspaceInner() {
         )}
       >
         {!ready && (
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-transparent text-sm text-stone-500">
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-transparent text-sm text-zinc-500">
             <p>
               {slow
                 ? "加载时间较长，请点击重试。"

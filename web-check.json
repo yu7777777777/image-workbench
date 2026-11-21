@@ -1,0 +1,1962 @@
+{
+  "pass": false,
+  "files": 65,
+  "missing": [],
+  "tokenFiles": [
+    "assets/tokens.css (bundled)"
+  ],
+  "contrastPairs": 168,
+  "contrast": [
+    {
+      "combo": "light",
+      "fg": "--label-primary",
+      "bg": "--bg-base",
+      "name": "正文",
+      "ratio": 18.58,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--label-secondary",
+      "bg": "--bg-base",
+      "name": "次要文字",
+      "ratio": 6.54,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--label-tertiary",
+      "bg": "--bg-base",
+      "name": "标注文字",
+      "ratio": 5.29,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-1",
+      "name": "层内次要文字",
+      "ratio": 6.16,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-1",
+      "name": "层内标注文字",
+      "ratio": 4.98,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-2",
+      "name": "层2次要文字",
+      "ratio": 5.74,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-2",
+      "name": "层2标注文字",
+      "ratio": 4.64,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--brand-text",
+      "bg": "--bg-base",
+      "name": "链接/强调文字",
+      "ratio": 6.42,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--brand-text",
+      "bg": "--bg-layer-1",
+      "name": "层内链接",
+      "ratio": 6.04,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--label-inverse",
+      "bg": "--brand",
+      "name": "主按钮文字",
+      "ratio": 5.86,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--label-inverse",
+      "bg": "--danger",
+      "name": "危险按钮文字",
+      "ratio": 5.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--danger-text",
+      "bg": "--bg-base",
+      "name": "错误文字",
+      "ratio": 6.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--warn-text",
+      "bg": "--bg-base",
+      "name": "警告文字",
+      "ratio": 5.93,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--success-text",
+      "bg": "--bg-base",
+      "name": "成功文字",
+      "ratio": 6.12,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--border-control",
+      "bg": "--bg-base",
+      "name": "控件边界",
+      "ratio": 3.76,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--border-control",
+      "bg": "--bg-layer-1",
+      "name": "层内控件边界",
+      "ratio": 3.54,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--chart-1",
+      "bg": "--bg-base",
+      "name": "图表1",
+      "ratio": 5.86,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--chart-2",
+      "bg": "--bg-base",
+      "name": "图表2",
+      "ratio": 6.73,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--chart-3",
+      "bg": "--bg-base",
+      "name": "图表3",
+      "ratio": 5.63,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--chart-4",
+      "bg": "--bg-base",
+      "name": "图表4",
+      "ratio": 6.42,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light",
+      "fg": "--chart-5",
+      "bg": "--bg-base",
+      "name": "图表5",
+      "ratio": 6.54,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--label-primary",
+      "bg": "--bg-base",
+      "name": "正文",
+      "ratio": 14.74,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--label-secondary",
+      "bg": "--bg-base",
+      "name": "次要文字",
+      "ratio": 6.8,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--label-tertiary",
+      "bg": "--bg-base",
+      "name": "标注文字",
+      "ratio": 5.8,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-1",
+      "name": "层内次要文字",
+      "ratio": 6.18,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-1",
+      "name": "层内标注文字",
+      "ratio": 5.27,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-2",
+      "name": "层2次要文字",
+      "ratio": 5.52,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-2",
+      "name": "层2标注文字",
+      "ratio": 4.7,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--brand-text",
+      "bg": "--bg-base",
+      "name": "链接/强调文字",
+      "ratio": 6.53,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--brand-text",
+      "bg": "--bg-layer-1",
+      "name": "层内链接",
+      "ratio": 5.93,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--label-inverse",
+      "bg": "--brand",
+      "name": "主按钮文字",
+      "ratio": 5.86,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--label-inverse",
+      "bg": "--danger",
+      "name": "危险按钮文字",
+      "ratio": 5.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--danger-text",
+      "bg": "--bg-base",
+      "name": "错误文字",
+      "ratio": 7.1,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--warn-text",
+      "bg": "--bg-base",
+      "name": "警告文字",
+      "ratio": 9.35,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--success-text",
+      "bg": "--bg-base",
+      "name": "成功文字",
+      "ratio": 8.9,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--border-control",
+      "bg": "--bg-base",
+      "name": "控件边界",
+      "ratio": 4.09,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--border-control",
+      "bg": "--bg-layer-1",
+      "name": "层内控件边界",
+      "ratio": 3.72,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--chart-1",
+      "bg": "--bg-base",
+      "name": "图表1",
+      "ratio": 6.53,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--chart-2",
+      "bg": "--bg-base",
+      "name": "图表2",
+      "ratio": 8.9,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--chart-3",
+      "bg": "--bg-base",
+      "name": "图表3",
+      "ratio": 9.35,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--chart-4",
+      "bg": "--bg-base",
+      "name": "图表4",
+      "ratio": 7.24,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark",
+      "fg": "--chart-5",
+      "bg": "--bg-base",
+      "name": "图表5",
+      "ratio": 6.8,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--label-primary",
+      "bg": "--bg-base",
+      "name": "正文",
+      "ratio": 18.58,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--label-secondary",
+      "bg": "--bg-base",
+      "name": "次要文字",
+      "ratio": 6.54,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--label-tertiary",
+      "bg": "--bg-base",
+      "name": "标注文字",
+      "ratio": 5.29,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-1",
+      "name": "层内次要文字",
+      "ratio": 6.16,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-1",
+      "name": "层内标注文字",
+      "ratio": 4.98,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-2",
+      "name": "层2次要文字",
+      "ratio": 5.74,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-2",
+      "name": "层2标注文字",
+      "ratio": 4.64,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--brand-text",
+      "bg": "--bg-base",
+      "name": "链接/强调文字",
+      "ratio": 6.42,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--brand-text",
+      "bg": "--bg-layer-1",
+      "name": "层内链接",
+      "ratio": 6.04,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--label-inverse",
+      "bg": "--brand",
+      "name": "主按钮文字",
+      "ratio": 5.86,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--label-inverse",
+      "bg": "--danger",
+      "name": "危险按钮文字",
+      "ratio": 5.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--danger-text",
+      "bg": "--bg-base",
+      "name": "错误文字",
+      "ratio": 6.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--warn-text",
+      "bg": "--bg-base",
+      "name": "警告文字",
+      "ratio": 5.93,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--success-text",
+      "bg": "--bg-base",
+      "name": "成功文字",
+      "ratio": 6.12,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--border-control",
+      "bg": "--bg-base",
+      "name": "控件边界",
+      "ratio": 3.76,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--border-control",
+      "bg": "--bg-layer-1",
+      "name": "层内控件边界",
+      "ratio": 3.54,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--chart-1",
+      "bg": "--bg-base",
+      "name": "图表1",
+      "ratio": 5.86,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--chart-2",
+      "bg": "--bg-base",
+      "name": "图表2",
+      "ratio": 6.73,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--chart-3",
+      "bg": "--bg-base",
+      "name": "图表3",
+      "ratio": 5.63,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--chart-4",
+      "bg": "--bg-base",
+      "name": "图表4",
+      "ratio": 6.42,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × admin",
+      "fg": "--chart-5",
+      "bg": "--bg-base",
+      "name": "图表5",
+      "ratio": 6.54,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--label-primary",
+      "bg": "--bg-base",
+      "name": "正文",
+      "ratio": 14.74,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--label-secondary",
+      "bg": "--bg-base",
+      "name": "次要文字",
+      "ratio": 6.8,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--label-tertiary",
+      "bg": "--bg-base",
+      "name": "标注文字",
+      "ratio": 5.8,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-1",
+      "name": "层内次要文字",
+      "ratio": 6.18,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-1",
+      "name": "层内标注文字",
+      "ratio": 5.27,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-2",
+      "name": "层2次要文字",
+      "ratio": 5.52,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-2",
+      "name": "层2标注文字",
+      "ratio": 4.7,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--brand-text",
+      "bg": "--bg-base",
+      "name": "链接/强调文字",
+      "ratio": 6.53,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--brand-text",
+      "bg": "--bg-layer-1",
+      "name": "层内链接",
+      "ratio": 5.93,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--label-inverse",
+      "bg": "--brand",
+      "name": "主按钮文字",
+      "ratio": 5.86,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--label-inverse",
+      "bg": "--danger",
+      "name": "危险按钮文字",
+      "ratio": 5.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--danger-text",
+      "bg": "--bg-base",
+      "name": "错误文字",
+      "ratio": 7.1,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--warn-text",
+      "bg": "--bg-base",
+      "name": "警告文字",
+      "ratio": 9.35,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--success-text",
+      "bg": "--bg-base",
+      "name": "成功文字",
+      "ratio": 8.9,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--border-control",
+      "bg": "--bg-base",
+      "name": "控件边界",
+      "ratio": 4.09,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--border-control",
+      "bg": "--bg-layer-1",
+      "name": "层内控件边界",
+      "ratio": 3.72,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--chart-1",
+      "bg": "--bg-base",
+      "name": "图表1",
+      "ratio": 6.53,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--chart-2",
+      "bg": "--bg-base",
+      "name": "图表2",
+      "ratio": 8.9,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--chart-3",
+      "bg": "--bg-base",
+      "name": "图表3",
+      "ratio": 9.35,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--chart-4",
+      "bg": "--bg-base",
+      "name": "图表4",
+      "ratio": 7.24,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × admin",
+      "fg": "--chart-5",
+      "bg": "--bg-base",
+      "name": "图表5",
+      "ratio": 6.8,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--label-primary",
+      "bg": "--bg-base",
+      "name": "正文",
+      "ratio": 18.58,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--label-secondary",
+      "bg": "--bg-base",
+      "name": "次要文字",
+      "ratio": 6.54,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--label-tertiary",
+      "bg": "--bg-base",
+      "name": "标注文字",
+      "ratio": 5.29,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-1",
+      "name": "层内次要文字",
+      "ratio": 6.16,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-1",
+      "name": "层内标注文字",
+      "ratio": 4.98,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-2",
+      "name": "层2次要文字",
+      "ratio": 5.74,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-2",
+      "name": "层2标注文字",
+      "ratio": 4.64,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--brand-text",
+      "bg": "--bg-base",
+      "name": "链接/强调文字",
+      "ratio": 5.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--brand-text",
+      "bg": "--bg-layer-1",
+      "name": "层内链接",
+      "ratio": 5.15,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--label-inverse",
+      "bg": "--brand",
+      "name": "主按钮文字",
+      "ratio": 5.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--label-inverse",
+      "bg": "--danger",
+      "name": "危险按钮文字",
+      "ratio": 5.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--danger-text",
+      "bg": "--bg-base",
+      "name": "错误文字",
+      "ratio": 6.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--warn-text",
+      "bg": "--bg-base",
+      "name": "警告文字",
+      "ratio": 5.93,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--success-text",
+      "bg": "--bg-base",
+      "name": "成功文字",
+      "ratio": 6.12,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--border-control",
+      "bg": "--bg-base",
+      "name": "控件边界",
+      "ratio": 3.76,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--border-control",
+      "bg": "--bg-layer-1",
+      "name": "层内控件边界",
+      "ratio": 3.54,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--chart-1",
+      "bg": "--bg-base",
+      "name": "图表1",
+      "ratio": 5.86,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--chart-2",
+      "bg": "--bg-base",
+      "name": "图表2",
+      "ratio": 6.73,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--chart-3",
+      "bg": "--bg-base",
+      "name": "图表3",
+      "ratio": 5.63,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--chart-4",
+      "bg": "--bg-base",
+      "name": "图表4",
+      "ratio": 6.42,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × content",
+      "fg": "--chart-5",
+      "bg": "--bg-base",
+      "name": "图表5",
+      "ratio": 6.54,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--label-primary",
+      "bg": "--bg-base",
+      "name": "正文",
+      "ratio": 14.74,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--label-secondary",
+      "bg": "--bg-base",
+      "name": "次要文字",
+      "ratio": 6.8,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--label-tertiary",
+      "bg": "--bg-base",
+      "name": "标注文字",
+      "ratio": 5.8,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-1",
+      "name": "层内次要文字",
+      "ratio": 6.18,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-1",
+      "name": "层内标注文字",
+      "ratio": 5.27,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-2",
+      "name": "层2次要文字",
+      "ratio": 5.52,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-2",
+      "name": "层2标注文字",
+      "ratio": 4.7,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--brand-text",
+      "bg": "--bg-base",
+      "name": "链接/强调文字",
+      "ratio": 9.52,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--brand-text",
+      "bg": "--bg-layer-1",
+      "name": "层内链接",
+      "ratio": 8.65,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--label-inverse",
+      "bg": "--brand",
+      "name": "主按钮文字",
+      "ratio": 5.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--label-inverse",
+      "bg": "--danger",
+      "name": "危险按钮文字",
+      "ratio": 5.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--danger-text",
+      "bg": "--bg-base",
+      "name": "错误文字",
+      "ratio": 7.1,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--warn-text",
+      "bg": "--bg-base",
+      "name": "警告文字",
+      "ratio": 9.35,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--success-text",
+      "bg": "--bg-base",
+      "name": "成功文字",
+      "ratio": 8.9,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--border-control",
+      "bg": "--bg-base",
+      "name": "控件边界",
+      "ratio": 4.09,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--border-control",
+      "bg": "--bg-layer-1",
+      "name": "层内控件边界",
+      "ratio": 3.72,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--chart-1",
+      "bg": "--bg-base",
+      "name": "图表1",
+      "ratio": 6.53,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--chart-2",
+      "bg": "--bg-base",
+      "name": "图表2",
+      "ratio": 8.9,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--chart-3",
+      "bg": "--bg-base",
+      "name": "图表3",
+      "ratio": 9.35,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--chart-4",
+      "bg": "--bg-base",
+      "name": "图表4",
+      "ratio": 7.24,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × content",
+      "fg": "--chart-5",
+      "bg": "--bg-base",
+      "name": "图表5",
+      "ratio": 6.8,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--label-primary",
+      "bg": "--bg-base",
+      "name": "正文",
+      "ratio": 18.58,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--label-secondary",
+      "bg": "--bg-base",
+      "name": "次要文字",
+      "ratio": 6.54,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--label-tertiary",
+      "bg": "--bg-base",
+      "name": "标注文字",
+      "ratio": 5.29,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-1",
+      "name": "层内次要文字",
+      "ratio": 6.16,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-1",
+      "name": "层内标注文字",
+      "ratio": 4.98,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-2",
+      "name": "层2次要文字",
+      "ratio": 5.74,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-2",
+      "name": "层2标注文字",
+      "ratio": 4.64,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--brand-text",
+      "bg": "--bg-base",
+      "name": "链接/强调文字",
+      "ratio": 7.77,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--brand-text",
+      "bg": "--bg-layer-1",
+      "name": "层内链接",
+      "ratio": 7.31,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--label-inverse",
+      "bg": "--brand",
+      "name": "主按钮文字",
+      "ratio": 6.42,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--label-inverse",
+      "bg": "--danger",
+      "name": "危险按钮文字",
+      "ratio": 5.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--danger-text",
+      "bg": "--bg-base",
+      "name": "错误文字",
+      "ratio": 6.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--warn-text",
+      "bg": "--bg-base",
+      "name": "警告文字",
+      "ratio": 5.93,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--success-text",
+      "bg": "--bg-base",
+      "name": "成功文字",
+      "ratio": 6.12,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--border-control",
+      "bg": "--bg-base",
+      "name": "控件边界",
+      "ratio": 3.76,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--border-control",
+      "bg": "--bg-layer-1",
+      "name": "层内控件边界",
+      "ratio": 3.54,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--chart-1",
+      "bg": "--bg-base",
+      "name": "图表1",
+      "ratio": 5.86,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--chart-2",
+      "bg": "--bg-base",
+      "name": "图表2",
+      "ratio": 6.73,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--chart-3",
+      "bg": "--bg-base",
+      "name": "图表3",
+      "ratio": 5.63,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--chart-4",
+      "bg": "--bg-base",
+      "name": "图表4",
+      "ratio": 6.42,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "light × marketing",
+      "fg": "--chart-5",
+      "bg": "--bg-base",
+      "name": "图表5",
+      "ratio": 6.54,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--label-primary",
+      "bg": "--bg-base",
+      "name": "正文",
+      "ratio": 14.74,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--label-secondary",
+      "bg": "--bg-base",
+      "name": "次要文字",
+      "ratio": 6.8,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--label-tertiary",
+      "bg": "--bg-base",
+      "name": "标注文字",
+      "ratio": 5.8,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-1",
+      "name": "层内次要文字",
+      "ratio": 6.18,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-1",
+      "name": "层内标注文字",
+      "ratio": 5.27,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--label-secondary",
+      "bg": "--bg-layer-2",
+      "name": "层2次要文字",
+      "ratio": 5.52,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--label-tertiary",
+      "bg": "--bg-layer-2",
+      "name": "层2标注文字",
+      "ratio": 4.7,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--brand-text",
+      "bg": "--bg-base",
+      "name": "链接/强调文字",
+      "ratio": 7.24,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--brand-text",
+      "bg": "--bg-layer-1",
+      "name": "层内链接",
+      "ratio": 6.57,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--label-inverse",
+      "bg": "--brand",
+      "name": "主按钮文字",
+      "ratio": 6.42,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--label-inverse",
+      "bg": "--danger",
+      "name": "危险按钮文字",
+      "ratio": 5.47,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--danger-text",
+      "bg": "--bg-base",
+      "name": "错误文字",
+      "ratio": 7.1,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--warn-text",
+      "bg": "--bg-base",
+      "name": "警告文字",
+      "ratio": 9.35,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--success-text",
+      "bg": "--bg-base",
+      "name": "成功文字",
+      "ratio": 8.9,
+      "min": 4.5,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--border-control",
+      "bg": "--bg-base",
+      "name": "控件边界",
+      "ratio": 4.09,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--border-control",
+      "bg": "--bg-layer-1",
+      "name": "层内控件边界",
+      "ratio": 3.72,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--chart-1",
+      "bg": "--bg-base",
+      "name": "图表1",
+      "ratio": 6.53,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--chart-2",
+      "bg": "--bg-base",
+      "name": "图表2",
+      "ratio": 8.9,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--chart-3",
+      "bg": "--bg-base",
+      "name": "图表3",
+      "ratio": 9.35,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--chart-4",
+      "bg": "--bg-base",
+      "name": "图表4",
+      "ratio": 7.24,
+      "min": 3,
+      "ok": true
+    },
+    {
+      "combo": "dark × marketing",
+      "fg": "--chart-5",
+      "bg": "--bg-base",
+      "name": "图表5",
+      "ratio": 6.8,
+      "min": 3,
+      "ok": true
+    }
+  ],
+  "tokenProblems": [],
+  "pathProblems": [],
+  "findings": [
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgba(120, 113, 108, 0.14)，应改为 var(--token)",
+      "line": 21,
+      "snippet": "rgba(120, 113, 108, 0.14)"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #78716c，应改为 var(--token)",
+      "line": 48,
+      "snippet": "#78716c"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #a8a29e，应改为 var(--token)",
+      "line": 55,
+      "snippet": "#a8a29e"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgba(120, 113, 108, 0.05)，应改为 var(--token)",
+      "line": 76,
+      "snippet": "rgba(120, 113, 108, 0.05)"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgba(120, 113, 108, 0.1)，应改为 var(--token)",
+      "line": 79,
+      "snippet": "rgba(120, 113, 108, 0.1)"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #a8a29e，应改为 var(--token)",
+      "line": 95,
+      "snippet": "#a8a29e"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #78716c，应改为 var(--token)",
+      "line": 104,
+      "snippet": "#78716c"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgba(120, 113, 108, 0.14)，应改为 var(--token)",
+      "line": 107,
+      "snippet": "rgba(120, 113, 108, 0.14)"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #a8a29e，应改为 var(--token)",
+      "line": 111,
+      "snippet": "#a8a29e"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #78716c，应改为 var(--token)",
+      "line": 134,
+      "snippet": "#78716c"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgba(120, 113, 108, 0.1)，应改为 var(--token)",
+      "line": 140,
+      "snippet": "rgba(120, 113, 108, 0.1)"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 #a8a29e，应改为 var(--token)",
+      "line": 151,
+      "snippet": "#a8a29e"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "另有 32 处字面色值未逐条列出（单文件最多列 12 条）"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "type-scale",
+      "severity": "error",
+      "message": "出现 11 档字号（上限 8）：13px / 12px / 10px / 11px / clamp(30px, 4vw, 42px) / 14px / 1.6em / 1.35em / 1.15em / 0.88em / 16px"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "focus-visible",
+      "severity": "error",
+      "message": "outline 被置空且同一规则内没有替代焦点样式，键盘用户会失去位置",
+      "line": 62
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "focus-visible",
+      "severity": "error",
+      "message": "outline 被置空且同一规则内没有替代焦点样式，键盘用户会失去位置",
+      "line": 412
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 18px 不在 4px 网格上",
+      "line": 38,
+      "snippet": "padding: 20px 18px 16px 4px"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 10px 不在 4px 网格上",
+      "line": 86,
+      "snippet": "padding: 12px 10px"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 6px 不在 4px 网格上",
+      "line": 87,
+      "snippet": "gap: 6px"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 10px 不在 4px 网格上",
+      "line": 92,
+      "snippet": "padding-right: 10px"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 10px 不在 4px 网格上",
+      "line": 125,
+      "snippet": "padding: 0 12px 10px"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 18px 不在 4px 网格上",
+      "line": 181,
+      "snippet": "margin: 18px 0 14px"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 10px 不在 4px 网格上",
+      "line": 191,
+      "snippet": "gap: 10px"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 10px 不在 4px 网格上",
+      "line": 202,
+      "snippet": "padding: 10px 14px"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 10px 不在 4px 网格上",
+      "line": 218,
+      "snippet": "margin-bottom: 10px"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 13px 不在 4px 网格上",
+      "line": 231,
+      "snippet": "padding: 13px 18px"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 5px 不在 4px 网格上",
+      "line": 304,
+      "snippet": "padding: 2px 5px"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 6px 不在 4px 网格上",
+      "line": 322,
+      "snippet": "gap: 6px"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 10px 不在 4px 网格上",
+      "line": 339,
+      "snippet": "margin-bottom: 10px"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 14px 不在 4px 网格上",
+      "line": 350,
+      "snippet": "margin-top: 14px"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 5px 不在 4px 网格上",
+      "line": 355,
+      "snippet": "gap: 5px"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 10px 不在 4px 网格上",
+      "line": 377,
+      "snippet": "margin-top: 10px"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 10px 不在 4px 网格上",
+      "line": 394,
+      "snippet": "padding: 0 24px max(10px, env(safe-area-inset-bottom))"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 14px 不在 4px 网格上",
+      "line": 400,
+      "snippet": "padding: 16px 14px 10px"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 10px 不在 4px 网格上",
+      "line": 426,
+      "snippet": "gap: 10px"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 10px 不在 4px 网格上",
+      "line": 427,
+      "snippet": "margin-top: 10px"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 10px 不在 4px 网格上",
+      "line": 443,
+      "snippet": "margin-top: 10px"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 14px 不在 4px 网格上",
+      "line": 449,
+      "snippet": "margin-bottom: 14px"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 3px 不在 4px 网格上",
+      "line": 464,
+      "snippet": "padding: 3px"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 10px 不在 4px 网格上",
+      "line": 528,
+      "snippet": "padding: 0 0 10px"
+    },
+    {
+      "file": "web\\src\\app\\chat\\chat.css",
+      "rule": "space-grid",
+      "severity": "warn",
+      "message": "间距 26px 不在 4px 网格上",
+      "line": 542,
+      "snippet": "margin-top: 26px"
+    },
+    {
+      "file": "web\\src\\app\\debug\\components\\editable-file-panel.tsx",
+      "rule": "a11y-name",
+      "severity": "error",
+      "message": "纯图标按钮缺少 aria-label",
+      "line": 283
+    },
+    {
+      "file": "web\\src\\app\\globals.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgba(255, 255, 255, 0.92)，应改为 var(--token)",
+      "line": 155,
+      "snippet": "rgba(255, 255, 255, 0.92)"
+    },
+    {
+      "file": "web\\src\\app\\globals.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgba(245, 239, 231, 0.96)，应改为 var(--token)",
+      "line": 155,
+      "snippet": "rgba(245, 239, 231, 0.96)"
+    },
+    {
+      "file": "web\\src\\app\\globals.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgba(240, 235, 227, 0.99)，应改为 var(--token)",
+      "line": 155,
+      "snippet": "rgba(240, 235, 227, 0.99)"
+    },
+    {
+      "file": "web\\src\\app\\globals.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgba(55, 48, 43, 0.72)，应改为 var(--token)",
+      "line": 161,
+      "snippet": "rgba(55, 48, 43, 0.72)"
+    },
+    {
+      "file": "web\\src\\app\\globals.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgba(28, 25, 23, 0.98)，应改为 var(--token)",
+      "line": 161,
+      "snippet": "rgba(28, 25, 23, 0.98)"
+    },
+    {
+      "file": "web\\src\\app\\globals.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgba(12, 10, 9, 1)，应改为 var(--token)",
+      "line": 161,
+      "snippet": "rgba(12, 10, 9, 1)"
+    },
+    {
+      "file": "web\\src\\app\\globals.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgb(28 25 23 / 0.94)，应改为 var(--token)",
+      "line": 185,
+      "snippet": "rgb(28 25 23 / 0.94)"
+    },
+    {
+      "file": "web\\src\\app\\globals.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgb(41 37 36 / 0.78)，应改为 var(--token)",
+      "line": 191,
+      "snippet": "rgb(41 37 36 / 0.78)"
+    },
+    {
+      "file": "web\\src\\app\\globals.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgb(41 37 36 / 0.86)，应改为 var(--token)",
+      "line": 200,
+      "snippet": "rgb(41 37 36 / 0.86)"
+    },
+    {
+      "file": "web\\src\\app\\globals.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgb(68 64 60 / 0.9)，应改为 var(--token)",
+      "line": 204,
+      "snippet": "rgb(68 64 60 / 0.9)"
+    },
+    {
+      "file": "web\\src\\app\\globals.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgb(255 255 255 / 0.11)，应改为 var(--token)",
+      "line": 217,
+      "snippet": "rgb(255 255 255 / 0.11)"
+    },
+    {
+      "file": "web\\src\\app\\globals.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "字面色值 rgb(250 250 249)，应改为 var(--token)",
+      "line": 223,
+      "snippet": "rgb(250 250 249)"
+    },
+    {
+      "file": "web\\src\\app\\globals.css",
+      "rule": "bare-color",
+      "severity": "error",
+      "message": "另有 5 处字面色值未逐条列出（单文件最多列 12 条）"
+    }
+  ],
+  "stats": {
+    "ignoredRegions": 0,
+    "ignoredLines": 0
+  }
+}

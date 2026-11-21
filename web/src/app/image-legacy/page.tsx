@@ -11,7 +11,7 @@ export default function ImageLegacyPage() {
   }, [router]);
 
   return (
-    <div className="flex flex-1 items-center justify-center p-8 text-sm text-stone-500">
+    <div className="flex flex-1 items-center justify-center p-8 text-sm text-zinc-500">
       正在跳转至生图画廊...
     </div>
   );

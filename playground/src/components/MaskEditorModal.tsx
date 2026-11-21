@@ -280,7 +280,7 @@ export default function MaskEditorModal() {
     previewCtx.save()
     previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height)
     previewCtx.globalCompositeOperation = 'source-over'
-    previewCtx.fillStyle = 'rgba(59, 130, 246, 0.58)'
+    previewCtx.fillStyle = 'oklch(0.623 0.188 260  / 0.58)'
     previewCtx.fillRect(0, 0, previewCanvas.width, previewCanvas.height)
     previewCtx.globalCompositeOperation = 'destination-out'
     previewCtx.drawImage(maskCanvas, 0, 0)
@@ -325,10 +325,10 @@ export default function MaskEditorModal() {
     ctx.lineWidth = 1
     ctx.beginPath()
     ctx.arc(x, y, radius, 0, Math.PI * 2)
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)'
+    ctx.strokeStyle = 'oklch(1.000 0.000 90  / 0.9)'
     ctx.stroke()
     
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)'
+    ctx.strokeStyle = 'oklch(0.000 0.000 0  / 0.4)'
     ctx.beginPath()
     ctx.arc(x, y, radius + 1, 0, Math.PI * 2)
     ctx.stroke()
@@ -338,7 +338,7 @@ export default function MaskEditorModal() {
     ctx.stroke()
 
     const crosshairSize = 5
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)'
+    ctx.strokeStyle = 'oklch(1.000 0.000 90  / 0.95)'
     ctx.beginPath()
     ctx.moveTo(x - crosshairSize, y)
     ctx.lineTo(x + crosshairSize, y)
@@ -346,7 +346,7 @@ export default function MaskEditorModal() {
     ctx.lineTo(x, y + crosshairSize)
     ctx.stroke()
 
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)'
+    ctx.strokeStyle = 'oklch(0.000 0.000 0  / 0.55)'
     ctx.beginPath()
     ctx.moveTo(x - crosshairSize, y)
     ctx.lineTo(x + crosshairSize, y)
@@ -924,11 +924,11 @@ export default function MaskEditorModal() {
 
         {/* Footer Toolbar */}
         <div className="absolute bottom-4 sm:bottom-8 left-1/2 -translate-x-1/2 flex items-center justify-center z-20 pointer-events-none w-full px-2 sm:px-4">
-          <div className="flex items-center gap-2 sm:gap-4 px-2 sm:px-3 py-1.5 sm:py-2 bg-white/95 dark:bg-[#0f0f0f]/95 backdrop-blur-md border border-gray-200/80 dark:border-white/5 rounded-2xl sm:rounded-[1.25rem] shadow-2xl pointer-events-auto">
+          <div className="flex items-center gap-2 sm:gap-4 px-2 sm:px-3 py-1.5 sm:py-2 bg-white/95 dark:bg-[oklch(0.168 0 90)]/95 backdrop-blur-md border border-gray-200/80 dark:border-white/5 rounded-2xl sm:rounded-[1.25rem] shadow-2xl pointer-events-auto">
             <div className="flex items-center gap-1.5 sm:gap-3">
-              <div className="flex items-center bg-gray-100/80 dark:bg-[#232325]/80 p-1 rounded-xl sm:rounded-[14px]">
+              <div className="flex items-center bg-gray-100/80 dark:bg-[oklch(0.257 0.004 286)]/80 p-1 rounded-xl sm:rounded-[14px]">
                 <button
-                  className={`p-2 sm:p-2.5 rounded-lg sm:rounded-xl transition-all ${tool === 'brush' ? 'bg-white shadow-sm text-blue-500 dark:bg-[#323338] dark:text-blue-400 dark:shadow-none' : 'text-gray-500 hover:text-gray-700 dark:text-[#8a8a8e] dark:hover:text-gray-200'}`}
+                  className={`p-2 sm:p-2.5 rounded-lg sm:rounded-xl transition-all ${tool === 'brush' ? 'bg-white shadow-sm text-blue-500 dark:bg-[oklch(0.322 0.009 277)] dark:text-blue-400 dark:shadow-none' : 'text-gray-500 hover:text-gray-700 dark:text-[oklch(0.635 0.006 286)] dark:hover:text-gray-200'}`}
                   onClick={() => setTool('brush')}
                   disabled={!isReady || isSaving}
                   title="画笔"
@@ -938,7 +938,7 @@ export default function MaskEditorModal() {
                   </svg>
                 </button>
                 <button
-                  className={`p-2 sm:p-2.5 rounded-lg sm:rounded-xl transition-all ${tool === 'eraser' ? 'bg-white shadow-sm text-blue-500 dark:bg-[#323338] dark:text-blue-400 dark:shadow-none' : 'text-gray-500 hover:text-gray-700 dark:text-[#8a8a8e] dark:hover:text-gray-200'}`}
+                  className={`p-2 sm:p-2.5 rounded-lg sm:rounded-xl transition-all ${tool === 'eraser' ? 'bg-white shadow-sm text-blue-500 dark:bg-[oklch(0.322 0.009 277)] dark:text-blue-400 dark:shadow-none' : 'text-gray-500 hover:text-gray-700 dark:text-[oklch(0.635 0.006 286)] dark:hover:text-gray-200'}`}
                   onClick={() => setTool('eraser')}
                   disabled={!isReady || isSaving}
                   title="橡皮"
@@ -957,7 +957,7 @@ export default function MaskEditorModal() {
                 <button
                   ref={brushSizeButtonRef}
                   onClick={toggleBrushControls}
-                  className={`flex items-center justify-center w-10 h-10 sm:w-[46px] sm:h-[46px] rounded-xl sm:rounded-[14px] transition-all border ${showBrushControls ? 'bg-blue-50 border-blue-200 text-blue-600 dark:bg-[#323338] dark:border-[#323338] dark:text-blue-400' : 'bg-white border-gray-200/80 text-gray-700 hover:bg-gray-50 dark:bg-transparent dark:border-[#323338] dark:text-[#e0e0e0] dark:hover:bg-white/[0.04] dark:hover:border-[#3a3b40]'}`}
+                  className={`flex items-center justify-center w-10 h-10 sm:w-[46px] sm:h-[46px] rounded-xl sm:rounded-[14px] transition-all border ${showBrushControls ? 'bg-blue-50 border-blue-200 text-blue-600 dark:bg-[oklch(0.322 0.009 277)] dark:border-[oklch(0.322 0.009 277)] dark:text-blue-400' : 'bg-white border-gray-200/80 text-gray-700 hover:bg-gray-50 dark:bg-transparent dark:border-[oklch(0.322 0.009 277)] dark:text-[oklch(0.907 0 90)] dark:hover:bg-white/[0.04] dark:hover:border-[oklch(0.353 0.009 277)]'}`}
                   disabled={!isReady || isSaving}
                   title="调节笔刷大小"
                 >
@@ -967,20 +967,20 @@ export default function MaskEditorModal() {
             </div>
 
             <div className="flex items-center gap-0.5 sm:gap-2 sm:ml-1">
-              <button onClick={handleUndo} disabled={!canUndo} className="p-2 sm:p-2.5 text-gray-500 hover:bg-gray-100 rounded-lg sm:rounded-xl disabled:opacity-30 dark:text-[#8a8a8e] dark:hover:bg-white/10 dark:hover:text-gray-200 transition-all" title="撤销">
+              <button onClick={handleUndo} disabled={!canUndo} className="p-2 sm:p-2.5 text-gray-500 hover:bg-gray-100 rounded-lg sm:rounded-xl disabled:opacity-30 dark:text-[oklch(0.635 0.006 286)] dark:hover:bg-white/10 dark:hover:text-gray-200 transition-all" title="撤销">
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 7v6h6" />
                   <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
                 </svg>
               </button>
-              <button onClick={handleRedo} disabled={!canRedo} className="p-2 sm:p-2.5 text-gray-500 hover:bg-gray-100 rounded-lg sm:rounded-xl disabled:opacity-30 dark:text-[#8a8a8e] dark:hover:bg-white/10 dark:hover:text-gray-200 transition-all" title="重做">
+              <button onClick={handleRedo} disabled={!canRedo} className="p-2 sm:p-2.5 text-gray-500 hover:bg-gray-100 rounded-lg sm:rounded-xl disabled:opacity-30 dark:text-[oklch(0.635 0.006 286)] dark:hover:bg-white/10 dark:hover:text-gray-200 transition-all" title="重做">
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 7v6h-6" />
                   <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7" />
                 </svg>
               </button>
-              <div className="w-px h-4 sm:h-5 bg-gray-300 dark:bg-[#323338] mx-1"></div>
-              <button onClick={resetViewTransform} disabled={!isReady || isSaving || !isZoomed} className="p-2 sm:p-2.5 text-gray-500 hover:bg-gray-100 rounded-lg sm:rounded-xl disabled:opacity-30 dark:text-[#8a8a8e] dark:hover:bg-white/10 dark:hover:text-gray-200 transition-all" title="重置视图">
+              <div className="w-px h-4 sm:h-5 bg-gray-300 dark:bg-[oklch(0.322 0.009 277)] mx-1"></div>
+              <button onClick={resetViewTransform} disabled={!isReady || isSaving || !isZoomed} className="p-2 sm:p-2.5 text-gray-500 hover:bg-gray-100 rounded-lg sm:rounded-xl disabled:opacity-30 dark:text-[oklch(0.635 0.006 286)] dark:hover:bg-white/10 dark:hover:text-gray-200 transition-all" title="重置视图">
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M4 14h6v6"/>
                   <path d="M20 10h-6V4"/>
@@ -988,7 +988,7 @@ export default function MaskEditorModal() {
                   <path d="M3 21l7-7"/>
                 </svg>
               </button>
-              <button onClick={handleClear} disabled={!isReady || isSaving} className="p-2 sm:p-2.5 text-gray-500 hover:bg-gray-100 rounded-lg sm:rounded-xl disabled:opacity-30 dark:text-[#8a8a8e] dark:hover:bg-white/10 dark:hover:text-gray-200 transition-all" title="清空遮罩">
+              <button onClick={handleClear} disabled={!isReady || isSaving} className="p-2 sm:p-2.5 text-gray-500 hover:bg-gray-100 rounded-lg sm:rounded-xl disabled:opacity-30 dark:text-[oklch(0.635 0.006 286)] dark:hover:bg-white/10 dark:hover:text-gray-200 transition-all" title="清空遮罩">
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 6h18"/>
                   <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
@@ -1002,7 +1002,7 @@ export default function MaskEditorModal() {
       {showBrushControls && sliderAnchor && createPortal(
         <div
           ref={brushSizePanelRef}
-          className="fixed z-[100] h-44 w-12 -translate-x-1/2 bg-white/95 dark:bg-[#28292d]/95 backdrop-blur-md rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-gray-200/80 dark:border-white/[0.08] flex items-center justify-center pointer-events-auto select-none touch-none"
+          className="fixed z-[100] h-44 w-12 -translate-x-1/2 bg-white/95 dark:bg-[oklch(0.282 0.007 275)]/95 backdrop-blur-md rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-gray-200/80 dark:border-white/[0.08] flex items-center justify-center pointer-events-auto select-none touch-none"
           style={{ left: sliderAnchor.left, bottom: sliderAnchor.bottom + 8, touchAction: 'none' }}
           onPointerDown={(e) => {
             e.currentTarget.setPointerCapture(e.pointerId)
