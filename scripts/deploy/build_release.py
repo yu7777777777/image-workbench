@@ -43,6 +43,7 @@ def build_playground(cfg: dict, skip: bool, allow_failing_tests: bool = False) -
     hidden = cfg.get("hidden_models")
     if hidden:
         flags["VITE_HIDDEN_IMAGE_MODELS"] = ",".join(hidden)
+    run_command([bun, "install", "--frozen-lockfile"], cwd=ROOT / "playground", desc="playground 依赖冻结安装")
     test_result = run_command([bun, "run", "test"], cwd=ROOT / "playground", desc="playground vitest 门", check=False)
     if test_result.returncode != 0:
         if allow_failing_tests:
