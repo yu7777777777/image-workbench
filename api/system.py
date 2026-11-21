@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+import json
+import re
+import urllib.request
+from datetime import datetime, timezone
+from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import HTMLResponse, Response, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict
 
 from api.support import require_admin, require_identity, resolve_image_base_url
 from services.backup_service import BackupError, backup_service
-from services.config import config
+from services.config import BASE_DIR, config
 from services.image_service import (
     cleanup_by_age,
     compress_images,
@@ -30,6 +35,47 @@ from services.proxy_service import proxy_settings, test_clearance, test_proxy
 
 class SettingsUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="allow")
+
+
+class UpgradeRequest(BaseModel):
+    version: str
+
+
+# ===== 半自动升级助手（容器写触发文件，宿主机 server_upgrader.py 消费） =====
+
+UPGRADE_TRIGGER_RELPATH = Path("data/upgrade/upgrade-request.json")
+UPGRADE_RESULT_RELPATH = Path("data/upgrade/upgrade-result.json")
+UPGRADE_GITHUB_REPO = "yu7777777777/image-workbench"
+
+
+def _upgrade_paths() -> tuple[Path, Path]:
+    base = Path(BASE_DIR)
+    return base / UPGRADE_TRIGGER_RELPATH, base / UPGRADE_RESULT_RELPATH
+
+
+def _github_latest_version() -> str | None:
+    try:
+        request = urllib.request.Request(
+            f"https://api.github.com/repos/{UPGRADE_GITHUB_REPO}/releases/latest",
+            headers={"Accept": "application/vnd.github+json", "User-Agent": "chatgpt2api-upgrade-check"},
+        )
+        with urllib.request.urlopen(request, timeout=8) as resp:
+            tag = str(json.load(resp).get("tag_name") or "")
+        return tag.lstrip("v") or None
+    except Exception:
+        return None
+
+
+def _github_release_exists(version: str) -> bool:
+    try:
+        request = urllib.request.Request(
+            f"https://api.github.com/repos/{UPGRADE_GITHUB_REPO}/releases/tags/v{version}",
+            headers={"Accept": "application/vnd.github+json", "User-Agent": "chatgpt2api-upgrade-check"},
+        )
+        with urllib.request.urlopen(request, timeout=8) as resp:
+            return bool(json.load(resp).get("assets"))
+    except Exception:
+        return False
 
 
 class ProxyTestRequest(BaseModel):
@@ -198,6 +244,46 @@ def create_router(app_version: str) -> APIRouter:
             return {"config": config.update(body.model_dump(mode="python"))}
         except ValueError as exc:
             raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
+
+    # ===== 半自动升级（提示 → 管理员确认 → 宿主机 server_upgrader 执行） =====
+
+    @router.get("/api/system/upgrade/status")
+    async def upgrade_status(authorization: str | None = Header(default=None)):
+        require_admin(authorization)
+        trigger, result = _upgrade_paths()
+        latest = await run_in_threadpool(_github_latest_version)
+        last_result = None
+        if result.exists():
+            try:
+                last_result = json.loads(result.read_text(encoding="utf-8"))
+            except Exception:
+                last_result = None
+        return {
+            "current_version": app_version,
+            "latest_version": latest,
+            "request_pending": trigger.exists(),
+            "last_result": last_result,
+        }
+
+    @router.post("/api/system/upgrade")
+    async def trigger_upgrade(body: UpgradeRequest, authorization: str | None = Header(default=None)):
+        require_admin(authorization)
+        version = body.version.strip().lstrip("v")
+        if not re.fullmatch(r"\d+\.\d+\.\d+", version):
+            raise HTTPException(status_code=400, detail={"error": f"版本号格式不正确: {version}"})
+        exists = await run_in_threadpool(_github_release_exists, version)
+        if not exists:
+            raise HTTPException(status_code=400, detail={"error": f"GitHub 上不存在 v{version} 的 Release，无法升级"})
+        trigger, _ = _upgrade_paths()
+        trigger.parent.mkdir(parents=True, exist_ok=True)
+        trigger.write_text(
+            json.dumps({"version": version, "requested_at": datetime.now(timezone.utc).isoformat()}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        return JSONResponse(
+            status_code=202,
+            content={"accepted": True, "version": version, "message": "升级请求已受理，宿主机升级器将在一分钟内执行，可稍后刷新查看结果"},
+        )
 
     @router.get("/api/images")
     async def get_images(request: Request, start_date: str = "", end_date: str = "", authorization: str | None = Header(default=None)):

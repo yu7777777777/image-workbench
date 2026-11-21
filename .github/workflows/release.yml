@@ -1,0 +1,70 @@
+name: Release
+
+# 打 tag（v*）即触发：构建全量发布 payload 并发布到 GitHub Releases。
+# 服务器端的半自动升级器（server_upgrader.py）会从这里匿名下载产物完成升级。
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.5
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Build release payload
+        run: python scripts/deploy/build_release.py --allow-failing-tests
+        env:
+          DEPLOY_BUN: bun
+
+      - name: Read release info
+        id: info
+        run: |
+          version=$(cat VERSION)
+          dir="out/deploy/${version}-$(date +%Y%m%d)"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "dir=${dir}" >> "$GITHUB_OUTPUT"
+          echo "tar_sha256=$(python -c "import json;print(json.load(open('${dir}/release-info.json'))['tar_sha256'])")" >> "$GITHUB_OUTPUT"
+
+      - name: Upload dist artifact (debug/追溯用)
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ steps.info.outputs.version }}
+          path: |
+            ${{ steps.info.outputs.dir }}/payload.tar.gz
+            ${{ steps.info.outputs.dir }}/manifest.json
+            ${{ steps.info.outputs.dir }}/release-info.json
+          retention-days: 14
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ steps.info.outputs.version }}
+          body: |
+            自动发布：tag ${{ github.ref_name }}
+
+            payload SHA256: `${{ steps.info.outputs.tar_sha256 }}`
+
+            服务器升级：管理页「版本更新」→「立即升级」，或宿主机执行
+            `python3 scripts/deploy/server_upgrader.py --version ${{ steps.info.outputs.version }}`
+          files: |
+            ${{ steps.info.outputs.dir }}/payload.tar.gz
+            ${{ steps.info.outputs.dir }}/manifest.json
+            ${{ steps.info.outputs.dir }}/release-info.json
+            scripts/deploy/deploy_host.py

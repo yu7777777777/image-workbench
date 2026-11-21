@@ -1,3 +1,14 @@
+# 1.16.0
+
+## 工作流改造：分支审核流程 + GitHub 自动发布 + 服务器半自动升级 + 模型下拉整理
+
+- 分支工作流：改动走 feature 分支 → PR → 审核确认后合并 main；main 已开启 GitHub 分支保护（禁止直接 push）。
+- 自动发布：新增 `.github/workflows/release.yml`，打 tag（v*）自动构建全量 payload 并发布 GitHub Release（产物含 payload.tar.gz/manifest.json/deploy_host.py，SHA256 随 Release 记录）。
+- 服务器半自动升级：`scripts/deploy/server_upgrader.py`（宿主机 systemd timer 驱动）+ 管理端 `POST/GET /api/system/upgrade[/status]`（admin）。流程：版本弹窗检测到 GitHub 新版本 → 管理员点「立即升级」→ 触发文件经 data/ 挂载传递 → 宿主机下载 Release 产物（SHA256 校验）→ 复用 deploy_host 全套安全网（快照/增量派生/离线自检/保 inode 写入/失败自动回滚）。不再需要本机连服务器传文件。
+- 版本检查弹窗接真数据：检查更新改为查询 GitHub latest（原为本地假检查）；管理员可见「立即升级」按钮与升级结果。
+- 新增 `PROJECT-LAYOUT.md`（目录分类：GitHub 同步 / 仅本地必留 / 仅本地可删）与 `WORKFLOW.md`（分支/审核/发布/升级流程）。
+- 清理误跟踪文件（.pytest_cache 缓存、playground/.tmp-helper.txt）。
+
 # 1.15.0
 
 ## 修复「尚未完成 API 配置」误报与提交禁用（全新浏览器/设置页保存后触发）
