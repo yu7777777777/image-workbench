@@ -1,0 +1,61 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+web_dist
+# Virtual environments
+.venv
+.idea
+data
+config.json
+edit
+
+docker-compose-local.yml
+
+.claude/settings.local.json
+
+# Environment variables
+.env
+.env.local
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Git cache
+git_cache/
+
+# 调试/测试输出目录
+loginwithpassword_*/
+logwithemailverifycode_*/
+test_batch_output/
+
+# 临时/中间文件归档区
+/out/
+
+# ===== 本地/敏感文件（不上传） =====
+# AI 工具临时文件与本地运维记录
+.codex/
+.task_*.md
+pwrun/
+r.txt
+logs/
+node_modules/
+服务器连接.txt
+账号备份/
+docker-compose.override.yml
+playground/dev-proxy.config.json
+playground/.env*
+playground/gpt-image-config.local.json
+
+# 含服务器 IP 的内部运维/规划文档
+agents.md
+docs/
+待上线与功能规划清单.md
+项目结构.md
+web/test-results/
+web/next-build.log

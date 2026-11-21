@@ -1,0 +1,81 @@
+/** Minimal shape needed to run a pure text rewrite through the Responses endpoint. */
+export interface PromptRewriteResponsesOptions {
+  settings: AppSettings
+  profile: ApiProfile
+  params: TaskParams
+  input: unknown
+  signal?: AbortSignal
+}
+
+/** True when the provider clearly lacks the chat-completions endpoint. */
+export function isMissingTextEndpointError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  return /\b(404|405|501)\b/.test(error.message) || /not\s*(found|supported|implemented)/i.test(error.message) || /unsupported/i.test(error.message)
+}
+
+/**
+ * Prompt rewriting must not reuse the agent channel: createAgentInstructions +
+ * createAgentTools turn the request into a tool-calling agent turn, so some models
+ * answer with process chatter ("正在整理为…") instead of the rewritten prompt.
+ *
+ * Strategy: always prefer the clean chat-completions endpoint. Only when the
+ * provider does not expose it (404/405/unsupported) do we fall back to the
+ * Responses endpoint, and the caller sanitizes that result.
+ */
+export async function callAgentPromptRewriteApi(opts: {
+  profile: ApiProfile
+  prompt: string
+  signal?: AbortSignal
+  settings?: AppSettings
+  /** Injected in tests; defaults to the real Responses API call. */
+  callResponses?: (options: PromptRewriteResponsesOptions) => Promise<{ text: string }>
+}): Promise<string> {
+  const { profile, prompt, signal, settings } = opts
+  if (profile.id.startsWith('shared-') || !settings) return callAgentTextCompletionApi({ profile, prompt, signal })
+  try {
+    return await callAgentTextCompletionApi({ profile, prompt, signal })
+  } catch (error) {
+    if (!isMissingTextEndpointError(error)) throw error
+  }
+  const responses = opts.callResponses ?? ((options: PromptRewriteResponsesOptions) => callAgentResponsesApi(options))
+  const result = await responses({
+    settings, profile,
+    params: { ...DEFAULT_PARAMS, n: 1 },
+    input: [{ role: 'user', content: [{ type: 'input_text', text: prompt }] }],
+    ...(signal ? { signal } : {}),
+  })
+  return result.text
+}
+
+const REWRITE_LEAD_PATTERN = /^(?:好的|好|当然|没问题|可以|收到|明白|明白了|以下是|这是|下面是|给你|为你)[\s，,、:：.。!！~～-]*/
+const REWRITE_PREFIX_PATTERN = /^(?:\*\*)?(?:润色后(?:的)?(?:提示词|结果)|修改后(?:的)?(?:提示词|结果)|提示词)\s*[:：](?:\*\*)?\s*/i
+const REWRITE_VERB_PATTERN = /整理|撰写|润色|构思|描述|生成|思考|改写|处理/
+
+/**
+ * Cleans a rewritten prompt coming back from a chatty provider: drops process
+ * narration, Markdown decorations, quoting and leading transitions. Throws when
+ * the payload is clearly meta-talk instead of an actual prompt.
+ */
+export function sanitizeRewrittenPrompt(raw: string): string {
+  let text = raw.replace(/\r\n?/g, '\n').trim()
+  if (!text) throw new Error('AI 未返回润色结果，请更换文本模型后重试。')
+  text = text.replace(/^```[a-zA-Z]*\n?/, '').replace(/\n?```\s*$/, '').trim()
+  const hadLabel = REWRITE_PREFIX_PATTERN.test(text)
+  text = text.replace(REWRITE_PREFIX_PATTERN, '').trim()
+  // Drop a leading process sentence such as "正在整理为自然、写实的人物视觉描述。"
+  const leadingSentence = text.match(/^[^\n。！？!?]{0,80}[。！？!?]\s*/)
+  if (leadingSentence && REWRITE_VERB_PATTERN.test(leadingSentence[0]) && leadingSentence[0].length < 60) {
+    text = text.slice(leadingSentence[0].length).trim()
+  }
+  text = text.replace(REWRITE_LEAD_PATTERN, '').trim()
+  text = text.replace(/^["'“”‘’`]+/, '').replace(/["'“”‘’`]+$/, '').trim()
+  text = text.replace(/^#{1,6}\s*/gm, '').replace(/^\s*[-*+]\s+/gm, '').trim()
+  text = text.replace(/\n{3,}/g, '\n\n')
+  if (!text) throw new Error('AI 未返回润色结果，请更换文本模型后重试。')
+  const looksLikeProcess = !hadLabel && text.length < 40 && REWRITE_VERB_PATTERN.test(text)
+  if (looksLikeProcess) {
+    throw new Error('该模型只返回了过程描述而不是润色结果，请在设置中更换文本模型（推荐共享 deepseek 文本模型）后重试。')
+  }
+  return text
+}
+

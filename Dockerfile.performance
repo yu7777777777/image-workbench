@@ -1,0 +1,29 @@
+FROM node:22-alpine AS web-build
+WORKDIR /app/web
+COPY web/package.json ./
+RUN npm install --no-audit --no-fund
+ARG CACHEBUST=1
+COPY VERSION /app/VERSION
+COPY CHANGELOG.md /app/CHANGELOG.md
+COPY web ./
+RUN NEXT_PUBLIC_APP_VERSION="$(cat /app/VERSION)" npm run build
+
+FROM node:22-alpine AS playground-build
+WORKDIR /app/playground
+COPY playground/package.json playground/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+ARG CACHEBUST=1
+COPY playground ./
+RUN VITE_ACCOUNT_POOL=true npm run build
+RUN npm test -- --maxWorkers=2
+
+FROM chatgpt2api:refresh-20260920
+COPY utils/helper.py /app/utils/
+COPY services/protocol/conversation.py services/protocol/openai_v1_models.py services/protocol/openai_v1_response.py /app/services/protocol/
+COPY api/accounts.py api/app.py api/support.py api/system.py /app/api/
+COPY services/account_service.py services/account_refresh_scheduler.py services/openai_oauth.py services/oauth_login_service.py services/openai_backend_api.py services/config.py /app/services/
+COPY services/storage/database_storage.py /app/services/storage/
+COPY VERSION /app/VERSION
+COPY CHANGELOG.md /app/CHANGELOG.md
+COPY --from=web-build /app/web/out /app/web_dist
+COPY --from=playground-build /app/playground/dist /app/playground_dist

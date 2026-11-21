@@ -1,0 +1,7 @@
+node_modules/
+dist/
+dev-proxy.config.json
+gpt-image-config.local.json
+.wrangler/
+.env.local
+.env.*.local
