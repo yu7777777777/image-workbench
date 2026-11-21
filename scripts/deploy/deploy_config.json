@@ -1,0 +1,21 @@
+{
+  "$comment": "部署单一配置源。目标=新机；服务器地址/凭据不写在这里，部署时读根目录 服务器连接.txt（credentials_offset=4 表示取第 5-8 个冒号字段=新机）。",
+  "root": "/opt/chatgpt2api-trial-20261029",
+  "container": "chatgpt2api-trial-app",
+  "compose_file": "compose.json",
+  "service": "app",
+  "health_url": "http://127.0.0.1:3000/health?format=json",
+  "disk_min_gb": 4,
+  "keep_images": 3,
+  "image_prefix": "chatgpt2api",
+  "credentials_file": "服务器连接.txt",
+  "credentials_offset": 4,
+  "bun_path": "bun",
+  "playground_flags": {
+    "VITE_ACCOUNT_POOL": "true",
+    "VITE_DEFAULT_API_URL": "",
+    "VITE_API_PROXY_AVAILABLE": "true",
+    "VITE_SHOW_PRESET_CONFIG_ONLY": "true",
+    "VITE_LOCK_PRESET_CONFIG_PARAMS": "true"
+  }
+}

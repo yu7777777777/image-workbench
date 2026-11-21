@@ -1,5 +1,15 @@
 # 1.15.0
 
+## 一键部署工具（scripts/deploy/）
+
+- 新增统一部署入口 `deploy.py`（check/build/package/upload/release/rollback/status/all），终结 100+ 个一次性字符串派生脚本；远端执行器 `deploy_host.py` 为进 git 的稳定文件（骨架移植自 apply_pool_release_host.py）。
+- 发布包改为**全量当前代码 payload**（main.py + api/services/utils 全部跟踪 .py + 两套前端产物 + 元信息，~2.3MB），根治白名单静默旧代码类事故；新增 `check_whitelist.py` 白名单守护（当前实测 23 个跟踪 .py 不在 Dockerfile 白名单——服务端对应文件仍为 2026-09-20 基线版本，仅影响从零构建路径）。
+- 远端流程全自动化且保留全部安全网：manifest 逐文件校验+路径穿越防护 → 代码/前端/compose/SQLite backup 快照 → DOCKER_BUILDKIT=0 增量派生镜像 + 逐文件哈希/py_compile/import api 离线自检 → 前端保 inode 原地写入（资源先行、HTML/sw 收尾）→ compose 字段级 diff 断言 → readiness(/health?format=json) + 版本指纹 → 失败自动回滚 → `deployment-result.json` 证据包（供独立复核人验收）。
+- 附带：镜像保留策略（默认最近 3 个）、构建开关注入自动化（playground 5 个公开开关来自 deploy_config.json，防漏注入）、`--allow-failing-tests` 构建逃逸门（vitest 19 个历史遗留失败已甄别）、`.dockerignore` 补 .codex/.zcode/pwrun/logs/账号备份、8 项 deploy_host 单测。
+- 未执行真实部署：需 服务器连接.txt 恢复 + 1.15.0 浏览器人工验收后，以 `deploy.py all` 完成首次实战。
+
+## 移植上游三项体验功能：真实像素对比 / 单独删除结果 / 参考图超限 UX
+
 ## 移植上游三项体验功能：真实像素对比 / 单独删除结果 / 参考图超限 UX
 
 - 真实像素对比展示（移植自上游 gpt_image_playground PR #172）：详情弹窗参数区新增"比例/分辨率"行，画廊卡片封面比例/尺寸标签升级，实际值一律由图片真实像素推算（`playground/src/lib/size.ts` 新增 MODEL_RATIOS 比例表与 RESOLUTION_TIERS 档位、对数距离容差 0.04；新文件 `imageActualParams.ts`），不一致时黄色徽章显示"图片实际值"。本地适配：TaskParams 无 aspect_ratio/resolution 字段，请求值从请求 size 推导，两侧同一派生函数保证 16 倍数取整不误报。尺寸数据三级降级（图片记录 → 缩略图记录 → 解码原图）并写回 IndexedDB（`db.ts` 新增 `getImageDimensions`/`updateImageDimensions`，并发去重），`imageCache.ts` 新增 `ensureImageDimensionsCached`，历史图打开详情即自动补全。
