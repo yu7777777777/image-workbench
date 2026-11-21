@@ -1751,3 +1751,40 @@ describe('isAgentTextApiProfile', () => {
     expect(poolPlusText.agentTextProfileId).toBe('chatgpt2api-pool-agent')
   })
 })
+
+describe('getActiveApiProfile：旧版扁平字段不再覆盖 profiles 里的激活配置', () => {
+  // 回归背景：设置页保存/失焦会把表单上显示的空 Key + 预设模型写进旧版扁平字段，
+  // 旧逻辑用扁平字段覆盖 profiles 里解析出的激活配置，导致「尚未完成 API 配置」且提交禁用。
+  const poolProfile = createDefaultOpenAIProfile({
+    id: 'chatgpt2api-pool',
+    name: '本站账号池',
+    apiKey: 'chatgpt2api-session',
+    model: 'gpt-image-2',
+  })
+  const poisonedSettings = {
+    ...DEFAULT_SETTINGS,
+    activeProfileId: 'chatgpt2api-pool',
+    profiles: [poolProfile],
+    apiKey: '',
+    model: 'gpt-image-2.5-sunburst',
+    baseUrl: '',
+  }
+
+  it('ignores poisoned flattened fields when profiles exist', () => {
+    const active = getActiveApiProfile(poisonedSettings)
+    expect(active.apiKey).toBe('chatgpt2api-session')
+    expect(active.model).toBe('gpt-image-2')
+    expect(active.name).toBe('本站账号池')
+  })
+
+  it('still honors flattened fields for legacy states without profiles', () => {
+    const active = getActiveApiProfile({
+      apiKey: 'legacy-key',
+      model: 'gpt-image-2.5-sunburst',
+      baseUrl: 'https://legacy.example.com/v1',
+    })
+    expect(active.apiKey).toBe('legacy-key')
+    expect(active.model).toBe('gpt-image-2.5-sunburst')
+    expect(active.baseUrl).toBe('https://legacy.example.com/v1')
+  })
+})

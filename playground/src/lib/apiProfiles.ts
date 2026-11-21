@@ -864,20 +864,24 @@ export function getActiveApiProfile(settings: Partial<AppSettings> | unknown): A
   const record = settings && typeof settings === 'object' ? settings as Record<string, unknown> : {}
   const normalized = normalizeSettings(settings)
   const profile = normalized.profiles.find((p) => p.id === normalized.activeProfileId) ?? normalized.profiles[0] ?? createDefaultOpenAIProfile()
-  const apiMode = profile.provider === 'openai' && (record.apiMode === 'images' || record.apiMode === 'responses')
+  // 旧版扁平字段（baseUrl/apiKey/model...）只在「没有 profiles 数组」的遗留状态里生效。
+  // profiles 存在时（账号池/共享配置等），设置页的保存/失焦会把表单上显示的空 Key 写进扁平字段，
+  // 若仍用扁平字段覆盖，激活配置的凭据就会被清空，表现为「尚未完成 API 配置」且提交禁用。
+  const legacyOnly = !Array.isArray(record.profiles) || (record.profiles as unknown[]).length === 0
+  const apiMode = legacyOnly && profile.provider === 'openai' && (record.apiMode === 'images' || record.apiMode === 'responses')
     ? record.apiMode
     : profile.apiMode
 
   return {
     ...profile,
-    baseUrl: typeof record.baseUrl === 'string' ? record.baseUrl : profile.baseUrl,
-    apiKey: typeof record.apiKey === 'string' ? record.apiKey : profile.apiKey,
-    model: typeof record.model === 'string' && record.model.trim() ? record.model : profile.model,
-    timeout: typeof record.timeout === 'number' && Number.isFinite(record.timeout) ? record.timeout : profile.timeout,
+    baseUrl: legacyOnly && typeof record.baseUrl === 'string' ? record.baseUrl : profile.baseUrl,
+    apiKey: legacyOnly && typeof record.apiKey === 'string' ? record.apiKey : profile.apiKey,
+    model: legacyOnly && typeof record.model === 'string' && record.model.trim() ? record.model : profile.model,
+    timeout: legacyOnly && typeof record.timeout === 'number' && Number.isFinite(record.timeout) ? record.timeout : profile.timeout,
     apiMode,
-    codexCli: typeof record.codexCli === 'boolean' ? record.codexCli : profile.codexCli,
-    apiProxy: typeof record.apiProxy === 'boolean' ? record.apiProxy : profile.apiProxy,
-    streamImages: profile.provider === 'openai' && typeof record.streamImages === 'boolean' ? record.streamImages : profile.streamImages,
+    codexCli: legacyOnly && typeof record.codexCli === 'boolean' ? record.codexCli : profile.codexCli,
+    apiProxy: legacyOnly && typeof record.apiProxy === 'boolean' ? record.apiProxy : profile.apiProxy,
+    streamImages: profile.provider === 'openai' && legacyOnly && typeof record.streamImages === 'boolean' ? record.streamImages : profile.streamImages,
     streamPartialImages: normalizeStreamPartialImages(record.streamPartialImages, profile.streamPartialImages),
   }
 }
