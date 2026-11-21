@@ -364,10 +364,6 @@ function AccountsPageContent() {
     return selectedIds;
   }, [selectedIds]);
 
-  const abnormalTokens = useMemo(() => {
-    return accounts.filter((item) => item.status === "异常").map((item) => item.access_token);
-  }, [accounts]);
-
   const paginationItems = useMemo(() => {
     const items: (number | "...")[] = [];
     const start = Math.max(1, safePage - 1);
@@ -410,6 +406,42 @@ function AccountsPageContent() {
       toast.success(`删除 ${data.removed ?? 0} 个账户`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "删除账户失败";
+      toast.error(message);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  /** 一键移除全部异常账号：不受分页限制，一次拉取全量异常账号后批量删除。 */
+  const handleRemoveAllAbnormal = async () => {
+    const total = statusCounts["异常"] || 0;
+    if (total === 0) {
+      toast.success("没有异常账号");
+      return;
+    }
+    if (!window.confirm(`确定移除全部 ${total} 个异常账号吗？此操作不可恢复。`)) return;
+
+    setIsDeleting(true);
+    try {
+      const result = await fetchAccounts({
+        page: 1,
+        pageSize: 100000,
+        search: query.trim(),
+        status: "异常",
+        type: typeFilter,
+      });
+      const tokens = (result.items || []).map((item) => item.access_token).filter(Boolean);
+      if (tokens.length === 0) {
+        toast.success("没有异常账号");
+        void loadAccounts(page, true);
+        return;
+      }
+      const data = await deleteAccounts(tokens);
+      void loadAccounts(page, true);
+      setSelectedIds((prev) => prev.filter((id) => !tokens.includes(id)));
+      toast.success(`已移除 ${data.removed ?? tokens.length} 个异常账号`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "移除异常账号失败";
       toast.error(message);
     } finally {
       setIsDeleting(false);
@@ -1128,11 +1160,11 @@ function AccountsPageContent() {
                 <Button
                   variant="ghost"
                   className="h-8 rounded-lg px-3 text-rose-500 hover:bg-rose-50 hover:text-rose-600"
-                  onClick={() => void handleDeleteTokens(abnormalTokens)}
-                  disabled={abnormalTokens.length === 0 || isDeleting}
+                  onClick={() => void handleRemoveAllAbnormal()}
+                  disabled={(statusCounts["异常"] || 0) === 0 || isDeleting}
                 >
                   {isDeleting ? <LoaderCircle className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
-                  移除异常账号
+                  移除全部异常账号{(statusCounts["异常"] || 0) > 0 ? `(${statusCounts["异常"]})` : ""}
                 </Button>
                 <Button
                   variant="ghost"

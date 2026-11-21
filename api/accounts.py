@@ -338,7 +338,10 @@ def create_router() -> APIRouter:
         tokens = [str(token or "").strip() for token in body.tokens if str(token or "").strip()]
         if not tokens:
             raise HTTPException(status_code=400, detail={"error": "tokens is required"})
-        return account_service.delete_accounts(tokens)
+        result = account_service.delete_accounts(tokens)
+        # 响应瘦身：全量 items 序列化（3 万+ 账号）曾是删除卡顿的主因；
+        # 管理页删除后自行 loadAccounts 刷新列表，这里只返回计数。
+        return {"removed": result.get("removed", 0), "items": []}
 
     @router.post("/api/accounts/refresh")
     async def refresh_accounts(body: AccountRefreshRequest, authorization: str | None = Header(default=None)):
