@@ -28,8 +28,8 @@ export default function DragUploadOverlay({
         <div className="text-center">
           {atImageLimit ? (
             <>
-              <p className="text-lg font-semibold text-red-500">已达上限 {maxImages} 张</p>
-              <p className="text-sm text-gray-400 mt-1">请先移除部分参考图后再添加</p>
+              <p className="text-lg font-semibold text-gray-700 dark:text-gray-200">当前模型每次最多使用 {maxImages} 张</p>
+              <p className="text-sm text-gray-400 mt-1">超限图片会保留并置灰，提交前请移除超限图片或切换模型</p>
             </>
           ) : (
             <>

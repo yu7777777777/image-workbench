@@ -12,6 +12,7 @@ import { ensureImageCached, getCachedImage } from '../lib/imageCache'
 import { DEFAULT_FAL_IMAGE_SIZE, getChangedParams, getOutputImageLimitForSettings, normalizeParamsForSettings } from '../lib/paramCompatibility'
 import { getAtImageQuery, getImageMentionLabel, getPromptIndexFromVisibleIndex, getPromptMentionParts, getSelectedImageMentionLabel, imageMentionMatches, insertImageMentionAtVisibleRange, insertTextMentionAtVisibleRange, isCursorInSelectedImageMention, stripImageMentionMarkers } from '../lib/promptImageMentions'
 import { normalizeCodexCliImageSize, normalizeImageSize } from '../lib/size'
+import { getInputImageLimit, getInputImageLimitHint } from '../lib/inputImageLimits'
 import { createMaskPreviewDataUrl } from '../lib/canvasImage'
 import { getSafeBoundingClientRect } from '../lib/domRect'
 import { collectAgentRoundOutputImageSlots } from '../lib/agentImageReferences'
@@ -28,8 +29,8 @@ import InputParamsPanel from './input/inputParamsPanel'
 import { fetchQuotaData, type QuotaData } from '../lib/quota'
 import { fetchAvailableImageModels } from '../lib/modelsCatalog'
 
-/** API 支持的最大参考图数量 */
-const API_MAX_IMAGES = 16
+/** API 支持的最大参考图数量（超限图片保留并置灰，提交时拦截） */
+const API_MAX_IMAGES = getInputImageLimit()
 
 function getFavoriteCollectionTasksForBatch(collectionId: string, tasks: TaskRecord[], defaultFavoriteCollectionId: string | null) {
   const favoriteTasks = tasks.filter((task) => task.isFavorite)
@@ -619,8 +620,10 @@ export default function InputBar() {
         ]
       : []),
   ]
-  const atImageLimit = inputImages.length >= API_MAX_IMAGES
-  const uploadImageTooltipText = atImageLimit ? `参考图数量已达上限（${API_MAX_IMAGES} 张），无法继续添加` : '上传图片'
+  const atImageLimit = inputImages.length > API_MAX_IMAGES
+  const uploadImageTooltipText = atImageLimit
+    ? getInputImageLimitHint(API_MAX_IMAGES)
+    : '上传图片'
   const transparentOutputHint = useHintTooltip()
   const handleTransparentOutputMenuOpenChange = useCallback((open: boolean) => {
     if (open) transparentOutputHint.hide()
@@ -924,29 +927,10 @@ export default function InputBar() {
 
   const handleFiles = async (files: FileList | File[]) => {
     try {
-      const currentCount = useStore.getState().inputImages.length
-      if (currentCount >= API_MAX_IMAGES) {
-        useStore.getState().showToast(
-          `参考图数量已达上限（${API_MAX_IMAGES} 张），无法继续添加`,
-          'error',
-        )
-        return
-      }
-
-      const remaining = API_MAX_IMAGES - currentCount
+      // 超限图片允许添加，会保留并置灰，提交时统一拦截
       const accepted = Array.from(files).filter((f) => f.type.startsWith('image/'))
-      const toAdd = accepted.slice(0, remaining)
-      const discarded = accepted.length - toAdd.length
-
-      for (const file of toAdd) {
+      for (const file of accepted) {
         await addImageFromFile(file)
-      }
-
-      if (discarded > 0) {
-        useStore.getState().showToast(
-          `已达上限 ${API_MAX_IMAGES} 张，${discarded} 张图片被丢弃`,
-          'error',
-        )
       }
     } catch (err) {
       useStore.getState().showToast(
@@ -1387,7 +1371,12 @@ export default function InputBar() {
 
   const renderImageThumb = (img: (typeof inputImages)[number], idx: number) => {
     const isMaskTarget = maskDraft?.targetImageId === img.id
-    const imageHintText = isMaskTarget ? '遮罩图必须为第一张图' : ''
+    const isOverLimit = idx >= API_MAX_IMAGES
+    const imageHintText = isMaskTarget
+      ? '遮罩图必须为第一张图'
+      : isOverLimit
+      ? getInputImageLimitHint(API_MAX_IMAGES)
+      : ''
     const displaySrc = isMaskTarget && maskPreviewUrl ? maskPreviewUrl : img.dataUrl
     const isImageDragging = imageDragIndex === idx
     const isLast = idx === inputImages.length - 1
@@ -1446,6 +1435,13 @@ export default function InputBar() {
       imageDragIndexRef.current = idx
       imageTouchDragRef.current = { index: idx, startX: touch.clientX, startY: touch.clientY, moved: false }
       setTouchDragPreview(null)
+      // 超限图片长按显示原因提示
+      if (isOverLimit) {
+        clearImageHintTimer()
+        imageHintTimerRef.current = window.setTimeout(() => {
+          showImageHintUntilRelease(img.id)
+        }, 450)
+      }
     }
 
     const handleTouchMove = (e: React.TouchEvent) => {
@@ -1461,7 +1457,16 @@ export default function InputBar() {
         return
       }
 
-      touchDrag.moved = true
+      // 纵向手势让位给参考图区滚动，只有横向拖动才进入排序
+      if (!touchDrag.moved) {
+        const dx = Math.abs(touch.clientX - touchDrag.startX)
+        const dy = Math.abs(touch.clientY - touchDrag.startY)
+        if (dy >= dx) {
+          imageTouchDragRef.current = { index: null, startX: 0, startY: 0, moved: false }
+          return
+        }
+        touchDrag.moved = true
+      }
       clearImageHintTimer()
       setImageHintId(null)
       suppressImageClickRef.current = true
@@ -1496,9 +1501,12 @@ export default function InputBar() {
       <div
         key={img.id}
         data-input-image-index={idx}
-        className={`relative group inline-block h-[52px] w-[52px] shrink-0 self-start transition-opacity ${isImageDragging ? 'opacity-40' : ''}`}
-        style={{ touchAction: isMaskTarget ? 'auto' : 'none' }}
+        className={`relative group inline-block h-[52px] w-[52px] shrink-0 self-start transition-opacity ${isImageDragging ? 'opacity-40' : ''} ${isOverLimit ? 'grayscale opacity-40' : ''}`}
+        style={{ touchAction: 'pan-y' }}
         draggable={!isMobile}
+        onMouseEnter={() => {
+          if (imageHintText) showImageHint(img.id)
+        }}
         onMouseLeave={hideImageHint}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
@@ -1532,7 +1540,7 @@ export default function InputBar() {
         }}
       >
         <ButtonTooltip
-          visible={imageHintId === img.id && Boolean(imageHintText) && (!isMobile || isMaskTarget)}
+          visible={imageHintId === img.id && Boolean(imageHintText) && (!isMobile || isMaskTarget || isOverLimit)}
           text={imageHintText}
         />
         {showDropBefore && (
@@ -1625,9 +1633,16 @@ export default function InputBar() {
   const renderImageThumbs = () => {
     return (
       <div ref={imagesRef}>
-        <div className="grid grid-cols-[repeat(auto-fill,52px)] justify-between gap-x-2 gap-y-3 mb-3">
-          {inputImages.map((img, idx) => renderImageThumb(img, idx))}
-          {renderClearAllButton()}
+        <div
+          className="mb-3 max-h-[min(140px,25dvh)] sm:max-h-[min(204px,30dvh)] overflow-y-auto overflow-x-hidden overscroll-y-contain"
+          role="region"
+          aria-label="参考图"
+          onScroll={hideImageHint}
+        >
+          <div className="grid grid-cols-[repeat(auto-fill,52px)] justify-between gap-x-2 gap-y-3">
+            {inputImages.map((img, idx) => renderImageThumb(img, idx))}
+            {renderClearAllButton()}
+          </div>
         </div>
         {touchDragPreview?.src && createPortal(
           <div
@@ -1958,12 +1973,8 @@ export default function InputBar() {
                 >
                   <ButtonTooltip visible={attachHover} text={uploadImageTooltipText} />
                   <button
-                    onClick={() => !atImageLimit && fileInputRef.current?.click()}
-                    className={`p-2.5 rounded-xl transition-all shadow-sm ${
-                      atImageLimit
-                        ? 'bg-gray-200 dark:bg-white/[0.04] text-gray-300 dark:text-gray-500 cursor-not-allowed'
-                        : 'bg-gray-200 dark:bg-white/[0.06] hover:bg-gray-300 dark:hover:bg-white/[0.1] text-gray-500 dark:text-gray-300 hover:shadow'
-                    }`}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-2.5 rounded-xl transition-all shadow-sm bg-gray-200 dark:bg-white/[0.06] hover:bg-gray-300 dark:hover:bg-white/[0.1] text-gray-500 dark:text-gray-300 hover:shadow"
                     aria-label={uploadImageTooltipText}
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2037,16 +2048,8 @@ export default function InputBar() {
                     onMouseLeave={() => setAttachHover(false)}
                   >
                     <button
-                      onClick={() => {
-                        if (!atImageLimit) {
-                          setShowMobileUploadMenu(!showMobileUploadMenu)
-                        }
-                      }}
-                      className={`p-2.5 rounded-xl transition-all shadow-sm flex-shrink-0 ${
-                        atImageLimit
-                          ? 'bg-gray-200 dark:bg-white/[0.04] text-gray-300 dark:text-gray-500 cursor-not-allowed'
-                          : 'bg-gray-200 dark:bg-white/[0.06] hover:bg-gray-300 dark:hover:bg-white/[0.1] text-gray-500 dark:text-gray-300'
-                      }`}
+                      onClick={() => setShowMobileUploadMenu(!showMobileUploadMenu)}
+                      className="p-2.5 rounded-xl transition-all shadow-sm flex-shrink-0 bg-gray-200 dark:bg-white/[0.06] hover:bg-gray-300 dark:hover:bg-white/[0.1] text-gray-500 dark:text-gray-300"
                       aria-label={uploadImageTooltipText}
                     >
                       <svg

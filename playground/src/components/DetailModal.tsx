@@ -3,14 +3,16 @@ import { DEFAULT_PARAMS } from '../types'
 import type { TaskRecord } from '../types'
 import type { ImageAnnotatorResult } from './ImageAnnotatorModal'
 import { openGalleryAnnotator } from './GalleryAnnotatorHost'
-import { useStore, reuseConfig, editOutputs, removeTask, showCodexCliPrompt, getCodexCliPromptKey, retryTask, submitTask } from '../store'
+import { useStore, reuseConfig, editOutputs, removeTask, removeTaskOutput, showCodexCliPrompt, getCodexCliPromptKey, retryTask, submitTask } from '../store'
 import { putTask } from '../lib/db'
 import { useCloseOnEscape } from '../hooks/useCloseOnEscape'
 import { usePreventBackgroundScroll } from '../hooks/usePreventBackgroundScroll'
 import { useTooltip } from '../hooks/useTooltip'
-import { ensureImageCached, getCachedImage } from '../lib/imageCache'
+import { ensureImageCached, ensureImageDimensionsCached, getCachedImage } from '../lib/imageCache'
 import { formatImageRatio } from '../lib/size'
-import { ActualValueBadge, DetailParamValue } from '../lib/paramDisplay'
+import { getImageActualParams } from '../lib/imageActualParams'
+import { getTaskOutputSlots } from '../lib/taskState'
+import { ActualValueBadge, DetailParamValue, getParamCompareRows } from '../lib/paramDisplay'
 import { copyImageSourceToClipboard, copyTextToClipboard, getClipboardFailureMessage } from '../lib/clipboard'
 import { createMaskPreviewDataUrl } from '../lib/canvasImage'
 import { dismissAllTooltips } from '../lib/tooltipDismiss'
@@ -40,6 +42,7 @@ export default function DetailModal() {
   const [outputPreviewSrcs, setOutputPreviewSrcs] = useState<Record<string, string>>({})
   const [imageRatios, setImageRatios] = useState<Record<string, string>>({})
   const [imageSizes, setImageSizes] = useState<Record<string, string>>({})
+  const [imageDims, setImageDims] = useState<Record<string, { width: number; height: number }>>({})
   const [maskPreviewSrc, setMaskPreviewSrc] = useState('')
   const [now, setNow] = useState(Date.now())
   const [showRawUrlsModal, setShowRawUrlsModal] = useState(false)
@@ -66,6 +69,7 @@ export default function DetailModal() {
   const downloadImageTooltip = useTooltip()
   const downloadOriginalImageTooltip = useTooltip()
   const downloadAllTooltip = useTooltip()
+  const deleteResultTooltip = useTooltip()
 
   const clearTextSelection = () => {
     const selection = window.getSelection()
@@ -137,6 +141,7 @@ export default function DetailModal() {
       setOutputPreviewSrcs({})
       setImageRatios({})
       setImageSizes({})
+      setImageDims({})
       return
     }
 
@@ -167,30 +172,7 @@ export default function DetailModal() {
   const maskTargetSrc = maskTargetId ? imageSrcs[maskTargetId] || '' : ''
   const maskSrc = task?.maskImageId ? imageSrcs[task.maskImageId] || '' : ''
   const allInputImageIds = task?.inputImageIds ?? []
-  const outputSlots = useMemo(() => {
-    if (!task) return []
-    const outputErrors = task.outputErrors ?? []
-    if (outputErrors.length === 0) {
-      return task.outputImages.map((imageId, outputImageIndex) => ({
-        requestIndex: outputImageIndex,
-        outputImageIndex,
-        imageId,
-        error: '',
-      }))
-    }
-
-    const errorsByIndex = new Map(outputErrors.map((item) => [item.requestIndex, item.error]))
-    const requestedCount = Math.max(task.params.n, task.outputImages.length + outputErrors.length)
-    let outputImageIndex = 0
-    return Array.from({ length: requestedCount }, (_, requestIndex) => {
-      const error = errorsByIndex.get(requestIndex)
-      if (error) return { requestIndex, outputImageIndex: -1, imageId: '', error }
-      const imageId = task.outputImages[outputImageIndex] ?? ''
-      const slot = { requestIndex, outputImageIndex, imageId, error: '' }
-      outputImageIndex += 1
-      return slot
-    })
-  }, [task])
+  const outputSlots = useMemo(() => (task ? getTaskOutputSlots(task) : []), [task])
   const currentOutputSlot = outputSlots[imageIndex]
   const currentOutputImageId = currentOutputSlot?.imageId || ''
   const currentOutputImageIndex = currentOutputSlot?.outputImageIndex ?? -1
@@ -227,6 +209,22 @@ export default function DetailModal() {
       cancelled = true
     }
   }, [task?.outputImages])
+
+  // 为当前输出图补全真实像素（历史图自动写入 IndexedDB，供参数对比使用）
+  useEffect(() => {
+    const id = currentOutputImageId
+    if (!id || imageDims[id]) return
+    let cancelled = false
+    ensureImageDimensionsCached(id).then((size) => {
+      if (cancelled || !size) return
+      setImageDims((prev) => ({ ...prev, [id]: size }))
+      setImageRatios((prev) => prev[id] ? prev : { ...prev, [id]: formatImageRatio(size.width, size.height) })
+      setImageSizes((prev) => prev[id] ? prev : { ...prev, [id]: `${size.width}×${size.height}` })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [currentOutputImageId])
 
   useEffect(() => {
     let cancelled = false
@@ -289,6 +287,11 @@ export default function DetailModal() {
   const transparentOutputText = task.transparentOutput || task.params.transparent_output ? 'true' : 'false'
   const currentTransparentOutputFailed = Boolean(currentOutputImageId && task.transparentOutput && task.transparentOriginalImages?.[currentOutputImageIndex] === '')
   const outputCompressionText = task.params.output_compression == null ? '未设置' : String(task.params.output_compression)
+  // 基于当前输出图真实像素的"请求 vs 实际"对比（比例/分辨率/尺寸）
+  const currentImageDims = currentOutputImageId ? imageDims[currentOutputImageId] : undefined
+  const actualParamRows = currentImageDims
+    ? getParamCompareRows(task, getImageActualParams(task, currentImageDims.width, currentImageDims.height))
+    : []
 
   const formatTime = (ts: number | null) => {
     if (!ts) return ''
@@ -358,6 +361,22 @@ export default function DetailModal() {
       title: '删除任务',
       message: '确定要删除这个任务吗？关联的图片资源也会被清理（如果没有其他任务引用）。',
       action: () => removeTask(task),
+    })
+  }
+
+  /** 删除当前槽位（单张成功图或一条失败记录），保留其他结果。 */
+  const handleDeleteCurrentOutput = () => {
+    if (!task || !currentOutputSlot) return
+    const slot = {
+      requestIndex: currentOutputSlot.requestIndex,
+      imageId: currentOutputSlot.imageId,
+      error: currentOutputSlot.error,
+    }
+    setConfirmDialog({
+      title: '删除结果',
+      message: '确定要删除这个结果吗？对应的图片资源也会被清理（如果没有其他任务引用）。',
+      awaitAction: true,
+      action: () => removeTaskOutput(task.id, slot),
     })
   }
 
@@ -560,6 +579,25 @@ export default function DetailModal() {
                   </ViewportTooltip>
                 </div>
               )}
+              {outputLen > 1 && (currentOutputImageId || currentOutputError) && (
+                <div className="relative group flex">
+                  <button
+                    type="button"
+                    {...deleteResultTooltip.handlers}
+                    onClick={(e) => {
+                      deleteResultTooltip.handlers.onClick()
+                      handleDeleteCurrentOutput()
+                    }}
+                    className="flex items-center justify-center px-1.5 py-0.5 bg-black/50 text-white rounded backdrop-blur-sm hover:bg-black/70 transition focus:outline-none focus:ring-1 focus:ring-white/50"
+                    aria-label="删除结果"
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </button>
+                  <ViewportTooltip visible={deleteResultTooltip.visible} className="whitespace-nowrap">
+                    删除结果
+                  </ViewportTooltip>
+                </div>
+              )}
             </div>
           )}
           {task.status === 'done' && outputLen > 0 && currentOutputPreviewSrc && (
@@ -571,6 +609,10 @@ export default function DetailModal() {
                 onLoad={(e) => {
                   const image = e.currentTarget
                   if (currentOutputImageId && image.naturalWidth > 0 && image.naturalHeight > 0) {
+                    setImageDims((prev) => ({
+                      ...prev,
+                      [currentOutputImageId]: { width: image.naturalWidth, height: image.naturalHeight },
+                    }))
                     setImageRatios((prev) => ({
                       ...prev,
                       [currentOutputImageId]: formatImageRatio(image.naturalWidth, image.naturalHeight),
@@ -1024,6 +1066,23 @@ export default function DetailModal() {
               </div>
             )}
             <div className="grid grid-cols-2 gap-2 text-xs mb-4 min-w-0">
+              {actualParamRows.filter((row) => row.key !== 'size').map((row) => (
+                <div key={row.key} className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2 min-w-0 overflow-hidden">
+                  <span className="text-gray-400 dark:text-gray-500">{row.label}</span>
+                  <br />
+                  <div className="mt-0.5 overflow-x-auto hide-scrollbar whitespace-nowrap mask-edge-r pr-2">
+                    {row.isMismatch ? (
+                      <span className="inline-flex items-center gap-1 font-medium">
+                        <span className="text-gray-700 dark:text-gray-300">{row.requested}</span>
+                        <span className="text-gray-300 dark:text-gray-600">|</span>
+                        <ActualValueBadge value={row.actual} tooltip="图片实际值" className="rounded px-1 py-0.5" />
+                      </span>
+                    ) : (
+                      <span className="font-medium text-gray-700 dark:text-gray-300">{row.requested}</span>
+                    )}
+                  </div>
+                </div>
+              ))}
               <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2 min-w-0 overflow-hidden">
                 <span className="text-gray-400 dark:text-gray-500">尺寸</span>
                 <br />

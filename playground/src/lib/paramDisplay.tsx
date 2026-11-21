@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { TaskParams, TaskRecord } from '../types'
+import { getImageActualParams, getImageRequestedParams, type ImageActualParams } from './imageActualParams'
 import ViewportTooltip from '../components/ViewportTooltip'
 
 type ParamKey = keyof TaskParams
@@ -15,9 +16,10 @@ interface ActualValueBadgeProps {
   value: string
   className?: string
   variant?: 'highlight' | 'normal'
+  tooltip?: string
 }
 
-export function ActualValueBadge({ value, className = '', variant = 'highlight' }: ActualValueBadgeProps) {
+export function ActualValueBadge({ value, className = '', variant = 'highlight', tooltip = 'API 实际响应值' }: ActualValueBadgeProps) {
   const [tooltipVisible, setTooltipVisible] = useState(false)
   const touchTimerRef = useRef<number | null>(null)
   const colorClass = variant === 'normal'
@@ -57,7 +59,7 @@ export function ActualValueBadge({ value, className = '', variant = 'highlight' 
     >
       {value}
       <ViewportTooltip visible={tooltipVisible} className="whitespace-nowrap">
-        API 实际响应值
+        {tooltip}
       </ViewportTooltip>
     </span>
   )
@@ -106,4 +108,45 @@ export function DetailParamValue({ task, paramKey, className = '', actualParams 
       <ActualValueBadge value={displayValue} className="rounded px-1 py-0.5" />
     </span>
   )
+}
+
+// ===== 基于图片真实像素的"请求 vs 实际"对比行（比例 / 分辨率） =====
+
+export type ParamCompareKey = 'aspect_ratio' | 'resolution' | 'size'
+
+export interface ParamCompareRow {
+  key: ParamCompareKey
+  label: string
+  requested: string
+  actual: string
+  isMismatch: boolean
+}
+
+/**
+ * 以图片真实像素为实际值，生成 比例 / 分辨率 / 尺寸 的对比行。
+ * 请求值为 auto 或无法派生时该行不输出。
+ */
+export function getParamCompareRows(task: TaskRecord, actual: ImageActualParams): ParamCompareRow[] {
+  const requested = getImageRequestedParams(task)
+  const rows: ParamCompareRow[] = []
+  const pushRow = (key: ParamCompareKey, label: string, requestedValue: string | undefined, actualValue: string | undefined) => {
+    if (!requestedValue || !actualValue) return
+    const requestedText = key === 'size' ? requestedValue.replace(/×/g, 'x') : requestedValue
+    const actualText = key === 'size' ? actualValue.replace(/×/g, 'x') : actualValue
+    rows.push({ key, label, requested: requestedText, actual: actualText, isMismatch: requestedText !== actualText })
+  }
+  pushRow('aspect_ratio', '比例', requested.aspect_ratio, actual.aspect_ratio)
+  pushRow('resolution', '分辨率', requested.resolution, actual.resolution)
+  pushRow('size', '尺寸', requested.size !== 'auto' ? requested.size : undefined, actual.size)
+  return rows
+}
+
+/** 实际参数与请求参数不一致的行 key 集合，便于调用方快速判断。 */
+export function getMismatchedParamKeys(rows: ParamCompareRow[]): Set<ParamCompareKey> {
+  return new Set(rows.filter((row) => row.isMismatch).map((row) => row.key))
+}
+
+/** 便捷组合：由任务与真实像素直接得到对比行。 */
+export function getParamCompareRowsForImage(task: TaskRecord, width: number, height: number): ParamCompareRow[] {
+  return getParamCompareRows(task, getImageActualParams(task, width, height))
 }

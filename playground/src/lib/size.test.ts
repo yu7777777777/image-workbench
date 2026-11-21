@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { calculateImageSize, normalizeCodexCliImageSize, prependCodexCliSizePrompt, stripInjectedCodexCliSizePrompt } from './size'
+import {
+  calculateImageSize,
+  getActualRatioAndResolution,
+  getDerivedParamsFromSize,
+  getResolutionTierLabel,
+  normalizeCodexCliImageSize,
+  prependCodexCliSizePrompt,
+  stripInjectedCodexCliSizePrompt,
+} from './size'
 
 describe('calculateImageSize', () => {
   // 上游按约 157 万像素原生生成：方形固定 1254×1254，其余比例按预算适配。
@@ -49,5 +57,32 @@ describe('Codex CLI size compatibility', () => {
     expect(stripInjectedCodexCliSizePrompt('Generate at 2048x2048 resolution. Draw a cat.', 'Draw a cat.', '1024x1024')).toBe('Generate at 2048x2048 resolution. Draw a cat.')
     expect(stripInjectedCodexCliSizePrompt('Generate at 1024x1024 resolution. Draw a cat.', 'Generate at 1024x1024 resolution. Draw a cat.', '1024x1024')).toBe('Generate at 1024x1024 resolution. Draw a cat.')
     expect(stripInjectedCodexCliSizePrompt('Generate at 1024x1024 resolution. Draw a cat.', 'Draw a cat.', 'auto')).toBe('Generate at 1024x1024 resolution. Draw a cat.')
+  })
+})
+
+describe('实际像素的比例与分辨率档位', () => {
+  it('derives ratio and resolution labels from real pixels regardless of the requested size', () => {
+    expect(getResolutionTierLabel(1770, 1770)).toBe('1.5K')
+    expect(getResolutionTierLabel(2496, 1664)).toBe('2K')
+
+    const actual = getActualRatioAndResolution('1536x1024', 1770, 1770)
+    expect(actual.aspect_ratio).toBe('1:1')
+    expect(actual.resolution).toBe('1.5K')
+  })
+
+  it('keeps the ratio label when real pixels deviate only from rounding', () => {
+    // 16 倍数取整造成的轻微比例偏差不应误报为不一致
+    expect(getActualRatioAndResolution('1256x1232', 1254, 1254).aspect_ratio).toBe('1:1')
+    expect(getDerivedParamsFromSize('1256x1232').aspect_ratio).toBe('1:1')
+  })
+
+  it('produces different labels when real pixels deviate beyond tolerance', () => {
+    expect(getDerivedParamsFromSize('1536x1024').aspect_ratio).toBe('3:2')
+    expect(getActualRatioAndResolution('1536x1024', 1672, 940).aspect_ratio).toBe('16:9')
+  })
+
+  it('returns no derived params for auto sizes', () => {
+    expect(getDerivedParamsFromSize('auto')).toEqual({})
+    expect(getDerivedParamsFromSize('')).toEqual({})
   })
 })

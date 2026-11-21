@@ -3,6 +3,7 @@ import type { TaskRecord } from '../types'
 import { useStore, retryTask } from '../store'
 import { ensureImageThumbnailCached, subscribeImageThumbnail } from '../lib/imageCache'
 import { formatImageRatio } from '../lib/size'
+import { getImageActualParams, getImageRequestedParams } from '../lib/imageActualParams'
 import { getParamDisplay, ActualValueBadge } from '../lib/paramDisplay'
 import { DEFAULT_FAL_MODEL, DEFAULT_IMAGES_MODEL } from '../lib/apiProfiles'
 import { isAgentTaskPromptPending } from '../lib/taskPromptDisplay'
@@ -70,6 +71,7 @@ export default function TaskCard({
   const [thumbSrc, setThumbSrc] = useState<string>('')
   const [coverRatio, setCoverRatio] = useState<string>('')
   const [coverSize, setCoverSize] = useState<string>('')
+  const [coverDims, setCoverDims] = useState<{ width: number; height: number } | null>(null)
   const [now, setNow] = useState(Date.now())
   const [isSwiping, setIsSwiping] = useState(false)
   const [swipeStartedSelected, setSwipeStartedSelected] = useState(false)
@@ -250,6 +252,7 @@ export default function TaskCard({
   useEffect(() => {
     setCoverRatio('')
     setCoverSize('')
+    setCoverDims(null)
     setThumbSrc('')
 
     let cancelled = false
@@ -262,6 +265,7 @@ export default function TaskCard({
       if (thumbnail.width && thumbnail.height) {
         setCoverRatio(formatImageRatio(thumbnail.width, thumbnail.height))
         setCoverSize(`${thumbnail.width}×${thumbnail.height}`)
+        setCoverDims({ width: thumbnail.width, height: thumbnail.height })
       }
     }
 
@@ -317,6 +321,20 @@ export default function TaskCard({
 
   const nDisplay = getParamDisplay(task, 'n')
   const isAgentTask = task.sourceMode === 'agent' || Boolean(task.agentConversationId || task.agentRoundId)
+
+  // 封面图真实像素与请求参数的对比（不一致时徽章显示实际值）
+  const coverActualParams = coverDims ? getImageActualParams(task, coverDims.width, coverDims.height) : null
+  const coverRequestedParams = getImageRequestedParams(task)
+  const coverRatioMismatch = Boolean(
+    coverActualParams?.aspect_ratio
+    && coverRequestedParams.aspect_ratio
+    && coverActualParams.aspect_ratio !== coverRequestedParams.aspect_ratio,
+  )
+  const coverSizeMismatch = Boolean(
+    coverActualParams?.size
+    && task.params.size !== 'auto'
+    && `${task.params.size.replace(/×/g, 'x')}` !== coverActualParams.size,
+  )
   const showPendingPrompt = isAgentTaskPromptPending(task)
   const showN = !isAgentTask && (task.params.n > 1 || nDisplay.isMismatch)
   const outputErrorCount = task.outputErrors?.length ?? 0
@@ -533,12 +551,28 @@ export default function TaskCard({
               </span>
             ) : (
               <>
-                <span className="bg-black/50 text-white text-[10px] sm:text-xs px-1.5 py-0.5 rounded backdrop-blur-sm font-mono">
-                  {coverRatio}
-                </span>
-                <span className="bg-black/50 text-white/90 text-[10px] sm:text-xs px-1.5 py-0.5 rounded backdrop-blur-sm font-medium">
-                  {coverSize}
-                </span>
+                {coverRatioMismatch && coverActualParams?.aspect_ratio ? (
+                  <ActualValueBadge
+                    value={coverActualParams.aspect_ratio}
+                    tooltip="图片实际值"
+                    className="rounded text-[10px] sm:text-xs px-1.5 py-0.5 font-mono"
+                  />
+                ) : (
+                  <span className="bg-black/50 text-white text-[10px] sm:text-xs px-1.5 py-0.5 rounded backdrop-blur-sm font-mono">
+                    {coverRatio}
+                  </span>
+                )}
+                {coverSizeMismatch && coverActualParams?.size ? (
+                  <ActualValueBadge
+                    value={coverActualParams.size.replace('x', '×')}
+                    tooltip="图片实际值"
+                    className="rounded text-[10px] sm:text-xs px-1.5 py-0.5 font-medium"
+                  />
+                ) : (
+                  <span className="bg-black/50 text-white/90 text-[10px] sm:text-xs px-1.5 py-0.5 rounded backdrop-blur-sm font-medium">
+                    {coverSize}
+                  </span>
+                )}
               </>
             )}
           </div>

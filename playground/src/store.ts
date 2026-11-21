@@ -82,7 +82,8 @@ import { ALL_FAVORITES_COLLECTION_ID, DEFAULT_FAVORITE_COLLECTION_ID, createDefa
 import { createAgentTextBuffer } from './lib/agentTextBuffer'
 import { createAgentConversationPersistence } from './lib/agentConversationPersistence'
 import { createPersistedState, mergePersistedAgentConversations, migratePersistedState, normalizePersistedState } from './lib/persistedState'
-import { addImageSizeParam, createTaskDonePatch, createTaskErrorPatch, deriveAgentImageActualParams, deriveGalleryActualParams, firstActualParams, hasActualParams, hasActualSizeParam, mapActualParamsByImage, mapRevisedPromptsByImage, markInterruptedOpenAIRunningTasks } from './lib/taskState'
+import { addImageSizeParam, createTaskDonePatch, createTaskErrorPatch, deriveAgentImageActualParams, deriveGalleryActualParams, firstActualParams, getTaskOutputSlots, hasActualParams, hasActualSizeParam, mapActualParamsByImage, mapRevisedPromptsByImage, markInterruptedOpenAIRunningTasks, type TaskOutputSlot } from './lib/taskState'
+import { getInputImageLimit, getInputImageLimitError } from './lib/inputImageLimits'
 import { stripInjectedCodexCliSizePrompt } from './lib/size'
 import { createCanvasSlice, type CanvasSlice } from './store/canvasSlice'
 import { createSettingsSlice, type SettingsSlice } from './store/settingsSlice'
@@ -1690,6 +1691,13 @@ export async function submitTask(options: {
   if (validateApiProfile(activeProfile)) {
     showToast(`请先完善请求 API 配置：${validateApiProfile(activeProfile)}`, 'error')
     useStore.getState().setShowSettings(true)
+    return
+  }
+
+  // 参考图数量拦截：超限图片允许保留并置灰，但提交前必须移除
+  const inputImageLimit = getInputImageLimit(activeProfile, normalizedSettings)
+  if (inputImages.length > inputImageLimit) {
+    showToast(getInputImageLimitError(inputImageLimit), 'error')
     return
   }
 
@@ -4265,7 +4273,8 @@ export async function clearFailedTasks(taskIds?: string[]) {
   const failedTasks = useStore.getState().tasks
     .filter((task) => taskMatchesFilterStatus(task, 'error') && (!targetTaskIds || targetTaskIds.has(task.id)))
   const failedTaskIds = failedTasks
-    .filter((task) => task.status === 'error')
+    // 整任务失败，或成功结果已删光只剩失败记录的任务，直接整任务清除
+    .filter((task) => task.status === 'error' || task.outputImages.length === 0)
     .map((task) => task.id)
   const partialFailedTaskIds = new Set(
     failedTasks
@@ -4283,6 +4292,83 @@ export async function clearFailedTasks(taskIds?: string[]) {
     await Promise.all(updated.filter((task) => partialFailedTaskIds.has(task.id)).map((task) => putTask(task)))
     showToast(`已清除 ${partialFailedTaskIds.size} 条部分失败记录`, 'success')
   }
+}
+
+/**
+ * 删除任务的一个输出槽位（单张成功图或一条失败记录）。
+ * 只改前端任务记录与本地图片存储，服务端文件仍由保留期与图片管理页管理。
+ * 返回 false 表示未删除（任务不存在、未完成、仅剩最后一个结果或并发下已被删除）。
+ */
+export async function removeTaskOutput(
+  taskId: string,
+  output: { imageId: string; requestIndex: number; error: string },
+): Promise<boolean> {
+  const task = useStore.getState().tasks.find((item) => item.id === taskId)
+  if (!task || task.status !== 'done') return false
+
+  const outputs = getTaskOutputSlots(task)
+  if (outputs.length <= 1) return false
+
+  const removed = outputs.find((slot) =>
+    slot.requestIndex === output.requestIndex
+    && slot.imageId === output.imageId
+    && slot.error === output.error,
+  )
+  if (!removed) return false
+
+  const imageId = removed.imageId
+  const index = removed.outputImageIndex
+  const remainingSlots = outputs.filter((slot) => slot !== removed)
+  const outputImages = task.outputImages.filter((_, idx) => idx !== index)
+  // 仅当该图不再被其他槽位引用（支持重复图）时，才清理按图记录的元数据
+  let actualParamsByImage = task.actualParamsByImage
+  let revisedPromptByImage = task.revisedPromptByImage
+  if (imageId && !outputImages.includes(imageId)) {
+    if (actualParamsByImage) {
+      actualParamsByImage = { ...actualParamsByImage }
+      delete actualParamsByImage[imageId]
+      if (Object.keys(actualParamsByImage).length === 0) actualParamsByImage = undefined
+    }
+    if (revisedPromptByImage) {
+      revisedPromptByImage = { ...revisedPromptByImage }
+      delete revisedPromptByImage[imageId]
+      if (Object.keys(revisedPromptByImage).length === 0) revisedPromptByImage = undefined
+    }
+  }
+
+  const previousTasks = useStore.getState().tasks
+  const rebuiltErrors = remainingSlots.flatMap((slot, requestIndex) =>
+    slot.error ? [{ requestIndex, error: slot.error }] : [])
+  const updated: TaskRecord = {
+    ...task,
+    outputImages,
+    transparentOriginalImages: task.transparentOriginalImages
+      ? task.transparentOriginalImages.filter((_, idx) => idx !== index)
+      : undefined,
+    outputErrors: task.outputErrors ? (rebuiltErrors.length > 0 ? rebuiltErrors : undefined) : undefined,
+    actualParamsByImage,
+    revisedPromptByImage,
+  }
+  useStore.setState((state) => ({ tasks: state.tasks.map((item) => item.id === taskId ? updated : item) }))
+
+  try {
+    await putTask(updated)
+  } catch (err) {
+    console.error('删除结果写入存储失败', err)
+    useStore.setState({ tasks: previousTasks })
+    useStore.getState().showToast('删除失败，请重试', 'error')
+    return false
+  }
+
+  const transparentOriginalId = task.transparentOriginalImages?.[index]
+  try {
+    await deleteUnreferencedImageIds([imageId, transparentOriginalId ?? ''])
+  } catch (err) {
+    console.warn('清理已删除的结果图片失败', err)
+  }
+
+  useStore.getState().showToast('结果已删除', 'success')
+  return true
 }
 
 /** 删除单条任务 */

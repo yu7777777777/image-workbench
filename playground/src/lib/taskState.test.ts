@@ -8,6 +8,7 @@ import {
   deriveAgentImageActualParams,
   deriveGalleryActualParams,
   firstActualParams,
+  getTaskOutputSlots,
   mapActualParamsByImage,
   mapRevisedPromptsByImage,
   markInterruptedOpenAIRunningTasks,
@@ -126,5 +127,36 @@ describe('task actual params', () => {
       'image-a': ' revised ',
     })
     expect(mapRevisedPromptsByImage(['image-a'], [])).toBeUndefined()
+  })
+})
+
+describe('getTaskOutputSlots', () => {
+  it('maps images to slots when there are no failures', () => {
+    const slots = getTaskOutputSlots(task({ outputImages: ['img-a', 'img-b'] }))
+    expect(slots).toEqual([
+      { requestIndex: 0, outputImageIndex: 0, imageId: 'img-a', error: '' },
+      { requestIndex: 1, outputImageIndex: 1, imageId: 'img-b', error: '' },
+    ])
+  })
+
+  it('aligns error slots with images by request index', () => {
+    const slots = getTaskOutputSlots(task({
+      params: { ...DEFAULT_PARAMS, n: 3 },
+      outputImages: ['img-a'],
+      outputErrors: [{ requestIndex: 1, error: '生成失败' }],
+    }))
+    expect(slots).toEqual([
+      { requestIndex: 0, outputImageIndex: 0, imageId: 'img-a', error: '' },
+      { requestIndex: 1, outputImageIndex: -1, imageId: '', error: '生成失败' },
+    ])
+  })
+
+  it('filters blank slots that were never filled', () => {
+    const slots = getTaskOutputSlots(task({
+      params: { ...DEFAULT_PARAMS, n: 4 },
+      outputImages: ['img-a', 'img-b'],
+    }))
+    expect(slots).toHaveLength(2)
+    expect(slots.every((slot) => slot.imageId || slot.error)).toBe(true)
   })
 })

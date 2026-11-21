@@ -1,3 +1,12 @@
+# 1.15.0
+
+## 移植上游三项体验功能：真实像素对比 / 单独删除结果 / 参考图超限 UX
+
+- 真实像素对比展示（移植自上游 gpt_image_playground PR #172）：详情弹窗参数区新增"比例/分辨率"行，画廊卡片封面比例/尺寸标签升级，实际值一律由图片真实像素推算（`playground/src/lib/size.ts` 新增 MODEL_RATIOS 比例表与 RESOLUTION_TIERS 档位、对数距离容差 0.04；新文件 `imageActualParams.ts`），不一致时黄色徽章显示"图片实际值"。本地适配：TaskParams 无 aspect_ratio/resolution 字段，请求值从请求 size 推导，两侧同一派生函数保证 16 倍数取整不误报。尺寸数据三级降级（图片记录 → 缩略图记录 → 解码原图）并写回 IndexedDB（`db.ts` 新增 `getImageDimensions`/`updateImageDimensions`，并发去重），`imageCache.ts` 新增 `ensureImageDimensionsCached`，历史图打开详情即自动补全。
+- 单独删除任务结果（移植自 dfcd1dd + 8791404）：outputSlots 从 DetailModal 内联提取为 `lib/taskState.ts` 的 `getTaskOutputSlots`（过滤从未填充的空白槽位）；详情弹窗顶栏新增"删除结果"按钮（多槽位时显示，awaitAction 确认），`store.ts` 新增 `removeTaskOutput`——乐观更新 → 落盘失败回滚 + toast → `deleteUnreferencedImageIds` 清理孤儿图，失败记录按剩余槽位重排 requestIndex（空则 undefined），`actualParamsByImage`/`revisedPromptByImage` 在图片不再被引用时清理；`clearFailedTasks` 联动：成功图删光只剩失败记录的任务整任务清除。只删客户端记录与 IndexedDB 图片，服务端文件仍由保留期与图片管理页管理（与现有删除任务行为一致）。
+- 参考图超限 UX（移植自上游 v0.9.3 a0046b2，本地适配）：超过 16 张的参考图保留并置灰（grayscale + opacity-40），桌面 hover / 移动端长按 450ms 显示原因（复用 imageHint 机制），参考图区从换行网格改为纵向滚动（移动端 max 140px/25dvh、桌面 204px/30dvh，overscroll-y-contain）；上传不再截断丢弃（`handleFiles` 移除限制检查），上传按钮不再禁用；提交时 `submitTask` 统一拦截（超限 toast 不创建任务）；触摸排序改为 `touchAction: 'pan-y'` + 横向手势判定（dy≥dx 让位滚动）。新文件 `inputImageLimits.ts` 暂为统一 16 张上限，保留按模型扩展位。
+- 测试与构建：新增 size/paramDisplay/taskState/inputImageLimits/store 共 32 项用例全部通过；DetailModal.test.tsx 的 imageCache/store mock 补充新导出后恢复通过。全量 vitest 中剩余失败（urlSettings/presetConfig/api/paramCompatibility/store preset-deletion 等）经 git stash 对照确认为改动前即存在的历史遗留，本次未引入新失败。`tsc -b` + `vite build` 通过；未做浏览器端人工验收与真实生图端到端。
+
 # 1.14.1
 
 ## 启用改进后的账号池自动检查（1.13.80）与详情弹窗排版微调

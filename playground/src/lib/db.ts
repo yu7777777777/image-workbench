@@ -1,4 +1,5 @@
 import type { AgentConversation, TaskRecord, StoredImage, StoredImageThumbnail, CanvasProject } from '../types'
+import { hasImageDimensions } from './size'
 
 const DB_NAME = 'gpt-image-playground'
 const DB_VERSION = 5
@@ -211,6 +212,59 @@ export function getAllImageIds(): Promise<string[]> {
 
 export function putImage(image: StoredImage): Promise<IDBValidKey> {
   return dbTransaction(STORE_IMAGES, 'readwrite', (s) => s.put(image))
+}
+
+/** 把图片真实宽高写回 images 与 thumbnails 两条记录；图片不存在时返回 false。 */
+export async function updateImageDimensions(id: string, width: number, height: number): Promise<boolean> {
+  if (!hasImageDimensions({ width, height })) throw new Error('图片尺寸无效')
+  const image = await getImage(id)
+  if (!image) return false
+  if (image.width !== width || image.height !== height) {
+    await putImage({ ...image, width, height })
+  }
+  const thumbnail = await getStoredImageThumbnail(id)
+  if (thumbnail && (thumbnail.width !== width || thumbnail.height !== height)) {
+    await putImageThumbnail({ ...thumbnail, width, height })
+  }
+  return true
+}
+
+const imageDimensionsPending = new Map<string, Promise<{ width: number; height: number } | undefined>>()
+
+/**
+ * 读取图片真实宽高，缺失时逐级降级补全：
+ * 图片记录 → 缩略图记录（可信证据，写回）→ 解码原图（写回）。
+ * 同一图片的并发请求共享同一个 Promise。
+ */
+export function getImageDimensions(id: string): Promise<{ width: number; height: number } | undefined> {
+  const pending = imageDimensionsPending.get(id)
+  if (pending) return pending
+
+  const request = (async () => {
+    const image = await getImage(id)
+    if (!image) return undefined
+    if (hasImageDimensions(image)) return { width: image.width, height: image.height }
+
+    const thumbnail = await getStoredImageThumbnail(id)
+    if (hasImageDimensions(thumbnail)) {
+      const size = { width: thumbnail.width, height: thumbnail.height }
+      await updateImageDimensions(id, size.width, size.height)
+      return size
+    }
+
+    const decoded = await loadImage(image.dataUrl)
+    const size = { width: decoded.naturalWidth, height: decoded.naturalHeight }
+    if (size.width > 0 && size.height > 0) {
+      await updateImageDimensions(id, size.width, size.height)
+      return size
+    }
+    return undefined
+  })()
+    .catch(() => undefined)
+    .finally(() => imageDimensionsPending.delete(id))
+
+  imageDimensionsPending.set(id, request)
+  return request
 }
 
 export function deleteImage(id: string): Promise<undefined> {

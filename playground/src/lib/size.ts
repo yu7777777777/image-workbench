@@ -225,6 +225,100 @@ function getPresetRatioKey(ratioWidth: number, ratioHeight: number): PresetRatio
 
 const MAX_RATIO_ERROR = 0.01
 
+/** 展示用的常见比例档位（用于把实际像素归一到可读的比例名）。 */
+const MODEL_RATIOS = [
+  '1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9',
+  '1:2', '2:1', '5:2', '1:4', '4:1', '1:8', '8:1', '1:16', '16:1', '9:19.5', '19.5:9', '9:20', '20:9',
+].map((label) => {
+  const [width, height] = label.split(':').map(Number)
+  return { label, value: width / height }
+})
+
+/** 展示用的分辨率档位，按总像素的平方根划分。 */
+const RESOLUTION_TIERS = [
+  { label: '512', side: 512 },
+  { label: '1K', side: 1024 },
+  { label: '1.5K', side: 1536 },
+  { label: '2K', side: 2048 },
+  { label: '3K', side: 3072 },
+  { label: '4K', side: 4096 },
+]
+const RATIO_TOLERANCE = 0.04
+
+export function hasImageDimensions(
+  value: { width?: number; height?: number } | null | undefined,
+): value is { width: number; height: number } {
+  const width = value?.width
+  const height = value?.height
+  return Number.isFinite(width) && Number.isFinite(height)
+    && (width as number) > 0 && (height as number) > 0
+}
+
+function logDelta(a: number, b: number) {
+  return Math.abs(Math.log(a / b))
+}
+
+function getClosestModelRatioLabel(ratio: number): string | null {
+  let best: { label: string; delta: number } | null = null
+  for (const item of MODEL_RATIOS) {
+    const delta = logDelta(ratio, item.value)
+    if (delta <= RATIO_TOLERANCE && (!best || delta < best.delta)) best = { label: item.label, delta }
+  }
+  return best?.label ?? null
+}
+
+/** 把实际像素归一到最接近的常见比例名，无法归一时给出 ≈ 形式的近似比例。 */
+export function getImageRatioLabel(width: number, height: number): string {
+  const closest = getClosestModelRatioLabel(width / height)
+  return closest ?? formatImageRatio(width, height)
+}
+
+/** 按总像素的平方根归一到分辨率档位（同一像素尺寸的档位不随请求档位改变）。 */
+export function getResolutionTierLabel(width: number, height: number): string {
+  const side = Math.sqrt(width * height)
+  let best = RESOLUTION_TIERS[0]
+  let bestDelta = logDelta(side, best.side)
+  for (const tier of RESOLUTION_TIERS.slice(1)) {
+    const delta = logDelta(side, tier.side)
+    if (delta < bestDelta) {
+      best = tier
+      bestDelta = delta
+    }
+  }
+  return best.label
+}
+
+/**
+ * 从请求的 size（WxH 或 auto）推导展示用比例/分辨率档位；
+ * 本地 TaskParams 未单独存这两项，请求值统一从这里派生。
+ */
+export function getDerivedParamsFromSize(size: string): { aspect_ratio?: string; resolution?: string } {
+  if (!size || size === 'auto') return {}
+  const match = size.trim().match(SIZE_PATTERN)
+  if (!match) return {}
+  const width = Number(match[1])
+  const height = Number(match[2])
+  if (!(width > 0 && height > 0)) return {}
+  return {
+    aspect_ratio: getImageRatioLabel(width, height),
+    resolution: getResolutionTierLabel(width, height),
+  }
+}
+
+/** 实际出图的比例/分辨率档位（一律由真实像素决定）。 */
+export function getActualRatioAndResolution(
+  requestedSize: string | undefined,
+  width: number,
+  height: number,
+): { aspect_ratio?: string; resolution?: string } {
+  void requestedSize
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return {}
+  return {
+    aspect_ratio: getImageRatioLabel(width, height),
+    resolution: getResolutionTierLabel(width, height),
+  }
+}
+
 export function calculateImageSize(tier: SizeTier, ratio: string) {
   const parsed = parseRatio(ratio)
   if (!parsed) return null

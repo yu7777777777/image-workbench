@@ -1,9 +1,11 @@
 import {
   CURRENT_THUMBNAIL_VERSION,
   getImage,
+  getImageDimensions,
   getImageThumbnail,
   getStoredFreshImageThumbnail,
 } from './db'
+import { hasImageDimensions } from './size'
 
 type ImageThumbnail = {
   dataUrl: string
@@ -111,6 +113,15 @@ export async function ensureImageThumbnailCached(id: string): Promise<ImageThumb
   }
   cacheThumbnail(id, thumbnail)
   return thumbnail
+}
+
+/** 读取图片真实宽高：内存缩略图快路径 → IndexedDB（含历史补全写回）。 */
+export async function ensureImageDimensionsCached(id: string): Promise<{ width: number; height: number } | undefined> {
+  const cachedThumbnail = getCachedThumbnail(id)
+  if (hasImageDimensions(cachedThumbnail)) {
+    return { width: cachedThumbnail.width, height: cachedThumbnail.height }
+  }
+  return getImageDimensions(id)
 }
 
 export function subscribeImageThumbnail(id: string, callback: (thumbnail: ImageThumbnail) => void) {

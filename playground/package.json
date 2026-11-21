@@ -41,5 +41,8 @@
     "vite": "^6.3.2",
     "vitest": "^4.1.5",
     "wrangler": "^4.96.0"
-  }
+  },
+  "trustedDependencies": [
+    "core-js"
+  ]
 }

@@ -159,7 +159,7 @@ import { callImageApi } from './lib/api'
 import { callAgentResponsesApi, callBatchImageSingle } from './lib/agentApi'
 import { getFalQueuedImageResult } from './lib/falAiImageApi'
 import { removeKeyedBackgroundFromDataUrl } from './lib/transparentImage'
-import { clearData, clearFailedTasks, deleteFavoriteCollection, editOutputs, getErrorToastMessage, getPersistedState, getTaskApiProfile, importData, initStore, regenerateAgentAssistantMessage, removeMultipleTasks, removeTask, restoreExplicitPresetConfig, reuseConfig, stopAgentResponse, submitAgentMessage, submitTask, taskMatchesFilterStatus, taskMatchesSearchQuery, useStore } from './store'
+import { clearData, clearFailedTasks, deleteFavoriteCollection, editOutputs, getErrorToastMessage, getPersistedState, getTaskApiProfile, importData, initStore, regenerateAgentAssistantMessage, removeMultipleTasks, removeTask, removeTaskOutput, restoreExplicitPresetConfig, reuseConfig, stopAgentResponse, submitAgentMessage, submitTask, taskMatchesFilterStatus, taskMatchesSearchQuery, useStore } from './store'
 import { createInputImageFromFile } from './store'
 
 const commitTaskDeletionImplementation = vi.mocked(commitTaskDeletion).getMockImplementation()!
@@ -3794,6 +3794,85 @@ describe('agent context for removed outputs', () => {
     await clearFailedTasks(failedTaskIds)
 
     expect(useStore.getState().tasks.map((item) => item.id)).toEqual(['failed-after-confirm-open'])
+  })
+
+  it('fully clears done tasks whose outputs were all removed', async () => {
+    const emptied = task({
+      id: 'emptied-task',
+      status: 'done',
+      outputImages: [],
+      outputErrors: [{ requestIndex: 0, error: '生成失败' }],
+    })
+    useStore.setState({ tasks: [emptied], showToast: vi.fn() })
+
+    await clearFailedTasks()
+
+    expect(useStore.getState().tasks).toHaveLength(0)
+  })
+
+  describe('removeTaskOutput', () => {
+    it('deletes a single image slot and reindexes failure records', async () => {
+      const partial = task({
+        id: 'multi-task',
+        params: { ...DEFAULT_PARAMS, n: 3 },
+        outputImages: ['img-a', 'img-b'],
+        outputErrors: [{ requestIndex: 2, error: '生成失败' }],
+        actualParamsByImage: { 'img-a': { size: '1024x1024' }, 'img-b': { size: '1024x1024' } },
+        revisedPromptByImage: { 'img-a': 'revised-a' },
+      })
+      useStore.setState({ tasks: [partial], showToast: vi.fn() })
+
+      await removeTaskOutput('multi-task', { requestIndex: 0, imageId: 'img-a', error: '' })
+
+      const updated = useStore.getState().tasks[0]
+      expect(updated.outputImages).toEqual(['img-b'])
+      expect(updated.outputErrors).toEqual([{ requestIndex: 1, error: '生成失败' }])
+      expect(updated.actualParamsByImage).toEqual({ 'img-b': { size: '1024x1024' } })
+      expect(updated.revisedPromptByImage).toBeUndefined()
+      expect(useStore.getState().showToast).toHaveBeenCalledWith('结果已删除', 'success')
+    })
+
+    it('deletes a failure record without touching images', async () => {
+      const partial = task({
+        id: 'error-slot-task',
+        params: { ...DEFAULT_PARAMS, n: 2 },
+        outputImages: ['img-a'],
+        outputErrors: [{ requestIndex: 1, error: '生成失败' }],
+      })
+      useStore.setState({ tasks: [partial], showToast: vi.fn() })
+
+      await removeTaskOutput('error-slot-task', { requestIndex: 1, imageId: '', error: '生成失败' })
+
+      expect(useStore.getState().tasks[0]).toMatchObject({
+        outputImages: ['img-a'],
+        outputErrors: undefined,
+      })
+    })
+
+    it('refuses to delete the only output slot', async () => {
+      const single = task({ id: 'single-task', outputImages: ['img-a'] })
+      useStore.setState({ tasks: [single], showToast: vi.fn() })
+
+      await removeTaskOutput('single-task', { requestIndex: 0, imageId: 'img-a', error: '' })
+
+      expect(useStore.getState().tasks[0].outputImages).toEqual(['img-a'])
+      expect(useStore.getState().showToast).not.toHaveBeenCalledWith('结果已删除', 'success')
+    })
+
+    it('is idempotent when the slot was already removed concurrently', async () => {
+      const partial = task({
+        id: 'raced-task',
+        params: { ...DEFAULT_PARAMS, n: 2 },
+        outputImages: ['img-a', 'img-b'],
+      })
+      useStore.setState({ tasks: [partial], showToast: vi.fn() })
+
+      await removeTaskOutput('raced-task', { requestIndex: 0, imageId: 'img-a', error: '' })
+      const afterFirst = useStore.getState().tasks[0]
+      await removeTaskOutput('raced-task', { requestIndex: 0, imageId: 'img-a', error: '' })
+
+      expect(useStore.getState().tasks[0]).toBe(afterFirst)
+    })
   })
 
   afterEach(async () => {

@@ -25,6 +25,7 @@ vi.mock('../store', () => ({
   reuseConfig: vi.fn(),
   editOutputs: vi.fn(),
   removeTask: vi.fn(),
+  removeTaskOutput: vi.fn(),
   showCodexCliPrompt: vi.fn(),
   retryTask: vi.fn(),
   submitTask: vi.fn(),
@@ -33,6 +34,7 @@ vi.mock('./GalleryAnnotatorHost', () => ({ openGalleryAnnotator: vi.fn() }))
 vi.mock('../lib/imageCache', () => ({
   getCachedImage: (id: string) => `blob:test-${id}`,
   ensureImageCached: vi.fn(),
+  ensureImageDimensionsCached: vi.fn().mockResolvedValue(undefined),
 }))
 vi.mock('../lib/downloadImages', () => ({
   downloadImageIds: vi.fn().mockResolvedValue({ successCount: 1 }),
