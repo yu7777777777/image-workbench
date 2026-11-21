@@ -163,6 +163,7 @@ def main() -> int:
         trigger_path.unlink(missing_ok=True)
         return 0
 
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
     lock_path.write_text(str(time.time()), encoding="utf-8")
     started = time.time()
     try:
