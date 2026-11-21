@@ -162,8 +162,8 @@ def cmd_upload(cfg: dict, output_dir: Path) -> int:
 def cmd_release(cfg: dict, output_dir: Path, check_only: bool = False) -> int:
     target_dir = f"{cfg['root']}/releases/{output_dir.name}"
     host_source = (ROOT / "scripts" / "deploy" / "deploy_host.py").read_text(encoding="utf-8")
-    mode = "--mode check-only" if check_only else "--mode deploy"
-    code = remote_exec(cfg, host_source, [mode, "--release", target_dir])
+    mode_arguments = ["--mode", "check-only"] if check_only else ["--mode", "deploy"]
+    code = remote_exec(cfg, host_source, [*mode_arguments, "--release", target_dir])
     return code
 
 

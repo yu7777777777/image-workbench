@@ -43,10 +43,9 @@ class HostError(RuntimeError):
 
 
 class Host:
-    def __init__(self, cfg: dict, release: Path, check_only: bool = False) -> None:
+    def __init__(self, cfg: dict, release: Path) -> None:
         self.cfg = cfg
         self.release = release
-        self.check_only = check_only
         self.root = Path(cfg["root"]).resolve()
         self.container = cfg["container"]
         self.service = cfg.get("service", "app")
@@ -109,6 +108,8 @@ class Host:
     def verify_payload(self) -> dict:
         manifest = json.loads((self.release / "manifest.json").read_text(encoding="utf-8"))
         payload_root = self.release / "payload"
+        if payload_root.exists():
+            shutil.rmtree(payload_root)
         payload_root.mkdir(mode=0o700)
         with tarfile.open(self.release / "payload.tar.gz") as tar:
             members = tar.getmembers()
@@ -129,6 +130,8 @@ class Host:
 
     def snapshot(self) -> dict:
         rollback = self.release / "rollback"
+        if rollback.exists():
+            shutil.rmtree(rollback)
         rollback.mkdir(mode=0o700)
         snapshot_code = r'''
 from pathlib import Path
@@ -173,7 +176,15 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as tar:
         image = f"{self.image_prefix}:{version}-{date}"
         payload_root = self.release / "payload"
         build = self.release / "build"
+        if build.exists():
+            shutil.rmtree(build)
         build.mkdir(mode=0o700)
+        # 构建上下文：payload 的 app/ + 两套前端产物
+        for name in ("app", "web_dist", "playground_dist"):
+            context_target = build / name
+            if context_target.exists():
+                shutil.rmtree(context_target)
+            shutil.copytree(payload_root / name, context_target)
         base_image = f"{self.image_prefix}:base-{version}-{self.old_image_id.removeprefix('sha256:')[:12]}"
         self.run(["docker", "tag", self.old_image_id, base_image])
         assert json.loads(self.run(["docker", "image", "inspect", base_image]))[0]["Id"] == self.old_image_id
@@ -423,7 +434,7 @@ def main() -> int:
     release = Path(args.release).resolve()
     if args.mode == "deploy":
         assert (release / "manifest.json").is_file() and (release / "payload.tar.gz").is_file()
-    host = Host(cfg, release, check_only=args.mode == "check-only")
+    host = Host(cfg, release)
 
     if args.mode == "check-only":
         print(json.dumps(host.check_only(), ensure_ascii=False, indent=2))

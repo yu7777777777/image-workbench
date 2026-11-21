@@ -7,6 +7,7 @@
 - 远端流程全自动化且保留全部安全网：manifest 逐文件校验+路径穿越防护 → 代码/前端/compose/SQLite backup 快照 → DOCKER_BUILDKIT=0 增量派生镜像 + 逐文件哈希/py_compile/import api 离线自检 → 前端保 inode 原地写入（资源先行、HTML/sw 收尾）→ compose 字段级 diff 断言 → readiness(/health?format=json) + 版本指纹 → 失败自动回滚 → `deployment-result.json` 证据包（供独立复核人验收）。
 - 附带：镜像保留策略（默认最近 3 个）、构建开关注入自动化（playground 5 个公开开关来自 deploy_config.json，防漏注入）、`--allow-failing-tests` 构建逃逸门（vitest 19 个历史遗留失败已甄别）、`.dockerignore` 补 .codex/.zcode/pwrun/logs/账号备份、8 项 deploy_host 单测。
 - 未执行真实部署：需 服务器连接.txt 恢复 + 1.15.0 浏览器人工验收后，以 `deploy.py all` 完成首次实战。
+- 2026-11-21 首次实战完成：1.15.0 已发布至新机（image `chatgpt2api:1.15.0-20261121`），停服窗口以容器 Recreated 计，公网 `/health?format=json` 返回 1.15.0 healthy，inode 不变，config 未动，回退镜像 `chatgpt2api:1.14.1-20261120` 保留。部署期间修复工具四处缺陷（remote_exec mode 参数、Host.check_only 属性/方法重名、payload/rollback/build 目录幂等清理、build_candidate 补建构建上下文）；`read_credentials` 兼容 3 行式凭据文件。
 
 ## 移植上游三项体验功能：真实像素对比 / 单独删除结果 / 参考图超限 UX
 

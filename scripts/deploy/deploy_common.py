@@ -49,19 +49,29 @@ def app_payload_files_list(root: Path = ROOT) -> list[Path]:
 
 
 def read_credentials(root: Path = ROOT, offset: int = 4) -> tuple[str, str, str, str]:
-    """读取 服务器连接.txt：冒号分隔行，offset=4 取第 5-8 个字段 = 新机 (host, port, user, password)。"""
+    """读取 服务器连接.txt，兼容两种格式：
+    - 旧格式：冒号分隔行（offset=4 取第 5-8 个字段 = 新机 host:port:user:password）
+    - 现行格式：3 行 = host/user/password（端口默认 22）；4 行 = host/port/user/password
+    """
     credentials_path = root / "服务器连接.txt"
     if not credentials_path.is_file():
         raise FileNotFoundError(
-            "未找到 服务器连接.txt（项目根目录）。请恢复该文件后重试；"
-            "格式为冒号分隔行，第 5-8 个字段为新机 host:port:user:password。"
+            "未找到 服务器连接.txt（项目根目录）。请恢复该文件后重试。"
         )
-    values = [
-        line.split("：", 1)[1].strip() if "：" in line else line.split(":", 1)[1].strip()
-        for line in credentials_path.read_text(encoding="utf-8-sig").splitlines()
-        if (":" in line or "：" in line)
-    ]
-    if len(values) < offset + 4:
-        raise SystemExit(f"服务器连接.txt 字段不足：需要至少 {offset + 4} 个冒号分隔字段，实际 {len(values)} 个")
-    host, port, user, password = values[offset:offset + 4]
-    return host, port, user, password
+    lines = [line.strip() for line in credentials_path.read_text(encoding="utf-8-sig").splitlines() if line.strip()]
+    if any(":" in line or "：" in line for line in lines):
+        values = [
+            line.split("：", 1)[1].strip() if "：" in line else line.split(":", 1)[1].strip()
+            for line in lines
+        ]
+        if len(values) < offset + 4:
+            raise SystemExit(f"服务器连接.txt 字段不足：需要至少 {offset + 4} 个冒号分隔字段，实际 {len(values)} 个")
+        host, port, user, password = values[offset:offset + 4]
+        return host, port, user, password
+    if len(lines) == 3:
+        host, user, password = lines
+        return host, "22", user, password
+    if len(lines) == 4:
+        host, port, user, password = lines
+        return host, port, user, password
+    raise SystemExit(f"服务器连接.txt 格式无法识别（{len(lines)} 行）。支持：3 行 host/user/password、4 行 host/port/user/password，或旧冒号分隔格式。")
