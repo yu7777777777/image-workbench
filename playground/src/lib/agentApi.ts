@@ -222,7 +222,7 @@ function createImageTool(params: TaskParams, profile: ApiProfile, maskDataUrl?: 
     tool.size = params.size
   }
 
-  tool.quality = params.quality
+  if (!profile.codexCli) tool.quality = params.quality
 
   if (params.output_format !== 'png' && params.output_compression != null) {
     tool.output_compression = params.output_compression
@@ -882,12 +882,12 @@ export async function callBatchImageSingle(opts: {
       action: referenceImageDataUrls.length > 0 ? 'auto' : 'generate',
       output_format: params.output_format,
       moderation: params.moderation,
-      quality: params.quality,
     }
     const imageModel = getImageGenerationModel(profile)
     if (imageModel) tool.model = imageModel
     if (!profile.codexCli) {
       tool.size = params.size
+      tool.quality = params.quality
     }
     if (params.output_format !== 'png' && params.output_compression != null) {
       tool.output_compression = params.output_compression

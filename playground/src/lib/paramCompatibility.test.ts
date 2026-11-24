@@ -59,7 +59,7 @@ describe('parameter compatibility', () => {
       activeProfileId: profile.id,
     })
 
-    expect(normalizeParamsForSettings({ ...DEFAULT_PARAMS, size: '2048x2048' }, settings).size).toBe('1024x1024')
+    expect(normalizeParamsForSettings({ ...DEFAULT_PARAMS, size: '2048x2048' }, settings).size).toBe('1254x1254')
     expect(normalizeParamsForSettings({ ...DEFAULT_PARAMS, size: 'auto' }, settings).size).toBe('auto')
   })
 
@@ -79,7 +79,7 @@ describe('parameter compatibility', () => {
     })
 
     expect(normalizeParamsForSettings({ ...DEFAULT_PARAMS, size: '2048x2048', quality: 'high' }, settings)).toMatchObject({
-      size: '1024x1024',
+      size: '1254x1254',
       quality: DEFAULT_PARAMS.quality,
     })
   })

@@ -396,12 +396,14 @@ describe('mask draft lifecycle in store actions', () => {
     vi.mocked(callImageApi).mockReset().mockResolvedValue({ images: [], actualParams: {}, actualParamsList: [], revisedPrompts: [] })
     vi.mocked(removeKeyedBackgroundFromDataUrl).mockReset().mockImplementation(async (dataUrl) => `transparent:${dataUrl}`)
     useStore.setState({
-      settings: {
+      settings: normalizeSettings({
         ...DEFAULT_SETTINGS,
-        baseUrl: 'https://api.example.com/v1',
-        apiKey: 'test-key',
-        profiles: DEFAULT_SETTINGS.profiles.map((profile) => ({ ...profile, transparentBackgroundMethod: 'local' })),
-      },
+        profiles: [createDefaultOpenAIProfile({
+          baseUrl: 'https://api.example.com/v1',
+          apiKey: 'test-key',
+          transparentBackgroundMethod: 'local',
+        })],
+      }),
       prompt: 'prompt',
       inputImages: [],
       maskDraft: null,
@@ -695,7 +697,7 @@ describe('mask draft lifecycle in store actions', () => {
       revisedPrompts: [],
     })
     useStore.setState({
-      settings: { ...DEFAULT_SETTINGS, baseUrl: 'https://api.example.com/v1', apiKey: 'test-key' },
+      settings: normalizeSettings({ ...DEFAULT_SETTINGS, profiles: [createDefaultOpenAIProfile({ baseUrl: 'https://api.example.com/v1', apiKey: 'test-key' })] }),
       prompt: '透明玻璃瓶',
       params: {
         ...DEFAULT_PARAMS,
@@ -4189,7 +4191,7 @@ describe('task deletion', () => {
     const request = deferred<Awaited<ReturnType<typeof callImageApi>>>()
     vi.mocked(callImageApi).mockImplementationOnce(() => request.promise)
     useStore.setState({
-      settings: { ...DEFAULT_SETTINGS, apiKey: 'test-key' },
+      settings: normalizeSettings({ ...DEFAULT_SETTINGS, profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key' })] }),
       appMode: 'gallery',
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },
@@ -4406,8 +4408,7 @@ describe('task deletion', () => {
     useStore.setState({
       settings: {
         ...DEFAULT_SETTINGS,
-        apiKey: 'test-key',
-        profiles: DEFAULT_SETTINGS.profiles.map((profile) => ({ ...profile, transparentBackgroundMethod: 'local' })),
+        profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key', transparentBackgroundMethod: 'local' })],
       },
       appMode: 'gallery',
       prompt: 'prompt',
@@ -4438,7 +4439,7 @@ describe('task deletion', () => {
       return request.promise
     })
     useStore.setState({
-      settings: { ...DEFAULT_SETTINGS, apiKey: 'test-key' },
+      settings: normalizeSettings({ ...DEFAULT_SETTINGS, profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key' })] }),
       appMode: 'gallery',
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },
