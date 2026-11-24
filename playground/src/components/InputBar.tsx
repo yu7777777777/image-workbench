@@ -1750,7 +1750,7 @@ export default function InputBar() {
 
       <div
         data-input-bar
-        className={`fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-30 w-full max-w-6xl px-3 sm:px-4 transition-all duration-300${promptExpanded ? ' flex flex-col' : ''}`}
+        className={`fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-30 w-full max-w-5xl px-3 sm:px-4 transition-all duration-300${promptExpanded ? ' flex flex-col' : ''}`}
         style={promptExpanded ? { top: `${promptExpandedTop}px`, transitionProperty: 'none' } : undefined}
       >
         <InputBatchBars
@@ -1781,7 +1781,7 @@ export default function InputBar() {
             {historyOpen && <HistoryModal placement="above" onClose={closeHistory} ignoreOutsideClickRef={historyButtonRef} />}
           </div>
         )}
-        <div ref={cardRef} className={`studio-input-card p-3 sm:p-4${promptExpanded ? ' flex min-h-0 flex-1 flex-col' : ''}`}>
+        <div ref={cardRef} className={`studio-input-card p-3${promptExpanded ? ' flex min-h-0 flex-1 flex-col' : ''}`}>
           {/* 移动端拖动条 */}
           <button
             ref={handleRef}

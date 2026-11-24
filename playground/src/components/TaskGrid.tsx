@@ -65,11 +65,20 @@ export default function TaskGrid() {
     })
   }, [tasks, searchQuery, filterStatus, filterFavorite, activeFavoriteCollectionId, defaultFavoriteCollectionId])
 
-  const columns = typeof window !== 'undefined' && window.innerWidth >= 1024
-    ? 3
-    : typeof window !== 'undefined' && window.innerWidth >= 640
-      ? 2
-      : 1
+  const [columns, setColumns] = useState(1)
+  useLayoutEffect(() => {
+    const root = rootRef.current
+    if (!root) return
+    // 使用内容区宽度，同时驱动网格、虚拟滚动和框选计算。
+    const resize = () => {
+      const width = root.clientWidth
+      setColumns(width < 600 ? 1 : Math.max(2, Math.floor((width + 16) / 296)))
+    }
+    const observer = new ResizeObserver(resize)
+    observer.observe(root)
+    resize()
+    return () => observer.disconnect()
+  }, [filteredTasks.length > 0])
   const virtualize = filteredTasks.length > 80
   const totalRows = Math.ceil(filteredTasks.length / columns)
   // 卡片高度随内容变化（提示词行数、参考图条数），固定按 430px 估算会让占位块
@@ -434,7 +443,7 @@ export default function TaskGrid() {
     >
       <div ref={gridRef}>
         {virtualize && <div aria-hidden style={{ height: firstVisibleRow * estimatedRowHeight + rowMetricsRef.current.gap }} />}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pb-10">
+        <div className="grid gap-4 pb-10" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
           {visibleTasks.map(renderTask)}
         </div>
         {virtualize && <div aria-hidden style={{ height: Math.max(0, (totalRows - lastVisibleRow) * estimatedRowHeight - rowMetricsRef.current.gap) + 40 }} />}

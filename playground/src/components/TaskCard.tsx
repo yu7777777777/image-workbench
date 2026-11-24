@@ -585,7 +585,7 @@ export default function TaskCard({
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">输入内容将在响应完成时接收</p>
               </div>
             ) : (
-              <p className="studio-task-prompt text-sm text-gray-700 dark:text-gray-300 leading-relaxed line-clamp-3">
+              <p className="studio-task-prompt text-sm text-gray-700 dark:text-gray-300 leading-relaxed line-clamp-2">
                 {task.prompt || '(无提示词)'}
               </p>
             )}
