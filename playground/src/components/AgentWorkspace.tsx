@@ -614,7 +614,7 @@ export default function AgentWorkspace() {
   return (
     <main
       data-agent-workspace
-      className="safe-area-x mx-auto flex min-h-[calc(100vh-100px)] flex-col lg:flex-row max-w-[1440px] lg:gap-3 px-4 sm:px-6 lg:px-8 relative overflow-visible transition-all duration-300"
+      className="safe-area-x mx-auto flex min-h-[calc(100vh-100px)] flex-col lg:flex-row max-w-[1120px] lg:gap-3 px-4 sm:px-6 lg:px-8 relative overflow-visible transition-all duration-300"
     >
       {/* Pull Down Indicator */}
       {pullDownOffset > 0 && !agentMobileHeaderVisible && (
@@ -807,7 +807,7 @@ export default function AgentWorkspace() {
                         if (!isAssistant && node) messageRefs.current.set(message.roundId, node)
                         else if (!isAssistant) messageRefs.current.delete(message.roundId)
                       }}
-                      className={`group flex max-w-[95%] flex-col md:max-w-[85%] lg:max-w-[75%] ${isAssistant ? 'items-start' : 'items-end'}`}
+                      className={`group flex min-w-0 max-w-full flex-col sm:max-w-[48rem] ${isAssistant ? 'items-start' : 'items-end'}`}
                     >
                       <article
                         className={`relative flex min-w-[16rem] max-w-full flex-col rounded-2xl p-4 transition-all duration-200 ${
@@ -881,14 +881,14 @@ export default function AgentWorkspace() {
                               }
                               if (block.type === 'deleted-image-task') {
                                 return (
-                                  <div key={block.key} className="mt-4 w-full min-w-[16rem] max-w-sm rounded-xl bg-gray-50/50 dark:bg-white/[0.02] border border-dashed border-gray-200 dark:border-white/[0.08] p-4 flex min-h-[120px] flex-col items-center justify-center text-gray-400 dark:text-gray-500" onClick={e => e.stopPropagation()}>
+                                  <div key={block.key} className="mt-3 w-full max-w-[17.5rem] rounded-xl bg-gray-50/50 dark:bg-white/[0.02] border border-dashed border-gray-200 dark:border-white/[0.08] p-4 flex min-h-[80px] flex-col items-center justify-center text-gray-400 dark:text-gray-500" onClick={e => e.stopPropagation()}>
                                     <TrashIcon className="w-6 h-6 mb-2 opacity-50" />
                                     <span className="text-xs">[Image Removed]</span>
                                   </div>
                                 )
                               }
                               return (
-                                <div key={block.key} className="mt-4 max-w-sm" onClick={e => e.stopPropagation()}>
+                                <div key={block.key} className="mt-3 w-full max-w-[17.5rem]" onClick={e => e.stopPropagation()}>
                                   <TaskCard
                                     task={block.task}
                                     disableSwipe={true}
