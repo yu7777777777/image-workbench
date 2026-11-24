@@ -38,6 +38,9 @@ export function VersionReleaseDialog({ className, compact = false }: { className
     startUpgrade,
   } = useVersionCheck();
   const [isAdmin, setIsAdmin] = useState(false);
+  const hasPendingRelease = Boolean(
+    hasNewVersion && latestVersion && upgradeResult?.version !== latestVersion,
+  );
 
   useEffect(() => {
     void getValidatedAuthSession().then((session) => {
@@ -104,6 +107,14 @@ export function VersionReleaseDialog({ className, compact = false }: { className
                 <div className="text-sm text-stone-700 dark:text-stone-300">
                   升级执行中（校验 → 快照 → 派生镜像 → 自检 → 切换），通常需要 1-2 分钟，完成后会提示刷新页面……
                 </div>
+              ) : hasPendingRelease && latestVersion ? (
+                <Button
+                  size="sm"
+                  className="w-full"
+                  onClick={() => void startUpgrade(latestVersion)}
+                >
+                  立即升级到 {latestVersion}
+                </Button>
               ) : upgradeResult?.status === "success" ? (
                 <div className="text-sm text-emerald-600 dark:text-emerald-400">
                   已成功升级到 {upgradeResult.version}（耗时 {upgradeResult.elapsed_secs ?? "-"} 秒），请刷新页面使用新版本。
@@ -112,15 +123,7 @@ export function VersionReleaseDialog({ className, compact = false }: { className
                 <div className="text-sm text-red-600 dark:text-red-400">
                   升级到 {upgradeResult.version} 失败：{upgradeResult.error ?? "未知原因"}（服务器已自动回滚）
                 </div>
-              ) : hasNewVersion && latestVersion ? (
-                <Button
-                  size="sm"
-                  className="w-full"
-                  onClick={() => void startUpgrade(latestVersion)}
-                >
-                  立即升级到 {latestVersion}
-                </Button>
-              ) : upgradeResult?.status === "success" ? null : (
+              ) : (
                 <div className="text-xs text-stone-400 dark:text-gray-500">当前已是最新版本。</div>
               )}
             </div>
