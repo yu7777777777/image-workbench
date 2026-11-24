@@ -41,10 +41,9 @@ describe('validateApiProfile', () => {
     }))).toBeNull()
   })
 
-  // 已知限制：DEFAULT_OPENAI_API_PROXY 是模块级常量（读取 import.meta.env），
-  // 在 import 时即求值，无法通过 vi.stubEnv 在用例内切换。
-  // 因此该用例只有在构建时 VITE_API_PROXY_AVAILABLE 未开启的环境下才会通过。
-  it.skip('still requires API URL when API proxy is unavailable', () => {
+  it('still requires API URL when API proxy is unavailable', () => {
+    vi.stubEnv('VITE_API_PROXY_AVAILABLE', 'false')
+
     expect(validateApiProfile(createDefaultOpenAIProfile({
       baseUrl: '',
       apiKey: 'test-key',

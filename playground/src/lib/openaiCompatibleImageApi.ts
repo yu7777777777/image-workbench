@@ -161,13 +161,13 @@ function createResponsesImageTool(
   const imageModel = getImageGenerationModel(profile)
   if (imageModel) tool.model = imageModel
 
-  tool.size = params.size
+  if (!profile.codexCli) tool.size = params.size
 
   if (profile.streamImages) {
     tool.partial_images = getStreamPartialImages(profile)
   }
 
-  tool.quality = params.quality
+  if (!profile.codexCli) tool.quality = params.quality
 
   if (params.output_format !== 'png' && params.output_compression != null) {
     tool.output_compression = params.output_compression
@@ -520,14 +520,15 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
       const formData = new FormData()
       formData.append('model', profile.model)
       formData.append('prompt', prompt)
-      formData.append('size', params.size)
+      // Codex CLI 的尺寸只通过提示词表达，禁用的参数不要再发送。
+      if (!profile.codexCli) formData.append('size', params.size)
       formData.append('output_format', params.output_format)
       formData.append('moderation', params.moderation)
       if (opts.nativeTransparentBackground) {
         formData.append('background', 'transparent')
       }
 
-      formData.append('quality', params.quality)
+      if (!profile.codexCli) formData.append('quality', params.quality)
 
       if (params.output_format !== 'png' && params.output_compression != null) {
         formData.append('output_compression', String(params.output_compression))
@@ -595,9 +596,10 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
         body.background = 'transparent'
       }
 
-      body.size = params.size
-
-      body.quality = params.quality
+      if (!profile.codexCli) {
+        body.size = params.size
+        body.quality = params.quality
+      }
 
       if (params.output_format !== 'png' && params.output_compression != null) {
         body.output_compression = params.output_compression
@@ -703,6 +705,8 @@ function createCustomProviderContext(opts: CallApiOptions, profile: ApiProfile) 
     : sizePrompt
   const params = {
     ...opts.params,
+    // 模板里的 $params 同样遵守兼容模式；undefined 会从 JSON 和表单中省略。
+    ...(profile.codexCli ? { size: undefined, quality: undefined } : {}),
     ...(opts.nativeTransparentBackground ? { background: 'transparent' } : {}),
   }
 

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_PARAMS } from '../types'
 import { createDefaultOpenAIProfile, DEFAULT_SETTINGS } from './apiProfiles'
-import { callAgentConversationTitleApi, callAgentResponsesApi, parseBatchImageCallArguments } from './agentApi'
+import { callAgentConversationTitleApi, callAgentResponsesApi, callBatchImageSingle, parseBatchImageCallArguments } from './agentApi'
 
 describe('parseBatchImageCallArguments', () => {
   it('trims ids and prompts, fills missing ids, and skips empty prompts', () => {
@@ -175,7 +175,23 @@ describe('callAgentResponsesApi', () => {
     expect(body.tools[0].input_image_mask).toEqual({ image_url: 'data:image/png;base64,bWFzaw==' })
   })
 
-  it('requires resolution in Agent prompts and omits the Codex CLI size parameter', async () => {
+  it.each([false, true])('only omits unsupported parameters for Codex CLI batch image tools (%s)', async (codexCli) => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      output: [{ type: 'image_generation_call', id: 'batch-image', result: 'aW1hZ2U=' }],
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    const result = await callBatchImageSingle({
+      profile: createDefaultOpenAIProfile({ apiKey: 'test-key', apiMode: 'responses', codexCli }),
+      params: { ...DEFAULT_PARAMS, size: '1024x768', quality: 'high' },
+      batchItemId: 'batch-one', prompt: 'prompt', referenceImageDataUrls: [],
+    })
+    const tool = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body)).tools[0]
+    expect(tool.size).toBe(codexCli ? undefined : '1024x768')
+    expect(tool.quality).toBe(codexCli ? undefined : 'high')
+    expect(result.error).toBeNull()
+    expect(result.image?.dataUrl).toBe('data:image/png;base64,aW1hZ2U=')
+  })
+
+  it('requires resolution in Agent prompts and omits unsupported Codex CLI size and quality parameters', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
       output: [{ type: 'message', content: [{ type: 'output_text', text: 'OK' }] }],
     }), {
@@ -198,6 +214,7 @@ describe('callAgentResponsesApi', () => {
     const [, init] = fetchMock.mock.calls[0]
     const body = JSON.parse(String((init as RequestInit).body))
     expect(body.tools[0].size).toBeUndefined()
+    expect(body.tools[0]).not.toHaveProperty('quality')
     expect(body.instructions).toContain('Start every image prompt with exactly "Generate at 1024x1024 resolution." followed by a space.')
   })
 
