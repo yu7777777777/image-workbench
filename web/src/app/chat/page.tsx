@@ -1,17 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState, type ComponentProps } from "react";
+import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
   ArrowDown,
-  ArrowUp,
+  ArrowRight,
   Check,
   Copy,
   ImagePlus,
   LoaderCircle,
-  MessageSquare,
-  PanelLeft,
+  History,
   Pencil,
   Plus,
   RotateCcw,
@@ -30,12 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -113,8 +107,7 @@ export default function ChatPage() {
   const chat = useChatStore();
   const [models, setModels] = useState<string[]>([]);
   const [modelError, setModelError] = useState("");
-  const [sidebar, setSidebar] = useState(true);
-  const [mobileSidebar, setMobileSidebar] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [settings, setSettings] = useState(false);
   const [query, setQuery] = useState("");
   const [rename, setRename] = useState<ChatThread | null>(null);
@@ -186,20 +179,6 @@ export default function ChatPage() {
   };
   const list = (
     <div className="chat-history">
-      <div className="chat-history-heading">
-        <span>你的对话</span>
-        <span className="text-xs opacity-50">{chat.threads.length}</span>
-      </div>
-      <Button
-        onClick={() => {
-          chat.createThread();
-          setMobileSidebar(false);
-        }}
-        className="w-full justify-start gap-2 rounded-xl"
-      >
-        <Plus size={16} />
-        新建对话
-      </Button>
       <div className="chat-search">
         <Search size={14} />
         <input
@@ -222,7 +201,7 @@ export default function ChatPage() {
                 className="chat-history-select"
                 onClick={() => {
                   chat.select(t.id);
-                  setMobileSidebar(false);
+                  setHistoryOpen(false);
                 }}
               >
                 <span className="truncate">{t.title}</span>
@@ -266,98 +245,85 @@ export default function ChatPage() {
     </div>
   );
 
+  const notices = (
+    <>
+      {!selection && <div className="chat-notice">历史模型设置已保留（{thread.model}）。请选择输入框下方的模型后继续，已有消息不会改变。</div>}
+      {selection && !models.includes(thread.model) && !modelError && <div className="chat-notice">正在确认模型目录；若当前模型不可用，请切换模型或思考程度。</div>}
+      {modelError && (
+        <button className="chat-notice text-left" onClick={loadModels}>
+          {modelError}
+        </button>
+      )}
+      {chat.storageError && (
+        <div role="alert" className="chat-notice">
+          {chat.storageError}
+        </div>
+      )}
+    </>
+  );
+
+  const conversationActions = (
+    <div className="chat-conversation-actions">
+      <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
+        <PopoverTrigger asChild>
+          <button type="button" className="chat-context-button"><History size={16} />对话历史</button>
+        </PopoverTrigger>
+        <PopoverContent side="top" align="start" sideOffset={8} aria-label="对话历史" className="chat-history-panel p-0">
+          {list}
+        </PopoverContent>
+      </Popover>
+      <button type="button" className="chat-context-button" onClick={() => { setHistoryOpen(false); chat.createThread(); }}><Plus size={16} />新建对话</button>
+    </div>
+  );
+
+  const modelControls = (
+    <div className="chat-model-controls">
+      <Select
+        value={selection?.family || ""}
+        disabled={busy}
+        onValueChange={(family) => {
+          const level = CHAT_LEVELS.find((item) => item.id === selection?.level && models.includes(`${family}-${item.suffix}`))
+            || CHAT_LEVELS.find((item) => models.includes(`${family}-${item.suffix}`));
+          if (level) choose(family, level.id);
+        }}
+      >
+        <SelectTrigger
+          aria-label="选择对话模型"
+          className="chat-model-control"
+        >
+          <SelectValue placeholder="选择模型" />
+        </SelectTrigger>
+        <SelectContent>
+          {CHAT_FAMILIES.map((family) => (
+            <SelectItem key={family.id} value={family.id}
+              disabled={!CHAT_LEVELS.some((level) => models.includes(`${family.id}-${level.suffix}`))}>
+              {family.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Select value={selection?.level || ""} disabled={busy || !selection}
+        onValueChange={(level) => selection && choose(selection.family, level)}>
+        <SelectTrigger aria-label="选择思考程度" className="chat-model-control">
+          <SelectValue placeholder="思考程度" />
+        </SelectTrigger>
+        <SelectContent>
+          {CHAT_LEVELS.map((level) => <SelectItem key={level.id} value={level.id}
+            disabled={!selection || !models.includes(`${selection.family}-${level.suffix}`)
+              || (level.id === "max" && !models.includes(`${selection.family}-pro`))}>
+            {level.label}
+          </SelectItem>)}
+        </SelectContent>
+      </Select>
+      <button type="button" className="chat-icon-button" aria-label="对话设置" title="对话设置" onClick={() => setSettings(true)}>
+        <Settings2 size={17} />
+      </button>
+    </div>
+  );
+
   return (
     <div className="chat-workspace">
-      {sidebar && <aside className="chat-desktop-sidebar">{list}</aside>}
-      <Sheet open={mobileSidebar} onOpenChange={setMobileSidebar}>
-        <SheetContent side="left" className="gap-0">
-          <SheetHeader>
-            <SheetTitle>对话历史</SheetTitle>
-          </SheetHeader>
-          {list}
-        </SheetContent>
-      </Sheet>
       <section className="chat-main">
-        <header className="chat-toolbar">
-          <button
-            className="chat-icon-button hidden md:inline-flex"
-            aria-label={sidebar ? "收起历史栏" : "展开历史栏"}
-            onClick={() => setSidebar(!sidebar)}
-          >
-            <PanelLeft size={18} />
-          </button>
-          <button
-            className="chat-icon-button md:hidden"
-            aria-label="打开对话历史"
-            onClick={() => setMobileSidebar(true)}
-          >
-            <PanelLeft size={18} />
-          </button>
-          <Select
-            value={selection?.family || ""}
-            disabled={busy}
-            onValueChange={(family) => {
-              const level = CHAT_LEVELS.find((item) => item.id === selection?.level && models.includes(`${family}-${item.suffix}`))
-                || CHAT_LEVELS.find((item) => models.includes(`${family}-${item.suffix}`));
-              if (level) choose(family, level.id);
-            }}
-          >
-            <SelectTrigger
-              aria-label="选择对话模型"
-              className="w-auto max-w-[44vw] border-0 bg-transparent px-2 shadow-none"
-            >
-              <SelectValue placeholder="选择模型" />
-            </SelectTrigger>
-            <SelectContent>
-              {CHAT_FAMILIES.map((family) => (
-                <SelectItem key={family.id} value={family.id}
-                  disabled={!CHAT_LEVELS.some((level) => models.includes(`${family.id}-${level.suffix}`))}>
-                  {family.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={selection?.level || ""} disabled={busy || !selection}
-            onValueChange={(level) => selection && choose(selection.family, level)}>
-            <SelectTrigger aria-label="选择思考程度" className="w-auto max-w-[34vw] rounded-full border-0 bg-muted/60 px-2 shadow-none">
-              <SelectValue placeholder="思考程度" />
-            </SelectTrigger>
-            <SelectContent>
-              {CHAT_LEVELS.map((level) => <SelectItem key={level.id} value={level.id}
-                disabled={!selection || !models.includes(`${selection.family}-${level.suffix}`)
-                  || (level.id === "max" && !models.includes(`${selection.family}-pro`))}>
-                {level.label}
-              </SelectItem>)}
-            </SelectContent>
-          </Select>
-          <span className="ml-auto" />
-          <button
-            className="chat-icon-button"
-            aria-label="新建对话"
-            onClick={chat.createThread}
-          >
-            <Plus size={18} />
-          </button>
-          <button
-            className="chat-icon-button"
-            aria-label="对话设置"
-            onClick={() => setSettings(true)}
-          >
-            <Settings2 size={18} />
-          </button>
-        </header>
-        {!selection && <div className="chat-notice">历史模型设置已保留（{thread.model}）。请选择上方模型后继续，已有消息不会改变。</div>}
-        {selection && !models.includes(thread.model) && !modelError && <div className="chat-notice">正在确认模型目录；若当前模型不可用，请切换模型或思考程度。</div>}
-        {modelError && (
-          <button className="chat-notice text-left" onClick={loadModels}>
-            {modelError}
-          </button>
-        )}
-        {chat.storageError && (
-          <div role="alert" className="chat-notice">
-            {chat.storageError}
-          </div>
-        )}
         <div
           ref={scroller}
           className="chat-scroll"
@@ -370,10 +336,9 @@ export default function ChatPage() {
         >
           {!thread.messages.length ? (
             <div className="chat-welcome">
-              <span className="chat-eyebrow">想法，从这里开始</span>
-              <h1>有什么想聊的？</h1>
-              <p>一个问题、一段文字，或一张图片。</p>
-              <div className="chat-suggestions">
+              <h1 className="studio-empty-title">开始新对话</h1>
+              <p className="chat-empty-description">描述想法，或引用图片继续修改。</p>
+              <div className="chat-suggestions studio-empty-actions">
                 {["帮我梳理一个想法", "润色一段文案", "一起分析一张图片"].map(
                   (text) => (
                     <button
@@ -384,7 +349,6 @@ export default function ChatPage() {
                         )
                       }
                     >
-                      <MessageSquare size={14} />
                       {text}
                     </button>
                   ),
@@ -514,6 +478,9 @@ export default function ChatPage() {
           onSend={(text, images) => { if (canSend) void chat.send(text, images); }}
           onStop={chat.stop}
           onPreview={setPreview}
+          conversationActions={conversationActions}
+          modelControls={modelControls}
+          notices={notices}
         />
       </section>
       <Dialog open={settings} onOpenChange={setSettings}>
@@ -523,7 +490,7 @@ export default function ChatPage() {
             <DialogDescription>仅影响当前对话的后续请求。</DialogDescription>
           </DialogHeader>
           <p className="text-xs text-muted-foreground">
-            思考程度可在顶部直接选择；即时 / Pro 是回答模式，中 / 高 / 极高是思考档位。极高与 Pro 需要可用的 Pro 账号，目录可见不保证额度可用。
+            思考程度可在输入框下方选择；即时 / Pro 是回答模式，中 / 高 / 极高是思考档位。极高与 Pro 需要可用的 Pro 账号，目录可见不保证额度可用。
           </p>
           <label className="space-y-2 text-sm">
             <span>系统提示词</span>
@@ -636,12 +603,18 @@ function Composer({
   onSend,
   onStop,
   onPreview,
+  conversationActions,
+  modelControls,
+  notices,
 }: {
   busy: boolean;
   disabled: boolean;
   onSend: (text: string, images: ChatImage[]) => void;
   onStop: () => void;
   onPreview: (image: ChatImage) => void;
+  conversationActions: ReactNode;
+  modelControls: ReactNode;
+  notices: ReactNode;
 }) {
   const [text, setText] = useState("");
   const [images, setImages] = useState<ChatImage[]>([]);
@@ -696,6 +669,8 @@ function Composer({
   };
   return (
     <div className="chat-composer-wrap">
+      {notices}
+      {conversationActions}
       <div
         className={`chat-composer ${dragging ? "dragging" : ""}`}
         onDragOver={(e) => {
@@ -775,8 +750,9 @@ function Composer({
               e.target.value = "";
             }}
           />
+          {modelControls}
           <button
-            className="chat-icon-button"
+            className="chat-icon-button chat-attachment-button"
             disabled={disabled || reading}
             aria-label="添加图片"
             title="最多 4 张，每张不超过 10MB"
@@ -788,17 +764,13 @@ function Composer({
               <ImagePlus size={18} />
             )}
           </button>
-          <span className="hidden text-xs text-stone-400 sm:inline">
-            Enter 发送 · Shift + Enter 换行
-          </span>
-          <span className="ml-auto" />
           {busy ? (
             <button
               className="chat-send"
               aria-label="停止生成"
               onClick={onStop}
             >
-              <Square size={15} fill="currentColor" />
+              <span>停止</span><Square size={15} fill="currentColor" />
             </button>
           ) : (
             <button
@@ -807,7 +779,7 @@ function Composer({
               disabled={disabled || reading || (!text.trim() && !images.length)}
               onClick={submit}
             >
-              <ArrowUp size={19} />
+              <span>发送</span><ArrowRight size={17} />
             </button>
           )}
         </div>

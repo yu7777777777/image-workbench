@@ -23,7 +23,7 @@ import type { EditableFileTask } from "./types";
 
 type Props = {
   title: string;
-  kind: "ppt" | "psd";
+  kind: "psd";
   endpoint: string;
   defaultPrompt: string;
   imageRequired?: boolean;
@@ -412,7 +412,7 @@ export function EditableFilePanel({ title, kind, endpoint, defaultPrompt, imageR
               {selectedTask.result ? (
                 <div className="space-y-3 rounded-md border border-stone-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.03]">
                   <div className="text-sm font-semibold text-stone-950 dark:text-stone-50">生成结果</div>
-                  <ResultFile href={selectedTask.result.primary_url} icon={<FileText className="size-4" />} label={kind === "ppt" ? "PPT 文件" : "PSD 文件"} />
+                  <ResultFile href={selectedTask.result.primary_url} icon={<FileText className="size-4" />} label="PSD 文件" />
                   <ResultFile href={selectedTask.result.zip_url} icon={<FileArchive className="size-4" />} label="素材包" />
                 </div>
               ) : null}

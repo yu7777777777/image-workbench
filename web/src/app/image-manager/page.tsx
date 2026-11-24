@@ -24,6 +24,10 @@ function formatSize(size: number) {
   return size > 1024 * 1024 ? `${(size / 1024 / 1024).toFixed(2)} MB` : `${Math.ceil(size / 1024)} KB`;
 }
 
+function formatMegabytes(size: number) {
+  return size >= 1024 ? `${(size / 1024).toFixed(1)} GB` : `${size} MB`;
+}
+
 function imageKey(item: ManagedImage) {
   return item.rel || item.url;
 }
@@ -276,26 +280,21 @@ function ImageManagerContent() {
   }, [startDate, endDate]);
 
   return (
-    <section className="space-y-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="space-y-1">
-          <div className="text-xs font-semibold tracking-[0.18em] text-stone-500 uppercase">Images</div>
-          <h1 className="text-2xl font-semibold tracking-tight">图片管理</h1>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <DateRangeFilter startDate={startDate} endDate={endDate} onChange={(start, end) => { setStartDate(start); setEndDate(end); }} />
-          <Button variant="outline" onClick={clearFilters} className="h-10 rounded-xl border-stone-200 bg-white px-4 text-stone-700">
-            清除筛选条件
-          </Button>
-          <Button onClick={() => void loadImages()} disabled={isLoading} className="h-10 rounded-xl bg-stone-950 px-4 text-white hover:bg-stone-800">
-            {isLoading ? <LoaderCircle className="size-4 animate-spin" /> : <Search className="size-4" />}
-            查询
-          </Button>
-          <Button variant="outline" onClick={() => setDeleteMode("filtered")} disabled={isDeleting || items.length === 0 || (!startDate && !endDate)} className="h-10 rounded-xl border-rose-200 bg-white px-4 text-rose-600 hover:bg-rose-50">
-            <Trash2 className="size-4" />
-            删除匹配日期
-          </Button>
-        </div>
+    <section className="space-y-5 pt-5">
+      <h1 className="sr-only">图片管理</h1>
+      <div role="group" aria-label="图片筛选" className="flex flex-wrap items-center gap-2">
+        <DateRangeFilter startDate={startDate} endDate={endDate} onChange={(start, end) => { setStartDate(start); setEndDate(end); }} />
+        <Button variant="outline" onClick={clearFilters} className="page-toolbar-control rounded-[10px] border-border bg-card px-4 text-foreground shadow-none">
+          清除筛选条件
+        </Button>
+        <Button onClick={() => void loadImages()} disabled={isLoading} className="page-toolbar-control rounded-[10px] px-4 shadow-none">
+          {isLoading ? <LoaderCircle className="size-4 animate-spin" /> : <Search className="size-4" />}
+          查询
+        </Button>
+        <Button variant="outline" onClick={() => setDeleteMode("filtered")} disabled={isDeleting || items.length === 0 || (!startDate && !endDate)} className="page-toolbar-control rounded-[10px] border-border bg-card px-4 shadow-none text-rose-600 hover:bg-rose-50">
+          <Trash2 className="size-4" />
+          删除匹配日期
+        </Button>
       </div>
 
       {allTags.length > 0 ? (
@@ -347,77 +346,76 @@ function ImageManagerContent() {
       ) : null}
 
       {/* Storage Stats Panel */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 mb-4">
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
         {storage ? (
           <>
-            <div className="rounded-xl border border-stone-200 bg-white/80 p-3">
-              <div className="text-xs text-stone-500">磁盘总量</div>
-              <div className="text-lg font-bold text-stone-800">{storage.disk_total_mb >= 1024 ? `${(storage.disk_total_mb / 1024).toFixed(1)} GB` : `${storage.disk_total_mb} MB`}</div>
-            </div>
-            <div className="rounded-xl border border-stone-200 bg-white/80 p-3">
-              <div className="text-xs text-stone-500">剩余空间</div>
-              <div className={`text-lg font-bold ${storage.disk_free_mb < 200 ? "text-red-500" : storage.disk_free_mb < 500 ? "text-yellow-500" : "text-green-600"}`}>{storage.disk_free_mb >= 1024 ? `${(storage.disk_free_mb / 1024).toFixed(1)} GB` : `${storage.disk_free_mb} MB`}</div>
-            </div>
-            <div className="rounded-xl border border-stone-200 bg-white/80 p-3">
-              <div className="text-xs text-stone-500">图片数量</div>
-              <div className="text-lg font-bold text-stone-800">{storage.image_count}</div>
-            </div>
-            <div className="rounded-xl border border-stone-200 bg-white/80 p-3">
-              <div className="text-xs text-stone-500">图片占用</div>
-              <div className="text-lg font-bold text-stone-800">{storage.image_size_mb >= 1024 ? `${(storage.image_size_mb / 1024).toFixed(1)} GB` : `${storage.image_size_mb} MB`}</div>
-            </div>
-            <div className="rounded-xl border border-stone-200 bg-white/80 p-3 col-span-2 flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-stone-500 w-full">快捷操作</span>
-              <Button size="sm" variant="outline" className="h-7 text-xs" disabled={storageLoading} onClick={() => { void loadStorage(); }}>
-                <RefreshCw className={`size-3 mr-1 ${storageLoading ? "animate-spin" : ""}`} />刷新
-              </Button>
-              <Button size="sm" variant="outline" className="h-7 text-xs"
-                onClick={async () => {
-                  try { const r = await compressAllImages(); setCompressResult(`已压缩${r.saved_mb}MB`); void loadStorage(); }
-                  catch { setCompressResult("压缩失败"); }
-                }}>
-                🗜️ 压缩优化
-              </Button>
-              <Button size="sm" variant="outline" className="h-7 text-xs border-rose-200 text-rose-600"
-                onClick={() => setDeleteMode("byDate")}>
-                🗑️ 按日期删除
-              </Button>
-              <form onSubmit={async (e) => { e.preventDefault();
-                try {
-                  const r = await deleteToTarget(targetFreeMb);
-                  toast.success(`已删除 ${r.removed} 张图片，释放 ${r.freed_mb ?? 0}MB`);
-                  void loadStorage();
-                } catch { toast.error("清理失败"); }
-              }} className="flex items-center gap-1">
-                <Button size="sm" variant="outline" className="h-7 text-xs border-amber-200 text-amber-700" type="submit">
-                  🧹 清理至
+            <dl className="grid grid-cols-2 gap-px bg-border sm:grid-cols-4">
+              {[
+                { label: "图片数量", value: storage.image_count },
+                { label: "图片占用", value: formatMegabytes(storage.image_size_mb) },
+                { label: "剩余空间", value: formatMegabytes(storage.disk_free_mb), low: storage.disk_free_mb < 200 },
+                { label: "磁盘总量", value: formatMegabytes(storage.disk_total_mb) },
+              ].map(({ label, value, low }) => (
+                <div key={label} className="bg-card px-4 py-3 sm:px-5">
+                  <dt className="text-xs text-muted-foreground">{label}</dt>
+                  <dd className={`mt-1 text-lg font-semibold tabular-nums ${low ? "text-destructive" : "text-card-foreground"}`}>{value}</dd>
+                </div>
+              ))}
+            </dl>
+            <details className="border-t border-border">
+              <summary className="cursor-pointer px-4 py-3 text-sm font-medium hover:bg-muted sm:px-5">存储维护</summary>
+              <div className="flex flex-wrap items-center gap-3 border-t border-border px-4 py-3 sm:px-5">
+                <Button size="sm" variant="outline" className="h-7 text-xs" disabled={storageLoading} onClick={() => { void loadStorage(); }}>
+                  <RefreshCw className={`size-3 mr-1 ${storageLoading ? "animate-spin" : ""}`} />刷新
                 </Button>
-                <Input className="h-7 w-14 text-xs text-center px-1" type="number" min={50} value={targetFreeMb}
-                  onChange={(e) => setTargetFreeMb(Number(e.target.value) || 500)} />
-                <span className="text-xs text-stone-400">MB 剩余</span>
-              </form>
-              <Button size="sm" variant="outline" className="h-7 text-xs border-sky-200 text-sky-700"
-                disabled={cleanupAgeRunning}
-                onClick={async () => {
-                  if (!window.confirm(`将删除超过 ${cleanupAgeDays} 天的图片（含缩略图），此操作不可撤销。确定继续？`)) return;
-                  setCleanupAgeRunning(true);
+                <Button size="sm" variant="outline" className="h-7 text-xs"
+                  onClick={async () => {
+                    try { const r = await compressAllImages(); setCompressResult(`已压缩${r.saved_mb}MB`); void loadStorage(); }
+                    catch { setCompressResult("压缩失败"); }
+                  }}>
+                  压缩优化
+                </Button>
+                <Button size="sm" variant="outline" className="h-7 text-xs border-rose-200 text-rose-600"
+                  onClick={() => setDeleteMode("byDate")}>
+                  按日期删除
+                </Button>
+                <form onSubmit={async (e) => { e.preventDefault();
                   try {
-                    const r = await cleanupImagesByAge(cleanupAgeDays);
-                    toast.success(`已删除 ${r.removed} 张过期图片，释放 ${r.freed_mb ?? 0}MB`);
+                    const r = await deleteToTarget(targetFreeMb);
+                    toast.success(`已删除 ${r.removed} 张图片，释放 ${r.freed_mb ?? 0}MB`);
                     void loadStorage();
                   } catch { toast.error("清理失败"); }
-                  finally { setCleanupAgeRunning(false); }
-                }}>
-                ⏳ 清理过期
-              </Button>
-              <Input className="h-7 w-14 text-xs text-center px-1" type="number" min={1} value={cleanupAgeDays}
-                onChange={(e) => setCleanupAgeDays(Math.max(1, Number(e.target.value) || 30))} />
-              <span className="text-xs text-stone-400">天前</span>
-              {compressResult ? <span className="text-xs text-green-600 ml-1">{compressResult}</span> : null}
-            </div>
+                }} className="flex items-center gap-1">
+                  <Button size="sm" variant="outline" className="h-7 text-xs border-border text-destructive" type="submit">
+                    清理至
+                  </Button>
+                  <Input className="h-7 w-14 text-xs text-center px-1" type="number" min={50} aria-label="目标剩余空间（MB）" value={targetFreeMb}
+                    onChange={(e) => setTargetFreeMb(Number(e.target.value) || 500)} />
+                  <span className="text-xs text-stone-400">MB 剩余</span>
+                </form>
+                <Button size="sm" variant="outline" className="h-7 text-xs border-border text-destructive"
+                  disabled={cleanupAgeRunning}
+                  onClick={async () => {
+                    if (!window.confirm(`将删除超过 ${cleanupAgeDays} 天的图片（含缩略图），此操作不可撤销。确定继续？`)) return;
+                    setCleanupAgeRunning(true);
+                    try {
+                      const r = await cleanupImagesByAge(cleanupAgeDays);
+                      toast.success(`已删除 ${r.removed} 张过期图片，释放 ${r.freed_mb ?? 0}MB`);
+                      void loadStorage();
+                    } catch { toast.error("清理失败"); }
+                    finally { setCleanupAgeRunning(false); }
+                  }}>
+                  清理过期
+                </Button>
+                <Input className="h-7 w-14 text-xs text-center px-1" type="number" min={1} aria-label="清理天数" value={cleanupAgeDays}
+                  onChange={(e) => setCleanupAgeDays(Math.max(1, Number(e.target.value) || 30))} />
+                <span className="text-xs text-stone-400">天前</span>
+                {compressResult ? <span className="text-xs text-muted-foreground">{compressResult}</span> : null}
+              </div>
+            </details>
           </>
         ) : (
-          <div className="rounded-xl border border-stone-200 bg-white/80 p-3 col-span-full text-center text-sm text-stone-400">
+          <div className="p-4 text-center text-sm text-muted-foreground">
             {storageLoading ? "加载存储信息..." : "存储信息加载失败"}
           </div>
         )}
@@ -457,7 +455,7 @@ function ImageManagerContent() {
         </DialogContent>
       </Dialog>
 
-      <Card className="rounded-2xl border-white/80 bg-white/90 shadow-sm">
+      <Card className="rounded-xl border-border bg-card shadow-none">
         <CardContent className="p-0">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 px-5 py-4">
             <div className="flex flex-wrap items-center gap-3 text-sm text-stone-600">
@@ -465,16 +463,16 @@ function ImageManagerContent() {
               共 {filteredItems.length} 张
               {selectedTags.length > 0 ? <span className="text-stone-400">（筛选自 {items.length} 张）</span> : null}
               <label className="flex items-center gap-2">
-                <Checkbox className={IMAGE_MANAGER_CHECKBOX_CLASS} checked={currentPageSelected} onCheckedChange={(checked) => togglePaths(currentRows.map(imageKey), Boolean(checked))} />
+                <Checkbox className={IMAGE_MANAGER_CHECKBOX_CLASS} checked={currentPageSelected} disabled={currentRows.length === 0} onCheckedChange={(checked) => togglePaths(currentRows.map(imageKey), Boolean(checked))} />
                 本页全选
               </label>
               <label className="flex items-center gap-2">
-                <Checkbox className={IMAGE_MANAGER_CHECKBOX_CLASS} checked={allSelected} onCheckedChange={(checked) => togglePaths(filteredItems.map(imageKey), Boolean(checked))} />
+                <Checkbox className={IMAGE_MANAGER_CHECKBOX_CLASS} checked={allSelected} disabled={filteredItems.length === 0} onCheckedChange={(checked) => togglePaths(filteredItems.map(imageKey), Boolean(checked))} />
                 全选结果
               </label>
               {selectedPaths.length > 0 ? <span>已选 {selectedPaths.length} 张</span> : null}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button variant="ghost" className="h-8 rounded-lg px-3 text-stone-500" onClick={() => void loadImages()} disabled={isLoading}>
                 <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} />
                 刷新
@@ -640,15 +638,17 @@ function ImageManagerContent() {
               </div>
             )})}
           </div>
-          <div className="flex items-center justify-end gap-2 border-t border-stone-100 px-4 py-3 text-sm text-stone-500">
-            <span>第 {safePage} / {pageCount} 页，共 {filteredItems.length} 张</span>
-            <Button variant="outline" size="icon" className="size-9 rounded-lg border-stone-200 bg-white" disabled={safePage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>
-              <ChevronLeft className="size-4" />
-            </Button>
-            <Button variant="outline" size="icon" className="size-9 rounded-lg border-stone-200 bg-white" disabled={safePage >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>
-              <ChevronRight className="size-4" />
-            </Button>
-          </div>
+          {pageCount > 1 ? (
+            <div className="flex items-center justify-end gap-2 border-t border-stone-100 px-4 py-3 text-sm text-stone-500">
+              <span>第 {safePage} / {pageCount} 页，共 {filteredItems.length} 张</span>
+              <Button variant="outline" size="icon" className="size-9 rounded-lg border-stone-200 bg-white" disabled={safePage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>
+                <ChevronLeft className="size-4" />
+              </Button>
+              <Button variant="outline" size="icon" className="size-9 rounded-lg border-stone-200 bg-white" disabled={safePage >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>
+                <ChevronRight className="size-4" />
+              </Button>
+            </div>
+          ) : null}
           {!isLoading && filteredItems.length === 0 ? <div className="px-6 py-14 text-center text-sm text-stone-500">没有找到图片</div> : null}
         </CardContent>
       </Card>

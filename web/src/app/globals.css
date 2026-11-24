@@ -30,14 +30,20 @@ html.image-route-lock .app-content {
   display: none;
 }
 
-/* 工作台路由下不再给导航栏留额外的上方间距，把高度让给画布区域。 */
-html.image-route-lock .app-nav-wrap {
-  padding-top: 0;
-}
-
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  --color-stone-50: var(--color-neutral-50);
+  --color-stone-100: var(--color-neutral-100);
+  --color-stone-200: var(--color-neutral-200);
+  --color-stone-300: var(--color-neutral-300);
+  --color-stone-400: var(--color-neutral-400);
+  --color-stone-500: var(--color-neutral-500);
+  --color-stone-600: var(--color-neutral-600);
+  --color-stone-700: var(--color-neutral-700);
+  --color-stone-800: var(--color-neutral-800);
+  --color-stone-900: var(--color-neutral-900);
+  --color-stone-950: var(--color-neutral-950);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
@@ -79,20 +85,25 @@ html.image-route-lock .app-nav-wrap {
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+  --brand-paper: #f5f5f6;
+  --brand-blue: #315b73;
+  --brand-gold: #f3c94d;
+  --brand-gold-hover: #f8d96b;
+  --brand-on-gold: #282719;
+  --background: #fcfcfd;
+  --foreground: #26313a;
+  --card: #fcfcfd;
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  --primary: var(--brand-blue);
+  --primary-foreground: #fff;
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --accent: color-mix(in srgb, var(--brand-blue) 8%, var(--card));
+  --accent-foreground: var(--brand-blue);
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
@@ -113,20 +124,25 @@ html.image-route-lock .app-nav-wrap {
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  --brand-paper: #22262c;
+  --brand-blue: #9ec7dc;
+  --brand-gold: #e9bd55;
+  --brand-gold-hover: #f5d17e;
+  --brand-on-gold: #302718;
+  --background: #252a30;
+  --foreground: #f0f1f3;
+  --card: #292f32;
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  --primary: var(--brand-blue);
+  --primary-foreground: #172631;
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
   --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --accent: color-mix(in srgb, var(--brand-blue) 12%, var(--card));
+  --accent-foreground: var(--brand-blue);
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
@@ -150,23 +166,221 @@ html.image-route-lock .app-nav-wrap {
   * {
     @apply border-border outline-ring/50;
   }
-  html,
-  body {
-    background: radial-gradient(circle at top left, rgba(255, 255, 255, 0.92), rgba(245, 239, 231, 0.96) 42%, rgba(240, 235, 227, 0.99) 100%);
-    overscroll-behavior: none;
+  html {
+    color-scheme: light;
+    background: var(--brand-paper) url("/paper-grain.png") repeat;
   }
 
-  .dark,
-  .dark body {
-    background: radial-gradient(circle at top left, rgba(55, 48, 43, 0.72), rgba(28, 25, 23, 0.98) 40%, rgba(12, 10, 9, 1) 100%);
+  html.dark {
+    color-scheme: dark;
+    background: var(--brand-paper);
   }
 
   body {
     @apply text-foreground;
+    overscroll-behavior: none;
+  }
+}
+
+.app-shell-inner:has(> .workspace-nav-rail) {
+  padding-inline-start: 56px;
+}
+
+.workspace-nav-rail {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 30;
+  display: flex;
+  width: 56px;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  border-inline-end: 1px solid var(--border);
+  padding-top: max(8px, env(safe-area-inset-top));
+  background: var(--card);
+}
+
+.workspace-rail-links {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding-block: 2px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.workspace-rail-utility {
+  display: flex;
+  margin-top: auto;
+  flex-shrink: 0;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 0 max(8px, env(safe-area-inset-bottom));
+}
+
+.workspace-theme-trigger {
+  width: 36px;
+  height: 32px;
+}
+
+.workspace-version-trigger {
+  min-height: 26px;
+  padding-inline: 2px;
+  font-size: 10px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-foreground);
+}
+
+.workspace-version-trigger:hover {
+  color: var(--foreground);
+}
+
+.workspace-user-trigger {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--muted-foreground);
+  transition: color 160ms ease, background 160ms ease;
+}
+
+.workspace-user-trigger:hover,
+.workspace-user-trigger[aria-expanded="true"] {
+  color: var(--brand-blue);
+  background: var(--accent);
+}
+
+.workspace-rail-link {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 9px;
+  color: var(--foreground);
+}
+
+.workspace-rail-link:hover,
+.workspace-rail-link[aria-current="page"] {
+  background: var(--accent);
+  color: var(--brand-blue);
+}
+
+.workspace-rail-divider {
+  flex-shrink: 0;
+  width: 24px;
+  height: 1px;
+  margin: 2px 0;
+  background: var(--border);
+}
+
+.workspace-nav-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.workspace-nav-trigger {
+  min-height: 36px;
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: 10px;
+  color: var(--brand-blue);
+  cursor: pointer;
+}
+
+.workspace-nav-trigger:is(:hover, [aria-expanded="true"]) {
+  background: var(--accent);
+}
+
+.workspace-nav-trigger:focus-visible,
+:is(.workspace-nav-link, .workspace-rail-link, .workspace-user-trigger, .workspace-version-trigger, .workspace-theme-trigger):focus-visible {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: -2px;
+}
+
+.workspace-nav-link {
+  display: flex;
+  min-height: 40px;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  border-radius: 8px;
+  padding: 0 10px;
+  text-align: left;
+  font-size: 14px;
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.workspace-nav-link:hover {
+  background: var(--accent);
+}
+
+.workspace-nav-link[aria-current="page"] {
+  background: var(--accent);
+  color: var(--brand-blue);
+  font-weight: 650;
+}
+
+.workspace-nav-sheet {
+  background: var(--card);
+}
+
+@media (min-width: 768px) {
+  .workspace-nav-trigger {
+    width: 44px;
+    flex-direction: column;
+    gap: 1px;
+    padding: 3px 0 7px;
+  }
+
+}
+
+.fish-logo {
+  display: block;
+  overflow: visible;
+  color: var(--brand-blue);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :is(.fish-logo--animated, .fish-logo-trigger:is(:hover, :focus-visible) .fish-logo) .fish-logo__motion {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: fish-logo-surge 860ms cubic-bezier(.2, .7, .2, 1) both;
+  }
+
+  :is(.fish-logo--animated, .fish-logo-trigger:is(:hover, :focus-visible) .fish-logo) .fish-logo__tail {
+    transform-origin: 40px 42px;
+    animation: fish-logo-tail 860ms ease-in-out both;
+  }
+
+  :is(.fish-logo--animated, .fish-logo-trigger:is(:hover, :focus-visible) .fish-logo) .fish-logo__eye {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: fish-logo-blink 860ms linear both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-nav-sheet {
+    animation: none !important;
   }
 }
 
 @layer utilities {
+  .page-toolbar-control {
+    height: 40px;
+    min-height: 40px;
+  }
+
   .hide-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -177,18 +391,39 @@ html.image-route-lock .app-nav-wrap {
   }
 }
 
+@keyframes fish-logo-surge {
+  0% { transform: none; }
+  20% { transform: translateX(-3px) rotate(3deg); }
+  49% { transform: translate(7px, -4px) rotate(-7deg); }
+  73% { transform: translate(3px, -1px) rotate(2deg); }
+  100% { transform: translateX(2px) rotate(-1deg); }
+}
+
+@keyframes fish-logo-tail {
+  0% { transform: none; }
+  19% { transform: rotate(-17deg); }
+  42% { transform: rotate(19deg); }
+  63% { transform: rotate(-9deg); }
+  81%, 100% { transform: rotate(4deg); }
+}
+
+@keyframes fish-logo-blink {
+  0%, 48%, 68%, 100% { transform: none; }
+  57%, 60% { transform: scaleY(.14); }
+}
+
 .dark .bg-white,
 .dark .bg-white\/85,
 .dark .bg-white\/90,
 .dark .bg-white\/95,
 .dark .hover\:bg-white:hover {
-  background-color: rgb(28 25 23 / 0.94) !important;
+  background-color: rgb(31 31 31) !important;
 }
 
 .dark .bg-white\/80,
 .dark .bg-white\/70,
 .dark .bg-white\/60 {
-  background-color: rgb(41 37 36 / 0.78) !important;
+  background-color: rgb(37 37 37) !important;
 }
 
 .dark .bg-stone-50,
@@ -197,11 +432,11 @@ html.image-route-lock .app-nav-wrap {
 .dark .bg-stone-100,
 .dark .hover\:bg-stone-100:hover,
 .dark .hover\:bg-stone-200:hover {
-  background-color: rgb(41 37 36 / 0.86) !important;
+  background-color: rgb(39 39 39) !important;
 }
 
 .dark .bg-stone-200 {
-  background-color: rgb(68 64 60 / 0.9) !important;
+  background-color: rgb(63 63 63) !important;
 }
 
 .dark .border-white,
@@ -220,32 +455,32 @@ html.image-route-lock .app-nav-wrap {
 .dark .text-stone-950,
 .dark .text-stone-900,
 .dark .text-stone-800 {
-  color: rgb(250 250 249) !important;
+  color: rgb(250 250 250) !important;
 }
 
 .dark .text-stone-700,
 .dark .text-stone-600 {
-  color: rgb(214 211 209) !important;
+  color: rgb(212 212 212) !important;
 }
 
 .dark .text-stone-500,
 .dark .text-stone-400 {
-  color: rgb(168 162 158) !important;
+  color: rgb(168 168 168) !important;
 }
 
 .dark .text-stone-300 {
-  color: rgb(214 211 209) !important;
+  color: rgb(212 212 212) !important;
 }
 
 .dark .placeholder\:text-stone-400::placeholder,
 .dark .placeholder\:text-muted-foreground::placeholder {
-  color: rgb(120 113 108) !important;
+  color: rgb(138 138 138) !important;
 }
 
 .dark .hover\:text-stone-700:hover,
 .dark .hover\:text-stone-800:hover,
 .dark .hover\:text-stone-900:hover {
-  color: rgb(250 250 249) !important;
+  color: rgb(250 250 250) !important;
 }
 
 .dark .shadow-sm,

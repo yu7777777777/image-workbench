@@ -184,7 +184,7 @@ export function BackupSettingsCard() {
           </div>
 
           <div className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm leading-6 text-stone-600">
-            账号与用户密钥会从当前存储后端导出逻辑快照，不依赖底层是 `json`、`sqlite`、`postgres` 还是 `git`。图片目录默认不备份，避免备份体积过大。
+            账号与用户密钥会从当前存储后端导出逻辑快照，不依赖底层是 `json`、`sqlite` 还是 `postgres`。图片目录默认不备份，避免备份体积过大。
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">

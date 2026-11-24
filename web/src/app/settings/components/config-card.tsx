@@ -79,7 +79,7 @@ export function ConfigCard() {
 
   if (isLoadingConfig) {
     return (
-      <Card className="rounded-2xl border-white/80 bg-white/90 shadow-sm">
+      <Card className="rounded-xl border-border bg-card shadow-none">
         <CardContent className="flex items-center justify-center p-10">
           <LoaderCircle className="size-5 animate-spin text-stone-400" />
         </CardContent>
@@ -88,19 +88,21 @@ export function ConfigCard() {
   }
 
   return (
-    <Card className="rounded-2xl border-white/80 bg-white/90 shadow-sm">
-      <CardContent className="space-y-4 p-6">
+    <Card className="rounded-xl border-border bg-card shadow-none">
+      <CardContent className="w-full max-w-6xl space-y-6 px-4 pt-5 sm:px-6">
+        <h2 className="text-lg font-semibold">基础配置</h2>
         <div className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm leading-6 text-stone-600">
-          管理员登录密钥继续从部署配置读取，不再在此页面展示；如需分发给其他人，请在下方创建普通用户密钥。
+          管理员登录密钥继续从部署配置读取，不再在此页面展示；如需分发给其他人，请在「用户密钥」中创建普通用户密钥。
         </div>
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">
+          <h3 className="border-b border-border pb-2 text-sm font-semibold md:col-span-2">账号与网络</h3>
           <div className="space-y-2">
             <label className="text-sm text-stone-700">同一账号自动刷新最短间隔</label>
             <Input
               value={String(config?.refresh_account_interval_minute || "")}
               onChange={(event) => setRefreshAccountIntervalMinute(event.target.value)}
               placeholder="分钟"
-              className="h-10 rounded-xl border-stone-200 bg-white"
+              className="h-10 rounded-[10px] border-border bg-card shadow-none"
             />
             <p className="text-xs leading-5 text-stone-500">单位分钟，保存后自动生效。后台每批最多检查 200 个账号，分批轮转；限流账号到恢复时间再检查。账号较多时，实际间隔取决于队列耗时，不保证在此时间内刷完全部账号。手动和自动任务共用最多 20 个并发。</p>
           </div>
@@ -113,7 +115,7 @@ export function ConfigCard() {
                 setProxyTestResult(null);
               }}
               placeholder="http://127.0.0.1:7890"
-              className="h-10 rounded-xl border-stone-200 bg-white"
+              className="h-10 rounded-[10px] border-border bg-card shadow-none"
             />
             <p className="text-xs leading-5 text-stone-500">
               留空表示不使用代理。支持协议://账号:密码@主机:端口，也可直接粘贴代理商的 主机:端口:账号:密码；示例 http://user:pass@127.0.0.1:7890、127.0.0.1:7890:user:pass。账号密码含 @/: 等特殊字符时需 URL 编码。
@@ -145,12 +147,57 @@ export function ConfigCard() {
             </div>
           </div>
           <div className="space-y-2">
+            <label className="flex items-center gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-700">
+              <Checkbox
+                checked={Boolean(config?.auto_remove_invalid_accounts)}
+                onCheckedChange={(checked) => setAutoRemoveInvalidAccounts(Boolean(checked))}
+              />
+              自动移除异常账号
+            </label>
+            <p className="text-xs text-stone-500">刷新时检测并移除</p>
+          </div>
+          <div className="space-y-2">
+            <label className="flex items-center gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-700">
+              <Checkbox
+                checked={Boolean(config?.auto_relogin_after_refresh)}
+                onCheckedChange={(checked) => setAutoReloginAfterRefresh(Boolean(checked))}
+              />
+              刷新后自动尝试移除异常状态
+            </label>
+            <p className="text-xs text-stone-500">开启后刷新时自动尝试密码登录恢复账号。</p>
+          </div>
+          <label className="flex items-center gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-700">
+            <Checkbox
+              checked={Boolean(config?.auto_remove_rate_limited_accounts)}
+              onCheckedChange={(checked) => setAutoRemoveRateLimitedAccounts(Boolean(checked))}
+            />
+            自动移除限流账号
+          </label>
+          <div className="space-y-3 rounded-xl border border-stone-200 bg-white px-4 py-3">
+            <div>
+              <label className="text-sm text-stone-700">控制台日志级别</label>
+              <p className="mt-1 text-xs text-stone-500">不选择时使用默认 info / warning / error。</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {logLevelOptions.map((level) => (
+                <label key={level} className="flex items-center gap-2 text-sm capitalize text-stone-700">
+                  <Checkbox
+                    checked={Boolean(config?.log_levels?.includes(level))}
+                    onCheckedChange={(checked) => setLogLevel(level, Boolean(checked))}
+                  />
+                  {level}
+                </label>
+              ))}
+            </div>
+          </div>
+          <h3 className="border-b border-border pb-2 text-sm font-semibold md:col-span-2">图片生成</h3>
+          <div className="space-y-2">
             <label className="text-sm text-stone-700">图片访问地址</label>
             <Input
               value={String(config?.base_url || "")}
               onChange={(event) => setBaseUrl(event.target.value)}
               placeholder="https://example.com"
-              className="h-10 rounded-xl border-stone-200 bg-white"
+              className="h-10 rounded-[10px] border-border bg-card shadow-none"
             />
             <p className="text-xs text-stone-500">用于生成图片结果的访问前缀地址。</p>
           </div>
@@ -160,7 +207,7 @@ export function ConfigCard() {
               value={String(config?.default_upstream_model_name || "")}
               onChange={(event) => setDefaultUpstreamModelName(event.target.value)}
               placeholder="gpt-5-5"
-              className="h-10 rounded-xl border-stone-200 bg-white"
+              className="h-10 rounded-[10px] border-border bg-card shadow-none"
             />
             <p className="text-xs text-stone-500">gpt-image-2 发起图片请求时使用的上游模型名称，默认 gpt-5-5。</p>
           </div>
@@ -170,7 +217,7 @@ export function ConfigCard() {
               value={String(config?.default_thinking_effort || "auto")}
               onValueChange={(value) => setDefaultThinkingEffort(value as "auto" | "standard" | "extended" | "max")}
             >
-              <SelectTrigger className="h-10 rounded-xl border-stone-200 bg-white">
+              <SelectTrigger className="h-10 rounded-[10px] border-border bg-card shadow-none">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -188,7 +235,7 @@ export function ConfigCard() {
               value={String(config?.image_retention_days || "")}
               onChange={(event) => setImageRetentionDays(event.target.value)}
               placeholder="30"
-              className="h-10 rounded-xl border-stone-200 bg-white"
+              className="h-10 rounded-[10px] border-border bg-card shadow-none"
             />
             <p className="text-xs text-stone-500">自动删除多少天前的本地图片。</p>
           </div>
@@ -198,7 +245,7 @@ export function ConfigCard() {
               value={String(config?.image_response_format || "b64_json")}
               onValueChange={(value) => setImageResponseFormat(value)}
             >
-              <SelectTrigger className="h-10 rounded-xl border-stone-200 bg-white">
+              <SelectTrigger className="h-10 rounded-[10px] border-border bg-card shadow-none">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -214,7 +261,7 @@ export function ConfigCard() {
               value={String(config?.image_poll_timeout_secs || "")}
               onChange={(event) => setImagePollTimeoutSecs(event.target.value)}
               placeholder="120"
-              className="h-10 rounded-xl border-stone-200 bg-white"
+              className="h-10 rounded-[10px] border-border bg-card shadow-none"
             />
             <p className="text-xs text-stone-500">单位秒，等待上游图片结果的最长时间。</p>
           </div>
@@ -224,7 +271,7 @@ export function ConfigCard() {
               value={String(config?.image_account_concurrency || "")}
               onChange={(event) => setImageAccountConcurrency(event.target.value)}
               placeholder="1"
-              className="h-10 rounded-xl border-stone-200 bg-white"
+              className="h-10 rounded-[10px] border-border bg-card shadow-none"
             />
             <p className="text-xs text-stone-500">限制每个账号同时处理的图片请求数量，默认 3。</p>
           </div>
@@ -252,20 +299,10 @@ export function ConfigCard() {
               disabled={config?.image_parallel_generation === false}
               aria-invalid={imageTaskConcurrencyInvalid}
               aria-describedby={imageTaskConcurrencyInvalid ? "image-task-concurrency-help image-task-concurrency-error" : "image-task-concurrency-help"}
-              className="h-10 rounded-xl border-stone-200 bg-white"
+              className="h-10 rounded-[10px] border-border bg-card shadow-none"
             />
             <p id="image-task-concurrency-help" className="text-xs text-stone-500">1–8 的整数，默认 2。仅限制单个任务同时生成的图片数，不是单账号限制，也不是全站总并发。</p>
             {imageTaskConcurrencyInvalid && <p id="image-task-concurrency-error" role="alert" className="text-xs text-red-600">{IMAGE_TASK_CONCURRENCY_ERROR}</p>}
-          </div>
-          <div className="space-y-2">
-            <label className="flex items-center gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-700">
-              <Checkbox
-                checked={Boolean(config?.auto_remove_invalid_accounts)}
-                onCheckedChange={(checked) => setAutoRemoveInvalidAccounts(Boolean(checked))}
-              />
-              自动移除异常账号
-            </label>
-            <p className="text-xs text-stone-500">刷新时检测并移除</p>
           </div>
           <div className="space-y-2">
             <div className="flex items-center gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3">
@@ -303,7 +340,7 @@ export function ConfigCard() {
               value={String(config?.image_timeout_retry_secs || "30")}
               onChange={(event) => setImageTimeoutRetrySecs(event.target.value)}
               placeholder="30"
-              className="h-10 rounded-xl border-stone-200 bg-white"
+              className="h-10 rounded-[10px] border-border bg-card shadow-none"
             />
             <p className="text-xs text-stone-500">单位秒，超时后点击"继续等待"额外等待的时间。</p>
           </div>
@@ -313,69 +350,16 @@ export function ConfigCard() {
               value={String(config?.image_settle_secs || "2.0")}
               onChange={(event) => setImageSettleSecs(event.target.value)}
               placeholder="2.0"
-              className="h-10 rounded-xl border-stone-200 bg-white disabled:cursor-not-allowed disabled:opacity-50"
+              className="h-10 rounded-[10px] border-border bg-card shadow-none disabled:cursor-not-allowed disabled:opacity-50"
               disabled={!config?.image_settle_enabled}
             />
             <p className="text-xs text-stone-500">单位秒，找到图片后等待多久再次确认。需配合图片二次确认机制使用。</p>
           </div>
-          <div className="flex gap-4 md:col-span-2">
-            <div className="flex-1 space-y-2">
-              <label className="flex items-center gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-700">
-                <Checkbox
-                  checked={Boolean(config?.auto_relogin_after_refresh)}
-                  onCheckedChange={(checked) => setAutoReloginAfterRefresh(Boolean(checked))}
-                />
-                刷新后自动尝试移除异常状态
-              </label>
-              <p className="text-xs text-stone-500">开启后刷新时自动尝试密码登录恢复账号。</p>
-            </div>
-            <div className="flex-1" aria-hidden="true" />
-          </div>
-          <label className="flex items-center gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-700">
-            <Checkbox
-              checked={Boolean(config?.auto_remove_rate_limited_accounts)}
-              onCheckedChange={(checked) => setAutoRemoveRateLimitedAccounts(Boolean(checked))}
-            />
-            自动移除限流账号
-          </label>
-          <div className="space-y-3 rounded-xl border border-stone-200 bg-white px-4 py-3">
-            <div>
-              <label className="text-sm text-stone-700">控制台日志级别</label>
-              <p className="mt-1 text-xs text-stone-500">不选择时使用默认 info / warning / error。</p>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {logLevelOptions.map((level) => (
-                <label key={level} className="flex items-center gap-2 text-sm capitalize text-stone-700">
-                  <Checkbox
-                    checked={Boolean(config?.log_levels?.includes(level))}
-                    onCheckedChange={(checked) => setLogLevel(level, Boolean(checked))}
-                  />
-                  {level}
-                </label>
-              ))}
-            </div>
-          </div>
-          <div className="space-y-2 md:col-span-2">
-            <label className="text-sm text-stone-700">全局附加指令</label>
-            <Textarea
-              value={String(config?.global_system_prompt || "")}
-              onChange={(event) => setGlobalSystemPrompt(event.target.value)}
-              placeholder="例如：先判断用户提示词是否合规；遇到违法、色情、暴力、仇恨等请求时拒绝回答。"
-              className="min-h-28 rounded-xl border-stone-200 bg-white font-mono text-xs shadow-none"
-            />
-            <p className="text-xs text-stone-500">每次请求都会作为 system 消息注入，可用于审核用户提示词、避免违规内容、统一约束模型行为或固定角色设定。</p>
-          </div>
-          <div className="space-y-2 md:col-span-2">
-            <label className="text-sm text-stone-700">敏感词</label>
-            <Textarea
-              value={(config?.sensitive_words || []).join("\n")}
-              onChange={(event) => setSensitiveWordsText(event.target.value)}
-              placeholder="一行一个，命中即拒绝"
-              className="min-h-28 rounded-xl border-stone-200 bg-white font-mono text-xs shadow-none"
-            />
-            <p className="text-xs text-stone-500">只要用户请求包含任意敏感词，就直接返回拒绝。</p>
-          </div>
-          <div className="space-y-4 rounded-xl border border-stone-200 bg-white px-4 py-3 md:col-span-2">
+          <details className="rounded-xl border border-border bg-card md:col-span-2">
+            <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-stone-800">
+              远程图片存储（高级）
+            </summary>
+            <div className="space-y-4 border-t border-border px-4 py-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <label className="flex items-center gap-3 text-sm text-stone-700">
                 <Checkbox
@@ -431,7 +415,7 @@ export function ConfigCard() {
                   onValueChange={(value) => setImageStorageField("mode", value as ImageStorageMode)}
                   disabled={!config?.image_storage?.enabled}
                 >
-                  <SelectTrigger className="h-10 rounded-xl border-stone-200 bg-white shadow-none">
+                  <SelectTrigger className="h-10 rounded-[10px] border-border bg-card shadow-none shadow-none">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -447,7 +431,7 @@ export function ConfigCard() {
                   value={String(config?.image_storage?.webdav_url || "")}
                   onChange={(event) => setImageStorageField("webdav_url", event.target.value)}
                   placeholder="https://example.com/dav"
-                  className="h-10 rounded-xl border-stone-200 bg-white"
+                  className="h-10 rounded-[10px] border-border bg-card shadow-none"
                   disabled={!config?.image_storage?.enabled}
                 />
               </div>
@@ -456,7 +440,7 @@ export function ConfigCard() {
                 <Input
                   value={String(config?.image_storage?.webdav_username || "")}
                   onChange={(event) => setImageStorageField("webdav_username", event.target.value)}
-                  className="h-10 rounded-xl border-stone-200 bg-white"
+                  className="h-10 rounded-[10px] border-border bg-card shadow-none"
                   disabled={!config?.image_storage?.enabled}
                 />
               </div>
@@ -466,7 +450,7 @@ export function ConfigCard() {
                   type="password"
                   value={String(config?.image_storage?.webdav_password || "")}
                   onChange={(event) => setImageStorageField("webdav_password", event.target.value)}
-                  className="h-10 rounded-xl border-stone-200 bg-white"
+                  className="h-10 rounded-[10px] border-border bg-card shadow-none"
                   disabled={!config?.image_storage?.enabled}
                 />
               </div>
@@ -476,7 +460,7 @@ export function ConfigCard() {
                   value={String(config?.image_storage?.webdav_root_path || "")}
                   onChange={(event) => setImageStorageField("webdav_root_path", event.target.value)}
                   placeholder="ai-images"
-                  className="h-10 rounded-xl border-stone-200 bg-white"
+                  className="h-10 rounded-[10px] border-border bg-card shadow-none"
                   disabled={!config?.image_storage?.enabled}
                 />
               </div>
@@ -486,12 +470,34 @@ export function ConfigCard() {
                   value={String(config?.image_storage?.public_base_url || "")}
                   onChange={(event) => setImageStorageField("public_base_url", event.target.value)}
                   placeholder="https://cdn.example.com/ai-images"
-                  className="h-10 rounded-xl border-stone-200 bg-white"
+                  className="h-10 rounded-[10px] border-border bg-card shadow-none"
                   disabled={!config?.image_storage?.enabled}
                 />
                 <p className="text-xs text-stone-500">留空时返回本应用 /images/... 代理地址；填入后直接返回公开图片地址。</p>
               </div>
             </div>
+            </div>
+          </details>
+          <h3 className="border-b border-border pb-2 text-sm font-semibold md:col-span-2">提示词与内容审核</h3>
+          <div className="space-y-2 md:col-span-2">
+            <label className="text-sm text-stone-700">全局附加指令</label>
+            <Textarea
+              value={String(config?.global_system_prompt || "")}
+              onChange={(event) => setGlobalSystemPrompt(event.target.value)}
+              placeholder="例如：先判断用户提示词是否合规；遇到违法、色情、暴力、仇恨等请求时拒绝回答。"
+              className="min-h-28 rounded-xl border-stone-200 bg-white font-mono text-xs shadow-none"
+            />
+            <p className="text-xs text-stone-500">每次请求都会作为 system 消息注入，可用于审核用户提示词、避免违规内容、统一约束模型行为或固定角色设定。</p>
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <label className="text-sm text-stone-700">敏感词</label>
+            <Textarea
+              value={(config?.sensitive_words || []).join("\n")}
+              onChange={(event) => setSensitiveWordsText(event.target.value)}
+              placeholder="一行一个，命中即拒绝"
+              className="min-h-28 rounded-xl border-stone-200 bg-white font-mono text-xs shadow-none"
+            />
+            <p className="text-xs text-stone-500">只要用户请求包含任意敏感词，就直接返回拒绝。</p>
           </div>
           <div className="space-y-4 rounded-xl border border-stone-200 bg-white px-4 py-3 md:col-span-2">
             <label className="flex items-center gap-3 text-sm text-stone-700">
@@ -507,15 +513,15 @@ export function ConfigCard() {
             <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2">
                 <label className="text-sm text-stone-700">Base URL</label>
-                <Input value={String(config?.ai_review?.base_url || "")} onChange={(event) => setAIReviewField("base_url", event.target.value)} placeholder="https://api.openai.com" className="h-10 rounded-xl border-stone-200 bg-white" />
+                <Input value={String(config?.ai_review?.base_url || "")} onChange={(event) => setAIReviewField("base_url", event.target.value)} placeholder="https://api.openai.com" className="h-10 rounded-[10px] border-border bg-card shadow-none" />
               </div>
               <div className="space-y-2">
                 <label className="text-sm text-stone-700">API Key</label>
-                <Input value={String(config?.ai_review?.api_key || "")} onChange={(event) => setAIReviewField("api_key", event.target.value)} placeholder="sk-..." className="h-10 rounded-xl border-stone-200 bg-white" />
+                <Input value={String(config?.ai_review?.api_key || "")} onChange={(event) => setAIReviewField("api_key", event.target.value)} placeholder="sk-..." className="h-10 rounded-[10px] border-border bg-card shadow-none" />
               </div>
               <div className="space-y-2">
                 <label className="text-sm text-stone-700">Model</label>
-                <Input value={String(config?.ai_review?.model || "")} onChange={(event) => setAIReviewField("model", event.target.value)} placeholder="gpt-5.4-mini" className="h-10 rounded-xl border-stone-200 bg-white" />
+                <Input value={String(config?.ai_review?.model || "")} onChange={(event) => setAIReviewField("model", event.target.value)} placeholder="gpt-5.4-mini" className="h-10 rounded-[10px] border-border bg-card shadow-none" />
               </div>
             </div>
             <div className="space-y-2">
@@ -525,9 +531,9 @@ export function ConfigCard() {
           </div>
         </div>
 
-        <div className="flex justify-end">
+        <div className="sticky bottom-0 z-10 flex justify-end border-t border-border bg-card py-3">
           <Button
-            className="h-10 rounded-xl bg-stone-950 px-5 text-white hover:bg-stone-800"
+            className="h-10 rounded-[10px] px-5 shadow-none"
             onClick={() => void saveConfig()}
             disabled={isSavingConfig}
           >

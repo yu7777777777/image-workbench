@@ -488,6 +488,7 @@ export default function CanvasWorkspace() {
       if (editable(event.target) || !loaded) return
       const state = useStore.getState()
       const modifier = event.ctrlKey || event.metaKey
+      if (event.code === 'Space' && event.target instanceof Element && event.target.closest('button, [data-canvas-ui]')) return
       if (event.code === 'Space') { event.preventDefault(); space.current = true }
       else if (modifier && event.key.toLowerCase() === 'c' && state.canvasSelectedNodeIds.length) { event.preventDefault(); clipboard.current = structuredClone(state.canvasNodes.filter((node) => state.canvasSelectedNodeIds.includes(node.id))); state.showToast(`已复制 ${clipboard.current.length} 个节点`, 'success') }
       else if (modifier && event.key.toLowerCase() === 'v' && clipboard.current.length) { event.preventDefault(); duplicateNodes(clipboard.current) }
@@ -669,7 +670,7 @@ export default function CanvasWorkspace() {
     return { groupId, name: members.find((node) => node.groupName)?.groupName || '未命名分组', collapsed: members.every((node) => node.groupCollapsed), count: members.length, x, y, width: right - x, height: bottom - y }
   })
 
-  return <div ref={viewport} className={`canvas-workspace ${tool === 'hand' ? 'hand-tool' : ''}`} style={{ top: isPoolBuild ? 0 : 44 }} onPointerDown={(event) => pointerDown(event)} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp} onContextMenu={(event) => { if (!(event.target as Element).closest('[data-canvas-ui],input,textarea,select')) openMenu(event) }}
+  return <div ref={viewport} className={`canvas-workspace ${tool === 'hand' ? 'hand-tool' : ''}`} data-standalone={!isPoolBuild || undefined} onPointerDown={(event) => pointerDown(event)} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp} onContextMenu={(event) => { if (!(event.target as Element).closest('[data-canvas-ui],input,textarea,select')) openMenu(event) }}
     onDragOver={(event) => { if (loaded && event.dataTransfer.types.includes('Files')) { event.preventDefault(); setDropActive(true) } }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDropActive(false) }} onDrop={(event) => { event.preventDefault(); setDropActive(false); if (loaded) void importFiles(Array.from(event.dataTransfer.files), screenToWorld(screenPoint({ x: event.clientX, y: event.clientY }), transform)) }}>
     {showGrid && <div className="canvas-dot-grid" style={{ backgroundSize: `${Math.max(12, 24 * transform.scale)}px ${Math.max(12, 24 * transform.scale)}px`, backgroundPosition: `${transform.x}px ${transform.y}px` }} />}
     <div className="canvas-world" style={{ transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})` }}>
@@ -707,14 +708,50 @@ export default function CanvasWorkspace() {
         gesture.current = { kind: 'connect', sourceId, start: point, origin: point, moved: false }; setConnection({ sourceId, point: screenToWorld(screenPoint(point), transform) })
       }} />)}
     </div>
-    <header className="canvas-project-bar" data-canvas-ui><div className="canvas-project-mark"><CanvasIcon name="generate" /></div><div><input aria-label="画布名称" value={projectName} onChange={(event) => useStore.setState({ canvasProjectName: event.target.value })} onBlur={() => { void renameProject(useStore.getState().canvasProjectName) }} /><p>{status} · {nodes.length} 个节点</p></div><select aria-label="切换画布工程" value={activeProjectId} disabled={!loaded} onChange={(event) => { void switchProject(event.target.value) }}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><button title="新建画布工程" disabled={!loaded} onClick={() => { const next = window.prompt('工程名称', '未命名画布'); if (next !== null) void createProject(next) }}>新建</button><button title="删除当前画布工程" disabled={!loaded} onClick={() => { if (window.confirm('删除当前画布工程？')) void removeProject() }}>删除</button><button title="保存画布" disabled={!loaded} onClick={() => void save()}>保存</button></header>
-    <div className="canvas-file-tools" data-canvas-ui><button disabled={!loaded} onClick={() => projectInput.current?.click()}>导入工程</button><button disabled={!loaded} onClick={() => void exportProject()}>导出工程</button><button disabled={!loaded} onClick={arrange}>按连接整理</button><button disabled={!loaded || selected.length < 2} onClick={groupSelected}>分组</button><button disabled={!loaded || !selected.some((id) => nodes.find((node) => node.id === id)?.groupId)} onClick={ungroupSelected}>解散组</button></div>
-    <nav className="canvas-create-tools" aria-label="添加画布节点" data-canvas-ui><button disabled={!loaded} title="上传图片（支持拖入 / 粘贴）" onClick={() => uploadInput.current?.click()}><CanvasIcon name="image" /><span>图片</span></button><button disabled={!loaded} onClick={() => addNode('text')}><CanvasIcon name="text" /><span>提示词</span></button><button disabled={!loaded} onClick={() => addNode('generation')}><CanvasIcon name="generate" /><span>生成</span></button><i /><button disabled={!loaded} className={libraryOpen ? 'active' : ''} onClick={() => setLibraryOpen(!libraryOpen)}><CanvasIcon name="library" /><span>素材库</span></button><button disabled={!loaded} className={promptLibraryOpen ? 'active' : ''} onClick={() => setPromptLibraryOpen(!promptLibraryOpen)}><CanvasIcon name="text" /><span>词库</span></button></nav>
-    {!nodes.length && loaded && <div className="canvas-welcome"><span className="canvas-welcome-eyebrow">INFINITE CANVAS</span><h2>让想法自由连接</h2><p>添加图片和提示词，连接到生成节点。<br />从一次创作，延伸出新的可能。</p><button data-canvas-ui onClick={() => addNode('generation')}><CanvasIcon name="generate" />创建第一个生成节点</button><small>滚轮缩放 · 空格 / 中键平移 · 拖入或粘贴图片</small></div>}
+    <div className="canvas-project" data-canvas-ui>
+      <button className="canvas-project-trigger" type="button" popoverTarget="canvas-project-panel" disabled={!loaded}>
+        <span className="truncate">{projectName || '未命名画布'}</span><span aria-hidden="true" className="canvas-project-chevron" />
+      </button>
+      {status && <p className="canvas-project-status" role="status">{status}</p>}
+      <div id="canvas-project-panel" className="canvas-project-panel" popover="auto" aria-label="画布工程">
+        <label>
+          画布名称
+          <input value={projectName} onChange={(event) => useStore.setState({ canvasProjectName: event.target.value })} onBlur={() => { void renameProject(useStore.getState().canvasProjectName) }} />
+        </label>
+        <label>
+          切换画布工程
+          <select value={activeProjectId} disabled={!loaded} onChange={(event) => { void switchProject(event.target.value) }}>
+            {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+          </select>
+        </label>
+        <div className="canvas-project-actions">
+          <button type="button" disabled={!loaded} onClick={() => void save()}>保存</button>
+          <button type="button" disabled={!loaded} onClick={() => { const next = window.prompt('工程名称', '未命名画布'); if (next !== null) void createProject(next) }}>新建</button>
+          <button type="button" disabled={!loaded} onClick={() => projectInput.current?.click()}>导入工程</button>
+          <button type="button" disabled={!loaded} onClick={() => void exportProject()}>导出工程</button>
+          <button type="button" disabled={!loaded} onClick={arrange}>按连接整理</button>
+          <button type="button" className="canvas-project-delete" disabled={!loaded} onClick={() => { if (window.confirm('删除当前画布工程？')) void removeProject() }}>删除工程</button>
+        </div>
+      </div>
+    </div>
+    {!nodes.length && loaded && <div className="canvas-welcome">
+      <h2 className="studio-empty-title">空白画布</h2>
+      <p className="studio-empty-description">添加图片和提示词，再连接到生成节点。</p>
+      <button data-canvas-ui onClick={() => addNode('generation')}><CanvasIcon name="generate" />添加生成节点</button>
+    </div>}
     {!loaded && <div className="canvas-load-state" data-canvas-ui><p>{status}</p><button onClick={() => void load()}>重新恢复</button></div>}
-    <CanvasToolbar tool={tool} scale={transform.scale} grid={showGrid} onTool={setTool} onZoom={(factor) => { const element = viewport.current!; useStore.getState().setCanvasTransform(zoomAtScreenPoint(transform, { x: element.clientWidth / 2, y: element.clientHeight / 2 }, transform.scale * factor)) }} onFocus={focusSelected} onHelp={() => setShortcutHelpOpen(true)} onFit={fit} onGrid={() => useStore.getState().setCanvasShowGrid(!showGrid)} onUndo={() => undo()} onRedo={() => undo(true)} canUndo={history.current.undo.length > 0} canRedo={history.current.redo.length > 0} />
+    <div className="canvas-dock" data-canvas-ui>
+      <div className="canvas-create-tools" role="group" aria-label="创建与素材">
+        <button type="button" disabled={!loaded} title="上传图片（支持拖入 / 粘贴）" onClick={() => uploadInput.current?.click()}><CanvasIcon name="image" />图片</button>
+        <button type="button" disabled={!loaded} onClick={() => addNode('text')}><CanvasIcon name="text" />提示词</button>
+        <button type="button" disabled={!loaded} onClick={() => addNode('generation')}><CanvasIcon name="generate" />生成</button>
+        <button type="button" disabled={!loaded} aria-pressed={libraryOpen} className={libraryOpen ? 'active' : ''} onClick={() => setLibraryOpen(!libraryOpen)}><CanvasIcon name="library" />素材库</button>
+        <button type="button" disabled={!loaded} aria-pressed={promptLibraryOpen} className={promptLibraryOpen ? 'active' : ''} onClick={() => setPromptLibraryOpen(!promptLibraryOpen)}><CanvasIcon name="text" />词库</button>
+      </div>
+      <CanvasToolbar tool={tool} scale={transform.scale} grid={showGrid} onTool={setTool} onZoom={(factor) => { const element = viewport.current!; useStore.getState().setCanvasTransform(zoomAtScreenPoint(transform, { x: element.clientWidth / 2, y: element.clientHeight / 2 }, transform.scale * factor)) }} onFocus={focusSelected} onHelp={() => setShortcutHelpOpen(true)} onFit={fit} onGrid={() => useStore.getState().setCanvasShowGrid(!showGrid)} onUndo={() => undo()} onRedo={() => undo(true)} canUndo={history.current.undo.length > 0} canRedo={history.current.redo.length > 0} />
+    </div>
     <div className="canvas-help">{selected.length ? `${selected.length} 个已选 · Delete 移除 · 右键更多` : '拖动圆点连接 · 双击连线断开 · V 选择 / H 平移'}</div>
-    {selected.length > 0 && <div className="canvas-selection-actions" data-canvas-ui role="toolbar" aria-label="选中节点操作"><strong>{selected.length} 个节点</strong><i /><button title="聚焦选中节点" aria-label="聚焦选中节点" onClick={focusSelected}><CanvasIcon name="focus" /><span>聚焦</span></button><button title="复制选中节点" aria-label="复制选中节点" onClick={duplicateSelected}><span>复制</span></button><button title="给选中节点分组" aria-label="给选中节点分组" disabled={selected.length < 2} onClick={groupSelected}><span>分组</span></button><button title="折叠或展开选中节点所属分组" aria-label="折叠或展开选中节点所属分组" disabled={!selected.some((id) => nodes.find((node) => node.id === id)?.groupId)} onClick={toggleSelectedGroups}><span>收起组</span></button><button title="锁定或解锁选中节点" aria-label="锁定或解锁选中节点" onClick={toggleSelectedLocked}><span>锁定</span></button><button className="is-danger" title="删除选中节点" aria-label="删除选中节点" onClick={removeSelected}><span>删除</span></button></div>}
+    {selected.length > 0 && <div className="canvas-selection-actions" data-canvas-ui role="toolbar" aria-label="选中节点操作"><strong>{selected.length} 个节点</strong><i /><button title="聚焦选中节点" aria-label="聚焦选中节点" onClick={focusSelected}><CanvasIcon name="focus" /><span>聚焦</span></button><button title="复制选中节点" aria-label="复制选中节点" onClick={duplicateSelected}><span>复制</span></button><button title="给选中节点分组" aria-label="给选中节点分组" disabled={selected.length < 2} onClick={groupSelected}><span>分组</span></button><button title="折叠或展开选中节点所属分组" aria-label="折叠或展开选中节点所属分组" disabled={!selected.some((id) => nodes.find((node) => node.id === id)?.groupId)} onClick={toggleSelectedGroups}><span>收起组</span></button><button title="解散选中节点所属分组" disabled={!selected.some((id) => nodes.find((node) => node.id === id)?.groupId)} onClick={ungroupSelected}>解散组</button><button title="锁定或解锁选中节点" aria-label="锁定或解锁选中节点" onClick={toggleSelectedLocked}><span>锁定</span></button><button className="is-danger" title="删除选中节点" aria-label="删除选中节点" onClick={removeSelected}><span>删除</span></button></div>}
     {libraryOpen && <CanvasLibrary onAdd={addHistoryImage} onClose={() => setLibraryOpen(false)} />}
     {promptLibraryOpen && <CanvasPromptLibrary onUse={addPromptFromLibrary} onClose={() => setPromptLibraryOpen(false)} />}
     {box && <div className="canvas-selection" style={{ left: Math.min(box.from.x, box.to.x), top: Math.min(box.from.y, box.to.y), width: Math.abs(box.from.x - box.to.x), height: Math.abs(box.from.y - box.to.y) }} />}

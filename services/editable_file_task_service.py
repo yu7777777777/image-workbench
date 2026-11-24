@@ -97,9 +97,6 @@ class EditableFileTaskService:
             if changed:
                 self._save_locked()
 
-    def submit_ppt(self, identity: dict[str, object], *, client_task_id: str = "", prompt: str = "", base64_images: list[str] | None = None, base_url: str = "") -> dict[str, Any]:
-        return self._submit(identity, client_task_id=client_task_id, kind="ppt", prompt=prompt, base64_images=base64_images or [], base_url=base_url)
-
     def submit_psd(self, identity: dict[str, object], *, client_task_id: str = "", prompt: str = "", base64_images: list[str] | None = None, base_url: str = "") -> dict[str, Any]:
         return self._submit(identity, client_task_id=client_task_id, kind="psd", prompt=prompt, base64_images=base64_images or [], base_url=base_url)
 
@@ -145,7 +142,7 @@ class EditableFileTaskService:
             account_email = _clean(account.get("email"))
             backend = OpenAIBackendAPI(token)
             output_dir = EDITABLE_FILE_ROOT / kind / key.rsplit(":", 1)[-1]
-            result = backend.export_psd_zip(base64_images, prompt, output_dir) if kind == "psd" else backend.export_ppt_zip(base64_images, prompt, output_dir)
+            result = backend.export_psd_zip(base64_images, prompt, output_dir)
             account_service.mark_text_used(token)
             data = {"conversation_id": result.conversation_id, "primary_url": _file_url(result.primary_path, base_url), "zip_url": _file_url(result.zip_path, base_url)}
             self._update_task(key, status=TASK_STATUS_SUCCESS, result=data, account_email=account_email, error="", ended_ts=time.time())
@@ -187,6 +184,8 @@ class EditableFileTaskService:
         for item in (raw.get("tasks") if isinstance(raw, dict) else raw) or []:
             if not isinstance(item, dict):
                 continue
+            if item.get("kind") != "psd":
+                continue
             task_id = _clean(item.get("id"))
             owner = _clean(item.get("owner_id"))
             if not task_id or not owner:
@@ -195,7 +194,7 @@ class EditableFileTaskService:
                 "id": task_id,
                 "owner_id": owner,
                 "status": _clean(item.get("status"), TASK_STATUS_ERROR),
-                "kind": "psd" if item.get("kind") == "psd" else "ppt",
+                "kind": "psd",
                 "created_at": _clean(item.get("created_at"), _now_iso()),
                 "updated_at": _clean(item.get("updated_at"), _clean(item.get("created_at"), _now_iso())),
                 "created_ts": float(item.get("created_ts") or 0),
@@ -227,7 +226,7 @@ class EditableFileTaskService:
 
     def _remove_task_output_dir(self, task: dict[str, Any]) -> None:
         """删除任务产物目录（data/files/<kind>/<task_id>），文件不存在时静默。"""
-        output_dir = EDITABLE_FILE_ROOT / str(task.get("kind") or "ppt") / str(task.get("id") or "")
+        output_dir = EDITABLE_FILE_ROOT / "psd" / str(task.get("id") or "")
         if output_dir.resolve().parent.parent != EDITABLE_FILE_ROOT.resolve():
             return
         shutil.rmtree(output_dir, ignore_errors=True)

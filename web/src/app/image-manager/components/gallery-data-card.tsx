@@ -117,7 +117,7 @@ export function GalleryDataCard() {
   };
 
   return (
-    <Card className="rounded-2xl border-white/80 bg-white/90 shadow-sm">
+    <Card className="rounded-xl border-border bg-card shadow-none">
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
           <HardDrive className="size-5 text-stone-700" />
@@ -130,10 +130,10 @@ export function GalleryDataCard() {
       <CardContent>
         <div className="grid gap-4 md:grid-cols-3">
           {/* 导出 */}
-          <div className="flex flex-col justify-between rounded-xl border border-stone-200 bg-stone-50/50 p-4">
+          <div className="flex flex-col justify-between rounded-xl border border-stone-200 bg-muted/30 p-4">
             <div className="space-y-3">
               <div className="flex items-center gap-2 font-medium text-stone-800 text-sm">
-                <Download className="size-4 text-blue-600" />
+                <Download className="size-4 text-muted-foreground" />
                 导出画廊数据
               </div>
               <p className="text-xs text-stone-500 leading-5">
@@ -151,7 +151,7 @@ export function GalleryDataCard() {
               </div>
             </div>
             <Button
-              className="mt-4 h-9 w-full rounded-xl bg-stone-900 text-xs text-white hover:bg-stone-800"
+              className="mt-4 h-9 w-full rounded-xl text-xs shadow-none"
               onClick={handleExport}
               disabled={isExporting || (!exportConfig && !exportTasks)}
             >
@@ -161,10 +161,10 @@ export function GalleryDataCard() {
           </div>
 
           {/* 导入 */}
-          <div className="flex flex-col justify-between rounded-xl border border-stone-200 bg-stone-50/50 p-4">
+          <div className="flex flex-col justify-between rounded-xl border border-stone-200 bg-muted/30 p-4">
             <div className="space-y-3">
               <div className="flex items-center gap-2 font-medium text-stone-800 text-sm">
-                <Upload className="size-4 text-emerald-600" />
+                <Upload className="size-4 text-muted-foreground" />
                 导入备份恢复
               </div>
               <p className="text-xs text-stone-500 leading-5">
@@ -200,21 +200,21 @@ export function GalleryDataCard() {
           </div>
 
           {/* 清理 */}
-          <div className="flex flex-col justify-between rounded-xl border border-rose-100 bg-rose-50/30 p-4">
+          <div className="flex flex-col justify-between rounded-xl border border-stone-200 bg-muted/30 p-4">
             <div className="space-y-3">
-              <div className="flex items-center gap-2 font-medium text-rose-700 text-sm">
-                <Trash2 className="size-4 text-rose-600" />
+              <div className="flex items-center gap-2 font-medium text-foreground text-sm">
+                <Trash2 className="size-4 text-muted-foreground" />
                 清除本地画廊数据
               </div>
-              <p className="text-xs text-rose-600/80 leading-5">
+              <p className="text-xs text-muted-foreground leading-5">
                 清空当前浏览器中缓存的画廊生图记录或配置。操作不可逆，请先做好备份。
               </p>
               <div className="flex flex-wrap gap-4 pt-1 text-xs">
-                <label className="flex items-center gap-2 cursor-pointer text-rose-800">
+                <label className="flex items-center gap-2 cursor-pointer">
                   <Checkbox checked={clearConfig} onCheckedChange={(v) => setClearConfig(Boolean(v))} />
                   <span>包含配置</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer text-rose-800">
+                <label className="flex items-center gap-2 cursor-pointer">
                   <Checkbox checked={clearTasks} onCheckedChange={(v) => setClearTasks(Boolean(v))} />
                   <span>包含任务与图片</span>
                 </label>

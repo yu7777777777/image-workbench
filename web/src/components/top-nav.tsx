@@ -2,42 +2,37 @@
 
 import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
-import { Menu } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
+import { FishLogo } from "@/components/fish-logo";
 import { HeaderActions } from "@/components/header-actions";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Sheet, SheetClose, SheetContent, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import webConfig from "@/constants/common-env";
 import { fetchThirdPartyApps, updateSelfProfile, type ThirdPartyAppsSettings } from "@/lib/api";
 import { getValidatedAuthSession } from "@/lib/auth-session";
-import { cn } from "@/lib/utils";
 import { clearStoredAuthSession, setStoredAuthSession, type StoredAuthSession } from "@/store/auth";
-import { BookOpen, Check, Copy, KeyRound, LoaderCircle, LogOut, Settings, ShieldCheck, Sparkles, User } from "lucide-react";
+import { BookOpen, Bug, Check, Copy, Database, GalleryHorizontal, Images, KeyRound, LayoutGrid, List, LoaderCircle, LogOut, MessageCircle, Settings, ShieldCheck, Sparkles, User } from "lucide-react";
 import { toast } from "sonner";
 
-const adminNavItems = [
-  { href: "/image?mode=gallery", label: "画廊" },
-  { href: "/image?mode=canvas", label: "画布" },
-  { href: "/image?mode=agent", label: "Agent" },
-  { href: "/chat", label: "对话" },
-  { href: "/accounts", label: "号池管理" },
-  { href: "/image-manager", label: "图片管理" },
-  { href: "/logs", label: "日志管理" },
-  { href: "/debug", label: "调试" },
-  { href: "/settings", label: "设置" },
+const workspaceItems = [
+  { href: "/image?mode=gallery", label: "画廊", icon: Images },
+  { href: "/image?mode=agent", label: "Agent", icon: Sparkles },
+  { href: "/image?mode=canvas", label: "画布", icon: LayoutGrid },
+  { href: "/chat", label: "对话", icon: MessageCircle },
 ];
 
-const userNavItems = [
-  { href: "/image?mode=gallery", label: "画廊" },
-  { href: "/image?mode=canvas", label: "画布" },
-  { href: "/image?mode=agent", label: "Agent" },
-  { href: "/chat", label: "对话" },
-  { href: "/settings", label: "设置" },
+const adminItems = [
+  { href: "/accounts", label: "号池管理", icon: Database },
+  { href: "/image-manager", label: "图片管理", icon: GalleryHorizontal },
+  { href: "/logs", label: "日志管理", icon: List },
+  { href: "/debug", label: "调试", icon: Bug },
 ];
+
+const settingsItem = { href: "/settings", label: "设置", icon: Settings };
 
 function buildThirdPartyHref(appUrl: string, baseUrl: string, apiKey: string) {
   const url = appUrl.trim();
@@ -55,6 +50,7 @@ function TopNavInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const mode = searchParams.get("mode");
+  const route = pathname?.replace(/\/$/, "");
   const router = useRouter();
   const [session, setSession] = useState<StoredAuthSession | null | undefined>(undefined);
   const [thirdPartyApps, setThirdPartyApps] = useState<ThirdPartyAppsSettings | null>(null);
@@ -73,7 +69,7 @@ function TopNavInner() {
     let active = true;
 
     const load = async () => {
-      if (pathname === "/login") {
+      if (route === "/login") {
         if (!active) {
           return;
         }
@@ -92,7 +88,7 @@ function TopNavInner() {
     return () => {
       active = false;
     };
-  }, [pathname]);
+  }, [route]);
 
   useEffect(() => {
     if (!session) {
@@ -185,11 +181,11 @@ function TopNavInner() {
     }
   };
 
-  if (pathname === "/login" || session === undefined || !session) {
+  if (route === "/login" || !session) {
     return null;
   }
 
-  const navItems = session.role === "admin" ? adminNavItems : userNavItems;
+  const managementItems = session.role === "admin" ? [...adminItems, settingsItem] : [settingsItem];
   const roleLabel = session.role === "admin" ? "管理员" : "普通用户";
   const displayName = session.name.trim() || roleLabel;
   const baseUrl = webConfig.apiUrl.replace(/\/$/, "") || window.location.origin;
@@ -213,201 +209,150 @@ function TopNavInner() {
 
   const isItemActive = (itemHref: string) => {
     if (itemHref.startsWith("/image?mode=")) {
-      if (pathname !== "/image") return false;
+      if (route !== "/image") return false;
       const targetMode = itemHref.split("mode=")[1];
       const currentMode = mode === "agent" ? "agent" : mode === "canvas" ? "canvas" : "gallery";
       return targetMode === currentMode;
     }
-    return pathname?.replace(/\/$/, "") === itemHref;
+    return route === itemHref;
   };
 
   return (
     <>
-      <header className="border-b border-stone-100/50 dark:border-white/10">
-        <div className="relative flex min-h-12 flex-col gap-1 px-3 py-2 sm:h-12 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-0">
-          <div className="flex w-full items-center justify-between gap-2 xl:w-auto xl:justify-start xl:gap-3">
-            <Sheet>
-              <SheetTrigger className="inline-flex size-8 items-center justify-center text-stone-700 transition hover:text-stone-950 xl:hidden dark:text-stone-200 dark:hover:text-white">
-                <Menu className="size-4" />
-                <span className="sr-only">打开导航</span>
-              </SheetTrigger>
-              <SheetContent side="left">
-                <SheetHeader>
-                  <SheetTitle className="text-base font-semibold">控制台</SheetTitle>
-                  <span className="text-xs text-stone-500 dark:text-stone-400">{roleLabel} · {displayName}</span>
-                </SheetHeader>
-                <nav className="mt-8 flex flex-col gap-1">
-                  {canvasHref ? (
+      <header className="workspace-nav-rail">
+        <Sheet>
+          <SheetTrigger className="workspace-nav-trigger fish-logo-trigger" aria-label="打开详细导航">
+            <FishLogo className="w-9" />
+          </SheetTrigger>
+          <SheetContent side="left" overlayClassName="bg-black/20" className="workspace-nav-sheet w-[min(252px,calc(100vw-1.5rem))] gap-0 p-4 data-[state=closed]:duration-150 data-[state=open]:duration-200 sm:max-w-none">
+            <SheetHeader className="flex-row items-center gap-2 p-0 pr-6 pb-5">
+              <FishLogo className="w-11 shrink-0" animated />
+              <div className="min-w-0">
+                <SheetTitle className="text-sm">AI 创作平台</SheetTitle>
+                <SheetDescription className="truncate text-xs">{displayName === roleLabel ? roleLabel : `${displayName} · ${roleLabel}`}</SheetDescription>
+              </div>
+            </SheetHeader>
+            <nav aria-label="工作台导航" className="min-h-0 space-y-4 overflow-y-auto">
+              {[{ label: "工作模式", items: workspaceItems }, { label: "管理", items: managementItems }].map((group) => (
+                <div role="group" aria-label={group.label} key={group.label}>
+                  <p aria-hidden="true" className="px-2.5 pb-1.5 text-xs text-muted-foreground">{group.label}</p>
+                  {group.items.map(({ href, icon: Icon, label }) => (
+                    <SheetClose asChild key={href}>
+                      <Link href={href} aria-current={isItemActive(href) ? "page" : undefined} className="workspace-nav-link">
+                        <Icon aria-hidden="true" className="size-4 shrink-0" />
+                        {label}
+                      </Link>
+                    </SheetClose>
+                  ))}
+                  {group.items === workspaceItems && canvasHref ? (
                     <SheetClose asChild>
-                      <button
-                        type="button"
-                        className="flex items-center rounded-xl px-3 py-2.5 text-left text-sm font-medium text-stone-600 transition hover:bg-stone-100 hover:text-stone-950 dark:text-stone-300 dark:hover:bg-white/10 dark:hover:text-white"
-                        onClick={handleCanvasOpen}
-                      >
+                      <button type="button" className="workspace-nav-link" onClick={handleCanvasOpen}>
+                        <LayoutGrid aria-hidden="true" className="size-4 shrink-0" />
                         无限画布
                       </button>
                     </SheetClose>
                   ) : null}
-                  {navItems.map((item) => {
-                    const active = isItemActive(item.href);
-                    const className = cn(
-                      "flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition",
-                      active ? "bg-stone-950 text-white dark:bg-white dark:text-stone-950" : "text-stone-600 hover:bg-stone-100 hover:text-stone-950 dark:text-stone-300 dark:hover:bg-white/10 dark:hover:text-white",
-                    );
-                    return (
-                      <SheetClose asChild key={item.href}>
-                        <Link href={item.href} className={className}>{item.label}</Link>
-                      </SheetClose>
-                    );
-                  })}
-                </nav>
-                <SheetFooter className="mt-4 flex flex-col gap-2 border-t border-stone-100 pt-4 dark:border-white/10">
-                  <button
-                    type="button"
-                    className="flex items-center gap-2.5 rounded-xl border border-stone-200 px-3 py-2.5 text-left text-sm font-medium text-stone-700 transition hover:bg-stone-50 dark:border-white/10 dark:text-stone-200 dark:hover:bg-white/10"
-                    onClick={() => setIsKeyDialogOpen(true)}
-                  >
-                    <KeyRound className="size-4 text-stone-500" />
-                    修改个人密钥
-                  </button>
-                  <button
-                    type="button"
-                    className="flex items-center gap-2.5 rounded-xl border border-stone-200 px-3 py-2.5 text-left text-sm font-medium text-stone-700 transition hover:bg-stone-50 dark:border-white/10 dark:text-stone-200 dark:hover:bg-white/10"
-                    onClick={() => setIsApiDocsDialogOpen(true)}
-                  >
-                    <BookOpen className="size-4 text-stone-500" />
-                    接口接入说明
-                  </button>
-                  <button
-                    type="button"
-                    className="flex items-center gap-2.5 rounded-xl border border-stone-200 px-3 py-2.5 text-left text-sm font-medium text-stone-700 transition hover:bg-stone-50 dark:border-white/10 dark:text-stone-200 dark:hover:bg-white/10"
-                    onClick={() => {
-                      window.dispatchEvent(new CustomEvent("open-version-release"));
-                    }}
-                  >
-                    <Sparkles className="size-4 text-stone-500" />
-                    版本更新说明
-                  </button>
-                  <button
-                    type="button"
-                    className="flex items-center gap-2.5 rounded-xl border border-rose-200 px-3 py-2.5 text-left text-sm font-medium text-rose-600 transition hover:bg-rose-50 dark:border-rose-900/40 dark:text-rose-400 dark:hover:bg-rose-950/30"
-                    onClick={() => void handleLogout()}
-                  >
-                    <LogOut className="size-4" />
-                    退出登录
-                  </button>
-                </SheetFooter>
-              </SheetContent>
-            </Sheet>
-            <HeaderActions className="ml-auto xl:hidden" showGithubText={false} />
-          </div>
-          <nav className="hide-scrollbar -mx-1 hidden min-w-0 gap-1 overflow-x-auto px-1 xl:mx-0 xl:flex xl:items-center xl:justify-center xl:gap-5 2xl:gap-8 xl:overflow-visible xl:px-0 xl:absolute xl:left-1/2 xl:top-1/2 xl:-translate-x-1/2 xl:-translate-y-1/2">
-            {canvasHref ? (
-              <button
-                type="button"
-                onClick={handleCanvasOpen}
-                className="relative shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] font-medium text-stone-500 transition hover:text-stone-900 sm:rounded-none sm:px-0 sm:text-[15px] dark:text-stone-400 dark:hover:text-stone-100"
-              >
-                无限画布
+                </div>
+              ))}
+            </nav>
+          </SheetContent>
+        </Sheet>
+        <nav aria-label="快速切换" className="workspace-rail-links">
+          {workspaceItems.map(({ href, icon: Icon, label }) => (
+            <Link
+              key={href}
+              href={href}
+              aria-label={label}
+              aria-current={isItemActive(href) ? "page" : undefined}
+              title={label}
+              className="workspace-rail-link"
+            >
+              <Icon aria-hidden="true" className="size-4" />
+            </Link>
+          ))}
+          <span className="workspace-rail-divider" aria-hidden="true" />
+          {managementItems.map(({ href, icon: Icon, label }) => (
+            <Link
+              key={href}
+              href={href}
+              aria-label={label}
+              aria-current={isItemActive(href) ? "page" : undefined}
+              title={label}
+              className="workspace-rail-link"
+            >
+              <Icon aria-hidden="true" className="size-4" />
+            </Link>
+          ))}
+        </nav>
+        <div className="workspace-rail-utility">
+          <HeaderActions compact />
+          <span className="workspace-rail-divider" aria-hidden="true" />
+          <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+            <PopoverTrigger asChild>
+              <button type="button" aria-label="用户菜单" className="workspace-user-trigger">
+                <User className="size-4" />
               </button>
-            ) : null}
-            {navItems.map((item) => {
-              const active = isItemActive(item.href);
-              return (
+            </PopoverTrigger>
+            <PopoverContent align="end" side="right" sideOffset={10} className="w-56 rounded-2xl p-2 shadow-xl">
+              <div className="border-b border-stone-100 px-2.5 py-2 dark:border-white/10">
+                <p className="text-xs font-semibold text-stone-900 dark:text-stone-100 truncate">{displayName}</p>
+                <p className="mt-0.5 text-[11px] text-stone-400">{roleLabel} 账户</p>
+              </div>
+              <div className="py-1 space-y-0.5">
                 <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "relative shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] font-medium transition sm:rounded-none sm:px-0 sm:text-[15px]",
-                    active
-                      ? "bg-stone-950 text-white sm:bg-transparent sm:font-semibold sm:text-stone-950 dark:bg-white dark:text-stone-950 dark:sm:bg-transparent dark:sm:text-white"
-                      : "text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100",
-                  )}
+                  href="/settings"
+                  onClick={() => setIsPopoverOpen(false)}
+                  className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-stone-700 hover:bg-stone-100 dark:text-stone-200 dark:hover:bg-white/10 transition-colors"
                 >
-                  {item.label}
-                  {active ? <span className="absolute inset-x-0 -bottom-[1px] hidden h-0.5 bg-stone-950 dark:bg-white sm:block" /> : null}
+                  <Settings className="size-3.5 text-stone-500" />
+                  设置
                 </Link>
-              );
-            })}
-          </nav>
-          <div className="hidden items-center justify-end gap-2 xl:flex xl:gap-3">
-            <HeaderActions />
-            <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
-              <PopoverTrigger asChild>
                 <button
                   type="button"
-                  className="group flex items-center gap-2 rounded-full border border-stone-200/80 bg-white/70 py-1 pl-2.5 pr-3 text-xs font-medium text-stone-700 shadow-sm backdrop-blur-sm transition-all hover:border-stone-300 hover:bg-white dark:border-white/10 dark:bg-stone-900/70 dark:text-stone-200 dark:hover:bg-stone-800"
+                  onClick={() => {
+                    setIsPopoverOpen(false);
+                    setIsKeyDialogOpen(true);
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-stone-700 hover:bg-stone-100 dark:text-stone-200 dark:hover:bg-white/10 transition-colors"
                 >
-                  <div className="flex size-5 items-center justify-center rounded-full bg-stone-100 text-stone-600 dark:bg-white/10 dark:text-stone-300">
-                    <User className="size-3" />
-                  </div>
-                  <span className="max-w-[120px] truncate">{displayName}</span>
-                  <span className="rounded-md bg-stone-100 px-1.5 py-0.5 text-[10px] text-stone-500 dark:bg-white/10 dark:text-stone-400">
-                    {roleLabel}
-                  </span>
+                  <KeyRound className="size-3.5 text-stone-500" />
+                  修改个人密钥
                 </button>
-              </PopoverTrigger>
-              <PopoverContent align="end" sideOffset={8} className="w-56 p-2 rounded-2xl shadow-xl">
-                <div className="border-b border-stone-100 px-2.5 py-2 dark:border-white/10">
-                  <p className="text-xs font-semibold text-stone-900 dark:text-stone-100 truncate">{displayName}</p>
-                  <p className="mt-0.5 text-[11px] text-stone-400">{roleLabel} 账户</p>
-                </div>
-                <div className="py-1 space-y-0.5">
-                  <Link
-                    href="/settings"
-                    onClick={() => setIsPopoverOpen(false)}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-stone-700 hover:bg-stone-100 dark:text-stone-200 dark:hover:bg-white/10 transition-colors"
-                  >
-                    <Settings className="size-3.5 text-stone-500" />
-                    设置
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsPopoverOpen(false);
-                      setIsKeyDialogOpen(true);
-                    }}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-stone-700 hover:bg-stone-100 dark:text-stone-200 dark:hover:bg-white/10 transition-colors"
-                  >
-                    <KeyRound className="size-3.5 text-stone-500" />
-                    修改个人密钥
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsPopoverOpen(false);
-                      setIsApiDocsDialogOpen(true);
-                    }}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-stone-700 hover:bg-stone-100 dark:text-stone-200 dark:hover:bg-white/10 transition-colors"
-                  >
-                    <BookOpen className="size-3.5 text-stone-500" />
-                    接口接入说明
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsPopoverOpen(false);
-                      window.dispatchEvent(new CustomEvent("open-version-release"));
-                    }}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-stone-700 hover:bg-stone-100 dark:text-stone-200 dark:hover:bg-white/10 transition-colors"
-                  >
-                    <Sparkles className="size-3.5 text-stone-500" />
-                    版本更新说明
-                  </button>
-                </div>
-                <div className="border-t border-stone-100 pt-1 dark:border-white/10">
-                  <button
-                    type="button"
-                    onClick={() => void handleLogout()}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40 transition-colors"
-                  >
-                    <LogOut className="size-3.5" />
-                    退出登录
-                  </button>
-                </div>
-              </PopoverContent>
-            </Popover>
-          </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPopoverOpen(false);
+                    setIsApiDocsDialogOpen(true);
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-stone-700 hover:bg-stone-100 dark:text-stone-200 dark:hover:bg-white/10 transition-colors"
+                >
+                  <BookOpen className="size-3.5 text-stone-500" />
+                  接口接入说明
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPopoverOpen(false);
+                    window.dispatchEvent(new CustomEvent("open-version-release"));
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-stone-700 hover:bg-stone-100 dark:text-stone-200 dark:hover:bg-white/10 transition-colors"
+                >
+                  <Sparkles className="size-3.5 text-stone-500" />
+                  版本更新说明
+                </button>
+              </div>
+              <div className="border-t border-stone-100 pt-1 dark:border-white/10">
+                <button
+                  type="button"
+                  onClick={() => void handleLogout()}
+                  className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40 transition-colors"
+                >
+                  <LogOut className="size-3.5" />
+                  退出登录
+                </button>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </header>
       <Dialog open={isCanvasDialogOpen} onOpenChange={setIsCanvasDialogOpen}>
@@ -592,7 +537,7 @@ function TopNavInner() {
 
 export function TopNav() {
   return (
-    <Suspense fallback={<header className="border-b border-stone-100/50 dark:border-white/10 min-h-12" />}>
+    <Suspense fallback={null}>
       <TopNavInner />
     </Suspense>
   );

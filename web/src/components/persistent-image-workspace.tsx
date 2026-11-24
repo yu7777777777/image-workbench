@@ -157,6 +157,25 @@ function PersistentImageWorkspaceInner() {
     };
   }, [session, attempt, hasVisitedImage, currentMode, isImageRoute, router]);
 
+  const handleFrameLoad = () => {
+    setReady(true);
+    setSlow(false);
+    const target = frame.current?.contentWindow;
+    if (!target || !session) {
+      return;
+    }
+    const origin = window.location.origin;
+    target.postMessage({ type: "account-pool-session", key: session.key }, origin);
+    target.postMessage(
+      {
+        type: "theme-sync",
+        theme: document.documentElement.classList.contains("dark") ? "dark" : "light",
+      },
+      origin
+    );
+    target.postMessage({ type: "set-app-mode", mode: currentMode }, origin);
+  };
+
   // If user hasn't visited /image yet, or is not logged in, don't mount the iframe
   if (!hasVisitedImage || !session) {
     return null;
@@ -202,6 +221,7 @@ function PersistentImageWorkspaceInner() {
           ref={frame}
           src={`/playground/?v=${encodeURIComponent(process.env.NEXT_PUBLIC_APP_VERSION || "0")}&retry=${attempt}#${currentMode}`}
           title="生图工作台"
+          onLoad={handleFrameLoad}
           className="absolute inset-0 h-full min-h-0 w-full border-0 bg-transparent"
           allow="clipboard-write; fullscreen"
         />

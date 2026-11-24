@@ -45,3 +45,11 @@ python scripts/deploy/deploy.py build     # 构建+打包（产物在 out/deploy
 python scripts/deploy/deploy.py all --yes # 本机直连部署（不再必需，已被自动升级取代）
 python scripts/deploy/check_whitelist.py  # Dockerfile 白名单守护
 ```
+
+## 6. 测试服务器（上线前验证，2026-11-23 起）
+
+- **本地测试服务器**：`192.168.123.27`（凭据在 `本地资料/服务器连接.txt` 的「本地测试服务器」段落）。
+- 运行目录与容器名**刻意与线上同构**（`/opt/chatgpt2api-trial-20261029` + `chatgpt2api-trial-app`），共用 `deploy_config.json`，只有凭据段落不同。
+- 数据从零开始（与线上完全隔离）：测试账号需在测试服务器上单独添加；测试产生的额度消耗走测试账号。
+- 部署方法：`python scripts/deploy/deploy.py --target test all --yes`（`--target test` 要放在子命令前面）。
+- 建议节奏：新版本先 `--target test` 部署验证，通过后再发线上（tag → 自动升级）。

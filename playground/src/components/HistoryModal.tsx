@@ -80,9 +80,10 @@ function formatDetailTime(value: number) {
 type HistoryModalProps = {
   onClose: () => void
   ignoreOutsideClickRef?: RefObject<HTMLElement | null>
+  placement?: 'above' | 'below'
 }
 
-export default function HistoryModal({ onClose, ignoreOutsideClickRef }: HistoryModalProps) {
+export default function HistoryModal({ onClose, ignoreOutsideClickRef, placement = 'below' }: HistoryModalProps) {
   const conversations = useStore((s) => s.agentConversations)
   const activeConversationId = useStore((s) => s.activeAgentConversationId)
   const setActiveConversationId = useStore((s) => s.setActiveAgentConversationId)
@@ -201,9 +202,17 @@ export default function HistoryModal({ onClose, ignoreOutsideClickRef }: History
         onClose()
       }
     }
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.defaultPrevented && !confirmDialogOpen) {
+        onClose()
+        ignoreOutsideClickRef?.current?.focus()
+      }
+    }
+    document.addEventListener('keydown', handleEscape)
     document.addEventListener('mousedown', handleInteract, { capture: true })
     document.addEventListener('touchstart', handleInteract, { capture: true })
     return () => {
+      document.removeEventListener('keydown', handleEscape)
       document.removeEventListener('mousedown', handleInteract, { capture: true })
       document.removeEventListener('touchstart', handleInteract, { capture: true })
     }
@@ -218,17 +227,21 @@ export default function HistoryModal({ onClose, ignoreOutsideClickRef }: History
   }
 
   return (
-    <div 
+    <div
       ref={modalRef}
-      className="absolute top-12 left-0 w-80 sm:w-96 max-w-[calc(100vw-2rem)] max-h-[70vh] bg-white dark:bg-[#1c1c1e] rounded-xl shadow-2xl overflow-hidden flex flex-col border border-gray-200 dark:border-white/10 z-50 text-gray-900 dark:text-gray-200 animate-dropdown-down"
+      role="dialog"
+      aria-label="对话历史"
+      className={`studio-history-panel ${placement === 'above' ? 'bottom-full mb-2' : 'top-12'}`}
     >
       <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-white/10 shrink-0">
-        <input 
-          type="text" 
-          placeholder="搜索聊天..." 
+        <input
+          type="text"
+          autoFocus
+          aria-label="搜索历史对话"
+          placeholder="搜索历史对话"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="flex-1 bg-transparent border-none outline-none text-sm px-2 text-gray-900 dark:text-white placeholder-gray-400"
+          className="studio-history-search"
         />
         <HistoryActionButton tooltip="关闭" onClick={onClose} className="p-1 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg text-gray-500 dark:text-gray-400 transition-colors">
           <CloseIcon className="w-4 h-4" />
@@ -243,10 +256,9 @@ export default function HistoryModal({ onClose, ignoreOutsideClickRef }: History
           <div key={label}>
             <div className="mt-4 mb-1 px-3 text-xs font-medium text-gray-500">{label}</div>
             {items.map(c => (
-              <div 
-                key={c.id} 
-                className="group flex h-14 items-center justify-between gap-2 rounded-lg px-3 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                onClick={() => handleSelect(c.id)}
+              <div
+                key={c.id}
+                className="group flex min-h-12 items-center justify-between gap-2 rounded-lg px-3 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <svg className="w-4 h-4 shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -264,17 +276,17 @@ export default function HistoryModal({ onClose, ignoreOutsideClickRef }: History
                       onBlur={confirmRename}
                     />
                   ) : (
-                    <div className="min-w-0 flex-1">
-                      <div className={`text-sm truncate ${c.id === activeConversationId ? 'text-gray-900 dark:text-white font-medium' : 'text-gray-600 dark:text-gray-300'}`}>
+                    <button type="button" className="min-w-0 flex-1 py-2 text-left" onClick={() => handleSelect(c.id)}>
+                      <span className={`block text-sm truncate ${c.id === activeConversationId ? 'text-gray-900 dark:text-white font-medium' : 'text-gray-600 dark:text-gray-300'}`}>
                         {c.title}
-                      </div>
-                      <div className="hidden sm:block mt-0.5 text-[11px] leading-none text-gray-500">
+                      </span>
+                      <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
                         {formatDetailTime(c.updatedAt)}
-                      </div>
-                    </div>
+                      </span>
+                    </button>
                   )}
                 </div>
-                <div className={`flex shrink-0 items-center justify-end gap-1 overflow-hidden transition-all duration-150 ${editingId === c.id ? 'w-7 opacity-100' : 'w-0 opacity-0 group-hover:w-16 group-hover:opacity-100 group-focus-within:w-16 group-focus-within:opacity-100'}`}>
+                <div className={`flex shrink-0 items-center justify-end gap-1 overflow-hidden transition-all duration-150 ${editingId === c.id ? 'w-7 opacity-100' : 'w-16 opacity-100'}`}>
                   {editingId === c.id ? (
                     <HistoryActionButton
                       tooltip="确认"

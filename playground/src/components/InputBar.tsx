@@ -21,7 +21,8 @@ import { getContentEditableCursor, getContentEditablePlainText, getContentEditab
 import { useHintTooltip } from '../hooks/useHintTooltip'
 import { downloadImageEntriesAsZip, downloadImageIds, formatExportFileTime, getTaskOutputImageZipEntries } from '../lib/downloadImages'
 import SizePickerModal from './SizePickerModal'
-import { CloseIcon, CollapseIcon, ExpandIcon } from './icons'
+import { CloseIcon, CollapseIcon, ExpandIcon, HistoryIcon, PlusIcon } from './icons'
+import HistoryModal from './HistoryModal'
 import ButtonTooltip from './input/buttonTooltip'
 import DragUploadOverlay from './input/dragUploadOverlay'
 import InputBatchBars from './input/inputBatchBars'
@@ -92,6 +93,11 @@ function AtImageOptionThumb({ option }: { option: AtImageOption }) {
 export default function InputBar() {
   const prompt = useStore((s) => s.prompt)
   const appMode = useStore((s) => s.appMode)
+  const createConversation = useStore((s) => s.createAgentConversation)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const historyButtonRef = useRef<HTMLButtonElement>(null)
+  const closeHistory = useCallback(() => setHistoryOpen(false), [])
+  useEffect(closeHistory, [appMode, closeHistory])
   const setPrompt = useStore((s) => s.setPrompt)
   const inputImages = useStore((s) => s.inputImages)
   const addInputImage = useStore((s) => s.addInputImage)
@@ -336,7 +342,7 @@ export default function InputBar() {
   const [submitHover, setSubmitHover] = useState(false)
   const [attachHover, setAttachHover] = useState(false)
   const [imageHintId, setImageHintId] = useState<string | null>(null)
-  const [mobileCollapsed, setMobileCollapsed] = useState(false)
+  const [mobileCollapsed, setMobileCollapsed] = useState(true)
   const [showSizePicker, setShowSizePicker] = useState(false)
   const [showMobileUploadMenu, setShowMobileUploadMenu] = useState(false)
   const [maskPreviewUrl, setMaskPreviewUrl] = useState('')
@@ -345,7 +351,7 @@ export default function InputBar() {
   const [atImageMenuIndex, setAtImageMenuIndex] = useState(0)
   const [atImageMenuDismissed, setAtImageMenuDismissed] = useState(false)
   const [touchDragPreview, setTouchDragPreview] = useState<{ src: string; x: number; y: number } | null>(null)
-  const handleRef = useRef<HTMLDivElement>(null)
+  const handleRef = useRef<HTMLButtonElement>(null)
   const dragTouchRef = useRef({ startY: 0, moved: false })
   const suppressHandleClickUntilRef = useRef(0)
   const imageDragIndexRef = useRef<number | null>(null)
@@ -564,10 +570,10 @@ export default function InputBar() {
   const submitButtonAriaLabel = activeAgentIsRunning
     ? '停止生成'
     : hasSubmitApiConfig
-    ? maskDraft ? '遮罩编辑' : '生成图像'
+    ? appMode === 'agent' ? '发送' : maskDraft ? '遮罩编辑' : '生成图像'
     : '请先配置 API'
   const submitTooltipText = activeAgentIsRunning ? '停止生成' : '尚未完成 API 配置，请在右上角设置中进行'
-  const promptPlaceholder = '描述你想生成的图片，可输入 @ 来指定参考图...'
+  const promptPlaceholder = appMode === 'agent' ? '输入消息，@ 引用图片' : '描述画面，@ 引用参考图'
   const submitCurrentMode = useCallback(() => {
     if (appMode === 'agent') {
       void submitAgentMessage()
@@ -1764,11 +1770,25 @@ export default function InputBar() {
           onDownloadSelected={handleDownloadSelected}
           onDeleteSelected={handleDeleteSelected}
         />
-        <div ref={cardRef} className={`bg-white/70 dark:bg-gray-950/85 backdrop-blur-2xl border border-white/50 dark:border-white/[0.08] shadow-[0_8px_30px_rgb(0,0,0,0.08)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)] rounded-2xl sm:rounded-3xl p-3 sm:p-4 ring-1 ring-black/5 dark:ring-white/10${promptExpanded ? ' flex min-h-0 flex-1 flex-col' : ''}`}>
+        {appMode === 'agent' && isPoolBuild && !promptExpanded && (
+          <div className="studio-conversation-actions" data-no-drag-select>
+            <button ref={historyButtonRef} type="button" aria-expanded={historyOpen} aria-haspopup="dialog" onClick={() => setHistoryOpen(!historyOpen)}>
+              <HistoryIcon aria-hidden="true" />对话历史
+            </button>
+            <button type="button" onClick={() => { closeHistory(); createConversation() }}>
+              <PlusIcon aria-hidden="true" />新建对话
+            </button>
+            {historyOpen && <HistoryModal placement="above" onClose={closeHistory} ignoreOutsideClickRef={historyButtonRef} />}
+          </div>
+        )}
+        <div ref={cardRef} className={`studio-input-card p-3 sm:p-4${promptExpanded ? ' flex min-h-0 flex-1 flex-col' : ''}`}>
           {/* 移动端拖动条 */}
-          <div
+          <button
             ref={handleRef}
-            className={promptExpanded ? 'hidden' : 'sm:hidden flex justify-center pt-0.5 pb-2 -mt-1 cursor-pointer touch-none'}
+            type="button"
+            aria-expanded={!mobileCollapsed}
+            aria-controls="studio-mobile-params"
+            className={promptExpanded ? 'hidden' : 'studio-mobile-params-toggle sm:hidden'}
             onClick={() => {
               if (Date.now() < suppressHandleClickUntilRef.current) {
                 suppressHandleClickUntilRef.current = 0
@@ -1777,8 +1797,9 @@ export default function InputBar() {
               setMobileCollapsed((v) => !v)
             }}
           >
-            <div className={`w-10 h-1 rounded-full bg-gray-300 dark:bg-white/[0.06] transition-transform duration-200 ${mobileCollapsed ? 'scale-x-75' : ''}`} />
-          </div>
+            {mobileCollapsed ? '展开参数' : '收起参数'}
+            <span aria-hidden="true">{mobileCollapsed ? '＋' : '−'}</span>
+          </button>
 
           {/* 输入图片行（移动端可折叠） */}
           {inputImages.length > 0 && (
@@ -1880,10 +1901,12 @@ export default function InputBar() {
                 syncMentionTagSelection(el)
               }}
               aria-label={promptPlaceholder}
-              className={`col-start-1 row-start-1 min-h-[42px] w-full overflow-hidden ios-rounded-scroll-fix whitespace-pre-wrap break-words rounded-2xl border border-gray-200/60 bg-white/50 pl-4 pr-10 py-3 text-sm leading-relaxed shadow-sm outline-none transition-[border-color,box-shadow] duration-200 focus:ring-1 focus:ring-blue-300/40 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-gray-100 dark:focus:ring-blue-500/30${promptExpanded ? ' !h-full !overflow-y-auto' : ''}`}
+              role="textbox"
+              aria-multiline="true"
+              className={`studio-prompt col-start-1 row-start-1 w-full overflow-hidden ios-rounded-scroll-fix whitespace-pre-wrap break-words pl-4 pr-10 py-3 leading-relaxed${promptExpanded ? ' !h-full !overflow-y-auto' : ''}`}
             />
             {prompt.length === 0 && (
-              <div className={`prompt-placeholder col-start-1 row-start-1 pointer-events-none pl-4 pr-10 py-3 text-sm leading-relaxed text-gray-400 dark:text-gray-500${
+              <div aria-hidden="true" className={`studio-prompt-placeholder prompt-placeholder relative col-start-1 row-start-1 pointer-events-none pl-4 pr-10 py-3 leading-relaxed${
                 isMobile && mobileCollapsed ? ' truncate' : ''
               }`}>
                 {promptPlaceholder}
@@ -1938,7 +1961,7 @@ export default function InputBar() {
           {/* 参数 + 按钮 */}
           <div className="mt-3">
             {/* 桌面端布局 */}
-            <div className="hidden sm:flex items-end justify-between gap-3">
+            <div className="studio-composer-controls hidden sm:flex items-end justify-between gap-3">
               {renderParams(
                 appMode === 'agent'
                   ? (availableModels && availableModels.length > 0
@@ -1963,8 +1986,7 @@ export default function InputBar() {
                     className="flex items-center self-center px-2.5 py-1.5 rounded-xl border border-blue-200/60 bg-blue-50/70 text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300 text-xs font-medium shadow-sm whitespace-nowrap select-none"
                     title={`当前模型（${selectedModel}）可用额度：${currentModelQuota.toLocaleString()}（号池总额度：${quotaData?.totalQuota.toLocaleString() || 0}）`}
                   >
-                    <span className="opacity-70 mr-1 text-[11px]">剩余额度</span>
-                    <span className="font-semibold font-mono">{currentModelQuota.toLocaleString()}</span>
+                    {currentModelQuota === 0 ? '当前模型暂无额度' : `剩余额度 ${currentModelQuota.toLocaleString()}`}
                   </div>
                 ) : null}
                 <div
@@ -1975,7 +1997,7 @@ export default function InputBar() {
                   <ButtonTooltip visible={attachHover} text={uploadImageTooltipText} />
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="p-2.5 rounded-xl transition-all shadow-sm bg-gray-200 dark:bg-white/[0.06] hover:bg-gray-300 dark:hover:bg-white/[0.1] text-gray-500 dark:text-gray-300 hover:shadow"
+                    className="studio-attachment-button transition-colors"
                     aria-label={uploadImageTooltipText}
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1992,15 +2014,16 @@ export default function InputBar() {
                   <button
                     onClick={() => activeAgentIsRunning ? stopActiveAgentResponse() : hasSubmitApiConfig ? submitCurrentMode() : setShowSettings(true)}
                     disabled={activeAgentIsRunning ? false : hasSubmitApiConfig ? !canSubmit : false}
-                    className={`p-2.5 rounded-xl transition-all shadow-sm hover:shadow ${
+                    className={`studio-submit inline-flex items-center justify-center gap-1.5 px-3 transition-colors ${
                       activeAgentIsRunning
                         ? 'bg-red-500 text-white hover:bg-red-600'
                         : !hasSubmitApiConfig
-                        ? 'bg-gray-300 dark:bg-white/[0.06] text-white cursor-pointer'
-                        : 'bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-white/[0.04] disabled:opacity-50 disabled:cursor-not-allowed'
+                        ? 'studio-submit-config'
+                        : 'studio-submit-primary'
                     }`}
                     aria-label={submitButtonAriaLabel}
                   >
+                    <span className="hidden md:inline whitespace-nowrap">{submitButtonAriaLabel}</span>
                     {activeAgentIsRunning ? (
                       <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                         <rect x="7" y="7" width="10" height="10" rx="1.5" />
@@ -2017,7 +2040,7 @@ export default function InputBar() {
 
             {/* 移动端布局 */}
             <div className="sm:hidden flex flex-col gap-2">
-              <div className={`collapse-section${mobileCollapsed ? ' collapsed' : ''}`}>
+              <div id="studio-mobile-params" inert={mobileCollapsed} className={`collapse-section${mobileCollapsed ? ' collapsed' : ''}`}>
                 <div className="collapse-inner">
                   {renderParams('grid-cols-2')}
                   <div className="h-2" />
@@ -2038,8 +2061,7 @@ export default function InputBar() {
                     className="flex items-center px-2.5 py-1 rounded-lg bg-blue-50/80 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 text-xs font-medium"
                     title={`当前模型（${selectedModel}）可用额度：${currentModelQuota.toLocaleString()}（号池总额度：${quotaData?.totalQuota.toLocaleString() || 0}）`}
                   >
-                    <span className="opacity-70 mr-1 text-[11px]">剩余额度</span>
-                    <span className="font-semibold font-mono">{currentModelQuota.toLocaleString()}</span>
+                    {currentModelQuota === 0 ? '暂无额度' : `剩余额度 ${currentModelQuota.toLocaleString()}`}
                   </div>
                 ) : null}
                 <div className="flex items-center gap-2 ml-auto">
@@ -2050,7 +2072,7 @@ export default function InputBar() {
                   >
                     <button
                       onClick={() => setShowMobileUploadMenu(!showMobileUploadMenu)}
-                      className="p-2.5 rounded-xl transition-all shadow-sm flex-shrink-0 bg-gray-200 dark:bg-white/[0.06] hover:bg-gray-300 dark:hover:bg-white/[0.1] text-gray-500 dark:text-gray-300"
+                      className="studio-attachment-button transition-colors"
                       aria-label={uploadImageTooltipText}
                     >
                       <svg
@@ -2103,12 +2125,12 @@ export default function InputBar() {
                   <button
                     onClick={() => activeAgentIsRunning ? stopActiveAgentResponse() : hasSubmitApiConfig ? submitCurrentMode() : setShowSettings(true)}
                     disabled={activeAgentIsRunning ? false : hasSubmitApiConfig ? !canSubmit : false}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-medium transition-all shadow-sm ${
+                    className={`studio-submit flex-1 flex items-center justify-center gap-2 px-3 text-sm font-medium transition-colors ${
                       activeAgentIsRunning
                         ? 'bg-red-500 text-white hover:bg-red-600'
                         : !hasSubmitApiConfig
-                        ? 'bg-gray-300 dark:bg-white/[0.06] text-white cursor-pointer'
-                        : 'bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-white/[0.04] disabled:opacity-50 disabled:cursor-not-allowed'
+                        ? 'studio-submit-config'
+                        : 'studio-submit-primary'
                     }`}
                   >
                     {activeAgentIsRunning ? (
@@ -2120,7 +2142,7 @@ export default function InputBar() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                       </svg>
                     )}
-                    {activeAgentIsRunning ? '停止生成' : maskDraft ? '遮罩编辑' : '生成图像'}
+                    {submitButtonAriaLabel}
                   </button>
                 </div>
               </div>

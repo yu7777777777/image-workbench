@@ -26,10 +26,10 @@ export function DateRangeFilter({ startDate, endDate, onChange }: DateRangeFilte
   const label = startDate ? `${startDate} 至 ${endDate || startDate}` : "选择日期范围";
 
   return (
-    <Field className="w-[240px]">
+    <Field className="w-[240px] max-w-full">
       <Popover>
         <PopoverTrigger asChild>
-          <Button variant="outline" className="h-10 justify-start rounded-xl border-stone-200 bg-white px-3 font-normal text-stone-700">
+          <Button variant="outline" className="page-toolbar-control justify-start rounded-[10px] border-border bg-card px-3 font-normal text-foreground shadow-none">
             <CalendarIcon className="size-4 text-stone-400" />
             {label}
           </Button>
