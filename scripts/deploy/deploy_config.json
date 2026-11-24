@@ -10,7 +10,7 @@
   "image_prefix": "chatgpt2api",
   "credentials_file": "服务器连接.txt",
   "credentials_offset": 4,
-  "bun_path": "bun",
+  "bun_path": "C:\\Users\\Administrator\\.bun\\bin\\bun.exe",
   "playground_flags": {
     "VITE_ACCOUNT_POOL": "true",
     "VITE_DEFAULT_API_URL": "",

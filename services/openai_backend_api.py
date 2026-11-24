@@ -101,22 +101,11 @@ EDITABLE_FILE_POLL_INTERVAL_SECS = 5.0
 EDITABLE_FILE_CLIENT_VERSION = "prod-bede35f9dcd856d080e012478f0c1031faa2588e"
 EDITABLE_FILE_CLIENT_BUILD_NUMBER = "6631702"
 EDITABLE_FILE_PSD_OUTPUT_DIR = "data/files/psd"
-EDITABLE_FILE_PPT_OUTPUT_DIR = "data/files/ppt"
-EDITABLE_FILE_PPT_PROMPT = """我需要你根据用户的需求，来制作一个可以编辑的PPT，你可以使用Agent来做，你不要再继续询问用户问题，内容风格、版式、配色、内容结构和页面信息你可以自行补充并直接执行。整体的流程如下：
-1. 用生图的方式，帮我生成一个精美的产品介绍ppt，5-6个页面
-2. 帮我把以上涉及到的所有图像和形状素材拆分成单独png，每个素材单独一张图片，不要有遗漏，让我可以直接在ppt里拼接素材还原，不要文字
-3. 利用以上所有图片和形状素材，帮我还原你第一次生成的展示ppt，我需要是可编辑的ppt格式，主要部分需要你单独还原插入，文字需要可以编辑
-最后只需要给我生成一个PPT文件，以及生成中遇到的各种素材压缩包zip文件就行。"""
 EDITABLE_FILE_PSD_PROMPT = "帮我生成这个图像，把这张海报分成若干图像，包括背景图，每个元素不要改位置，这样子我可以直接在 平时里无需拖动，底色为白色，不要伪透明底。再帮我将以上拆分的图像拼合成一个psd文件，去除白色底，不要改变每个图层的相应位置，保留每个元素所在图层的相应位置，保留每个元素的图层，最后只需要给我输出psd文件，以及每个图层的zip文件"
 EDITABLE_ASSET_POINTER_RE = re.compile(r"(?:file-service|sediment)://([A-Za-z0-9_-]+)")
 EDITABLE_ZIP_MIME_TYPES = {"application/zip", "application/x-zip-compressed"}
 EDITABLE_PSD_MIME_TYPES = {"image/vnd.adobe.photoshop", "application/vnd.adobe.photoshop"}
-EDITABLE_PPT_MIME_TYPES = {
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    "application/vnd.ms-powerpoint",
-}
 EDITABLE_PSD_EXPORT_FILE_RE = re.compile(r"(?:sandbox:)?(/mnt/data/[^\s\"'\)\]]+\.(?:psd|zip))", re.IGNORECASE)
-EDITABLE_PPT_EXPORT_FILE_RE = re.compile(r"(?:sandbox:)?(/mnt/data/[^\s\"'\)\]]+\.(?:pptx?|zip))", re.IGNORECASE)
 FILE_SERVICE_ID_RE = re.compile(r"file-service://([A-Za-z0-9_-]+)")
 FILE_ID_RE = re.compile(r"\b(file[-_](?!service\b)[A-Za-z0-9_-]+)\b")
 # 真正的图片文件 ID 格式：file_00000000 + 24位十六进制字符（共32字符）
@@ -1309,28 +1298,6 @@ class OpenAIBackendAPI:
     def _editable_prompt(fixed_prompt: str, user_prompt_text: str) -> str:
         extra = str(user_prompt_text or "").strip()
         return fixed_prompt if not extra else fixed_prompt + "\n\n以下是用户补充需求，请直接结合执行：\n" + extra
-
-    def export_ppt_zip(
-            self,
-            base64_images: list[str] | None,
-            prompt: str,
-            output_dir: str | Path = EDITABLE_FILE_PPT_OUTPUT_DIR,
-            timeout_secs: float = EDITABLE_FILE_TIMEOUT_SECS,
-            poll_interval_secs: float = EDITABLE_FILE_POLL_INTERVAL_SECS,
-    ) -> EditableFileExportResult:
-        return self._export_editable_file_zip(
-            base64_images or [],
-            self._editable_prompt(EDITABLE_FILE_PPT_PROMPT, prompt),
-            output_dir,
-            primary_label="ppt",
-            primary_suffixes=(".ppt", ".pptx"),
-            primary_mime_types=EDITABLE_PPT_MIME_TYPES,
-            primary_mime_keywords=("presentationml.presentation", "ms-powerpoint"),
-            primary_default_extension=".pptx",
-            export_file_re=EDITABLE_PPT_EXPORT_FILE_RE,
-            timeout_secs=timeout_secs,
-            poll_interval_secs=poll_interval_secs,
-        )
 
     def export_psd_zip(
             self,

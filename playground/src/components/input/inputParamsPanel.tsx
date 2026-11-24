@@ -155,7 +155,7 @@ export default function InputParamsPanel({
   }
 
   return (
-    <div className={`grid ${cols} gap-2 text-xs flex-1`}>
+    <div className={`studio-composer-params grid ${cols} gap-2 text-xs min-w-0 flex-1`}>
       {isAgentMode && agentTextProfiles && agentTextProfiles.length > 0 && (
         <label className="relative flex flex-col gap-0.5 min-w-0">
           <span className="text-gray-400 dark:text-gray-500 ml-1 truncate">对话模型</span>

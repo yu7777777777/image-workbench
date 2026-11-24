@@ -37,7 +37,13 @@ def app_payload_files_list(root: Path = ROOT) -> list[Path]:
     result = [root / "main.py"]
     for line in tracked:
         line = line.strip()
-        if line and line != "main.py" and line.endswith(".py") and line.split("/")[0] in ("api", "services", "utils"):
+        if (
+            line
+            and line != "main.py"
+            and line.endswith(".py")
+            and line.split("/")[0] in ("api", "services", "utils")
+            and (root / line).is_file()
+        ):
             result.append(root / line)
     for name in ("VERSION", "CHANGELOG.md", "RELEASE-NOTES.md"):
         result.append(root / name)
@@ -48,10 +54,12 @@ def app_payload_files_list(root: Path = ROOT) -> list[Path]:
     return existing
 
 
-def read_credentials(root: Path = ROOT, offset: int = 4) -> tuple[str, str, str, str]:
-    """读取 服务器连接.txt，兼容两种格式：
+def read_credentials(root: Path = ROOT, offset: int = 4, target: str = "online") -> tuple[str, str, str, str]:
+    """读取 服务器连接.txt，兼容三种格式：
     - 旧格式：冒号分隔行（offset=4 取第 5-8 个字段 = 新机 host:port:user:password）
-    - 现行格式：3 行 = host/user/password（端口默认 22）；4 行 = host/port/user/password
+    - 单服务器：3 行 = host/user/password（端口默认 22）；4 行 = host/port/user/password
+    - 双服务器（2026-11-23 起）：线上段落（3/4 行）+ 标记行「本地测试服务器」+ 测试段落（3/4 行）。
+      target="online"（默认）读第一段，target="test" 读标记行之后的段落。
     查找位置：项目根目录 或 本地资料/ 目录（1.16.1 起文件归入本地资料文件夹）。
     """
     candidates = [root / "服务器连接.txt", root / "本地资料" / "服务器连接.txt"]
@@ -70,10 +78,21 @@ def read_credentials(root: Path = ROOT, offset: int = 4) -> tuple[str, str, str,
             raise SystemExit(f"服务器连接.txt 字段不足：需要至少 {offset + 4} 个冒号分隔字段，实际 {len(values)} 个")
         host, port, user, password = values[offset:offset + 4]
         return host, port, user, password
-    if len(lines) == 3:
-        host, user, password = lines
+    marker = "本地测试服务器"
+    if marker in lines:
+        marker_index = lines.index(marker)
+        blocks = {"online": lines[:marker_index], "test": lines[marker_index + 1:]}
+    else:
+        blocks = {"online": lines}
+    if target not in blocks or not blocks[target]:
+        raise SystemExit(f"服务器连接.txt 中没有目标「{target}」的凭据段落（缺少标记行「{marker}」或其后无内容）")
+    block = blocks[target]
+    if len(block) == 3:
+        host, user, password = block
         return host, "22", user, password
-    if len(lines) == 4:
-        host, port, user, password = lines
+    if len(block) == 4:
+        host, port, user, password = block
         return host, port, user, password
-    raise SystemExit(f"服务器连接.txt 格式无法识别（{len(lines)} 行）。支持：3 行 host/user/password、4 行 host/port/user/password，或旧冒号分隔格式。")
+    raise SystemExit(
+        f"服务器连接.txt 的「{target}」段落格式无法识别（{len(block)} 行）。支持：3 行 host/user/password、4 行 host/port/user/password。"
+    )

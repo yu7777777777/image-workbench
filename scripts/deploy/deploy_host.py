@@ -53,6 +53,7 @@ class Host:
         self.disk_min_gb = int(cfg.get("disk_min_gb", 4))
         self.keep_images = int(cfg.get("keep_images", 3))
         self.health_url = cfg.get("health_url", "http://127.0.0.1:3000/health?format=json")
+        self.allow_degraded_health = bool(cfg.get("allow_degraded_health", False))
 
     def run(self, arguments: list[str], check: bool = True) -> bytes:
         result = subprocess.run(arguments, capture_output=True)
@@ -281,7 +282,10 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as tar:
             try:
                 with urllib.request.urlopen(self.health_url, timeout=2) as response:
                     result = json.load(response)
-                    if result.get("version") == version and result.get("healthy"):
+                    if result.get("version") == version and (
+                        result.get("healthy")
+                        or (self.allow_degraded_health and result.get("status") == "degraded")
+                    ):
                         return
             except Exception:
                 pass

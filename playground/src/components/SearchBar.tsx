@@ -5,17 +5,20 @@ import { useTooltip } from '../hooks/useTooltip'
 import Select from './Select'
 import { ChevronLeftIcon, CollectionManageIcon, FavoriteIcon, TrashIcon } from './icons'
 import ViewportTooltip from './ViewportTooltip'
+import { useFavoriteCollectionTitle } from './favorites/useFavoriteCollectionTitle'
 
 function SearchActionButton({
   tooltip,
   className,
   disabled = false,
+  pressed,
   onClick,
   children,
 }: {
   tooltip: string
   className: string
   disabled?: boolean
+  pressed?: boolean
   onClick: () => void
   children: ReactNode
 }) {
@@ -33,6 +36,7 @@ function SearchActionButton({
         disabled={disabled}
         className={className}
         aria-label={tooltip}
+        aria-pressed={pressed}
       >
         {children}
       </button>
@@ -69,6 +73,7 @@ export default function SearchBar() {
   })
   const setConfirmDialog = useStore((s) => s.setConfirmDialog)
   const inCollectionOverview = filterFavorite && !activeFavoriteCollectionId
+  const collectionTitle = useFavoriteCollectionTitle()
   const isFailedFilter = filterStatus === 'error'
   const favoriteTooltip = activeFavoriteCollectionId ? '返回收藏夹' : filterFavorite ? '退出收藏夹' : '收藏夹'
 
@@ -123,66 +128,17 @@ export default function SearchBar() {
     })
   }
 
-  const handleStatusChange = (val: any) => {
-    if (val === filterStatus) return
+  const handleStatusChange = (val: string | number) => {
+    if (val === filterStatus || (val !== 'all' && val !== 'done' && val !== 'running' && val !== 'error')) return
     setFilterStatus(val)
     clearSelection()
   }
 
   return (
-    <div ref={rootRef} data-no-drag-select className="mt-6 mb-4 flex gap-3">
-      <div className="flex gap-2 flex-shrink-0 z-20">
-        <SearchActionButton
-          tooltip={favoriteTooltip}
-          onClick={handleFavoriteClick}
-          className={`p-2.5 rounded-xl border transition-all ${
-            filterFavorite
-              ? 'border-yellow-400 bg-yellow-50 dark:bg-yellow-500/10 text-yellow-500'
-              : 'border-gray-200 dark:border-white/[0.08] bg-white dark:bg-gray-900 text-gray-400 hover:bg-gray-50 dark:hover:bg-white/[0.06]'
-          }`}
-        >
-          {activeFavoriteCollectionId ? <ChevronLeftIcon className="w-5 h-5" /> : <FavoriteIcon filled={filterFavorite} className="w-5 h-5" />}
-        </SearchActionButton>
-        {inCollectionOverview && (
-          <SearchActionButton
-            tooltip="管理收藏夹"
-            onClick={openManageCollectionsModal}
-            className="p-2.5 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-gray-900 text-gray-400 hover:bg-gray-50 dark:hover:bg-white/[0.06] transition-all"
-          >
-            <CollectionManageIcon className="w-5 h-5" />
-          </SearchActionButton>
-        )}
-        {!inCollectionOverview && (
-          <>
-            <div className="relative w-[88px]">
-              <Select
-                value={filterStatus}
-                onChange={handleStatusChange}
-                options={[
-                  { label: '全部', value: 'all' },
-                  { label: '已完成', value: 'done' },
-                  { label: '生成中', value: 'running' },
-                  { label: '失败', value: 'error' },
-                ]}
-                className="px-3 py-2.5 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-white/[0.06] text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
-              />
-            </div>
-            {isFailedFilter && (
-              <button
-                type="button"
-                onClick={handleClearFailed}
-                disabled={failedCount === 0}
-                title={failedCount > 0 ? `清除 ${failedCount} 条失败记录` : '没有失败记录'}
-                aria-label={failedCount > 0 ? `清除 ${failedCount} 条失败记录` : '没有失败记录'}
-                className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-400 transition-all hover:bg-gray-50 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:bg-white disabled:hover:text-gray-400 dark:border-white/[0.08] dark:bg-gray-900 dark:text-gray-500 dark:hover:bg-white/[0.06] dark:hover:text-gray-300 dark:disabled:hover:bg-gray-900 dark:disabled:hover:text-gray-500"
-              >
-                <TrashIcon className="h-[18px] w-[18px]" />
-              </button>
-            )}
-          </>
-        )}
-      </div>
-      <div className="relative z-10 flex-1">
+    <div ref={rootRef} data-no-drag-select className="studio-gallery-tools">
+      <h1 className={filterFavorite ? 'studio-gallery-title truncate' : 'sr-only'}>{activeFavoriteCollectionId ? collectionTitle : inCollectionOverview ? '收藏夹' : '作品画廊'}</h1>
+      <div className="studio-search-bar">
+      <div className="relative z-10 min-w-0 flex-1">
         <svg
           className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500"
           fill="none"
@@ -201,9 +157,59 @@ export default function SearchBar() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           type="text"
-          placeholder={inCollectionOverview ? '搜索收藏夹名称...' : '搜索提示词、参数...'}
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
+          aria-label={inCollectionOverview ? '搜索收藏夹' : '搜索作品'}
+          placeholder={inCollectionOverview ? '搜索收藏夹' : '搜索作品'}
+          className="w-full pl-9 pr-3 py-1.5 rounded-lg border text-sm"
         />
+      </div>
+      <div className="flex gap-1.5 sm:gap-2 shrink-0 z-20">
+        <SearchActionButton
+          tooltip={favoriteTooltip}
+          onClick={handleFavoriteClick}
+          pressed={activeFavoriteCollectionId ? undefined : filterFavorite}
+          className="studio-filter-control p-2 rounded-lg border transition-colors"
+        >
+          {activeFavoriteCollectionId ? <ChevronLeftIcon className="w-5 h-5" /> : <FavoriteIcon filled={filterFavorite} className="w-5 h-5" />}
+        </SearchActionButton>
+        {inCollectionOverview && (
+          <SearchActionButton
+            tooltip="管理收藏夹"
+            onClick={openManageCollectionsModal}
+            className="studio-filter-control p-2 rounded-lg border transition-colors"
+          >
+            <CollectionManageIcon className="w-5 h-5" />
+          </SearchActionButton>
+        )}
+        {!inCollectionOverview && (
+          <>
+            <div className="relative w-[88px]">
+              <Select
+                value={filterStatus}
+                onChange={handleStatusChange}
+                options={[
+                  { label: '全部', value: 'all' },
+                  { label: '已完成', value: 'done' },
+                  { label: '生成中', value: 'running' },
+                  { label: '失败', value: 'error' },
+                ]}
+                className="studio-filter-control px-2.5 py-2 rounded-lg border text-sm transition-colors"
+              />
+            </div>
+            {isFailedFilter && (
+              <button
+                type="button"
+                onClick={handleClearFailed}
+                disabled={failedCount === 0}
+                title={failedCount > 0 ? `清除 ${failedCount} 条失败记录` : '没有失败记录'}
+                aria-label={failedCount > 0 ? `清除 ${failedCount} 条失败记录` : '没有失败记录'}
+                className="studio-filter-control flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border transition-colors disabled:cursor-not-allowed disabled:opacity-55"
+              >
+                <TrashIcon className="h-[18px] w-[18px]" />
+              </button>
+            )}
+          </>
+        )}
+      </div>
       </div>
     </div>
   )

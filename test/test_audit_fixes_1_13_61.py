@@ -247,16 +247,16 @@ class EditableFileCleanupTests(unittest.TestCase):
                 "services.editable_file_task_service.EDITABLE_FILE_ROOT",
                 new=Path(tmp_dir) / "files",
             ):
-                output_dir = Path(tmp_dir) / "files" / "ppt" / "task-old"
+                output_dir = Path(tmp_dir) / "files" / "psd" / "task-old"
                 output_dir.mkdir(parents=True, exist_ok=True)
-                (output_dir / "deck.pptx").write_bytes(b"x")
+                (output_dir / "layers.psd").write_bytes(b"x")
                 service = EditableFileTaskService(Path(tmp_dir) / "editable.json")
                 with service._lock:
                     service._tasks["owner:task-old"] = {
                         "id": "task-old",
                         "owner_id": "owner",
                         "status": "success",
-                        "kind": "ppt",
+                        "kind": "psd",
                         "updated_ts": time.time() - 40 * 86400,
                     }
                     removed = service._cleanup_expired_locked()

@@ -189,8 +189,8 @@ export default function App() {
           </Suspense>
         </ErrorBoundary>
       ) : (
-        <main data-home-main data-drag-select-surface className="pb-48">
-          <div className="safe-area-x max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
+        <main data-home-main data-drag-select-surface className="studio-gallery">
+          <div className="safe-area-x mx-auto w-full max-w-[1680px] px-4 sm:px-6 lg:px-8">
             <SearchBar />
             {filterFavorite && !activeFavoriteCollectionId ? <FavoriteCollectionsView /> : <TaskGrid />}
           </div>

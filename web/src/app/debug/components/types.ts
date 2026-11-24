@@ -22,7 +22,7 @@ export type EditableFileTask = {
   id: string;
   taskId?: string;
   status: "queued" | "running" | "success" | "error" | string;
-  kind: "ppt" | "psd" | string;
+  kind: "psd" | string;
   created_at?: string;
   updated_at?: string;
   elapsed_seconds?: number;

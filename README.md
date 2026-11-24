@@ -90,7 +90,6 @@ bun run dev
 - `json` - 本地 JSON 文件（默认）
 - `sqlite` - 本地 SQLite 数据库
 - `postgres` - 外部 PostgreSQL（需配置 `DATABASE_URL`）
-- `git` - Git 私有仓库（需配置 `GIT_REPO_URL` 和 `GIT_TOKEN`）
 
 示例：使用 PostgreSQL
 
@@ -110,7 +109,6 @@ environment:
 - 兼容面向图片场景的 `POST /v1/responses`
 - `GET /v1/models` 返回 `gpt-image-2`、`codex-gpt-image-2`、`auto`、`gpt-5` 系列等模型
 - 支持通过 `n` 返回多张生成结果
-- 支持生成可编辑 PPT 文件
 - 支持生成可编辑 PSD 文件
 - 支持 Codex 画图接口逆向，仅 `Plus` / `Team` / `Pro` 订阅可用，模型别名为 `codex-gpt-image-2`；同一账号可同时拥有官网与 Codex 两份生图额度
 

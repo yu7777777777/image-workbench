@@ -826,7 +826,7 @@ export function AccountImportDialog({ disabled, onImported }: AccountImportDialo
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <Button
-          className="h-10 rounded-xl bg-stone-950 px-4 text-white hover:bg-stone-800"
+          className="page-toolbar-control rounded-[10px] px-4 shadow-none"
           onClick={() => setOpen(true)}
           disabled={disabled}
         >

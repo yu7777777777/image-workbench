@@ -9,6 +9,10 @@ import {
   readChatResponse,
   type RequestMessage,
 } from "@/lib/chat-stream";
+import {
+  readStandaloneChatSettings,
+  saveStandaloneChatSettings,
+} from "@/lib/standalone-chat-settings";
 
 export type ChatImage = { id: string; name: string; url: string };
 export type ChatMessage = {
@@ -54,12 +58,12 @@ let generation = 0;
 let controller: AbortController | null = null;
 let writeQueue = Promise.resolve();
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
-const makeThread = (model: string): ChatThread => ({
+const makeThread = (model: string, effort = model.endsWith("-thinking") ? "standard" : ""): ChatThread => ({
   id: createChatId(),
   title: "新对话",
   updatedAt: Date.now(),
   model,
-  effort: model.endsWith("-thinking") ? "standard" : "",
+  effort,
   system: "",
   messages: [],
 });
@@ -108,7 +112,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       activeId: "",
       busyId: null,
       storageError: "",
-      lastModel: "gpt-6-instant",
+      lastModel: readStandaloneChatSettings(owner).model,
     });
     try {
       await writeQueue;
@@ -122,7 +126,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
             : message,
         ),
       }));
-      if (!threads.length) threads.push(makeThread(saved?.lastModel || "gpt-6-instant"));
+      if (!threads.length) {
+        const defaults = readStandaloneChatSettings(owner);
+        threads.push(makeThread(saved?.lastModel || defaults.model, saved?.lastModel ? undefined : defaults.effort));
+      }
       set({
         threads,
         activeId: threads.some((t) => t.id === saved?.activeId)
@@ -133,7 +140,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       });
     } catch {
       if (ticket !== generation) return;
-      const thread = makeThread("gpt-6-instant");
+      const defaults = readStandaloneChatSettings(owner);
+      const thread = makeThread(defaults.model, defaults.effort);
       set({
         threads: [thread],
         activeId: thread.id,
@@ -143,7 +151,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
   createThread: () => {
-    const thread = makeThread(get().lastModel);
+    const defaults = readStandaloneChatSettings(get().owner);
+    const thread = makeThread(defaults.model, defaults.effort);
     set({ threads: [thread, ...get().threads], activeId: thread.id });
     persist();
   },
@@ -156,6 +165,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
       threads: get().threads.map((t) => (t.id === id ? { ...t, ...patch } : t)),
       ...(patch.model ? { lastModel: patch.model } : {}),
     });
+    if (patch.model && get().owner) {
+      saveStandaloneChatSettings(get().owner, {
+        model: patch.model,
+        effort: patch.effort ?? get().threads.find((thread) => thread.id === id)?.effort ?? "",
+      });
+    }
     persist();
   },
   remove: (id) => {

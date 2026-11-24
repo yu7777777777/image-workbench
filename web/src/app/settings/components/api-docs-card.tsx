@@ -142,27 +142,6 @@ const docs: ApiDoc[] = [
   -F "image=@./input.png"`,
   },
   {
-    title: "创建 PPT 任务",
-    method: "POST",
-    path: "/v1/ppt/generations",
-    icon: FileText,
-    input: [
-      ["prompt", "string", "PPT 需求描述，可为空但建议填写完整主题、页数、风格和内容结构。"],
-      ["base64_images", "string[]", "可选，图片 data URL/base64，用作 PPT 参考素材。"],
-      ["client_task_id", "string", "可选，客户端幂等任务 ID；重复提交同 ID 会返回已有任务。"],
-    ],
-    output: [
-      ["id / taskId", "string", "任务 ID，用于轮询状态。"],
-      ["status", "queued | running | success | error", "任务状态。"],
-      ["kind", "ppt", "任务类型。"],
-      ["created_at / updated_at", "string", "任务创建和更新时间。"],
-    ],
-    example: (baseUrl: string, key: string) => `curl ${baseUrl}/ppt/generations \\
-  -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer ${key}" \\
-  -d '{"prompt":"制作一份 8 页以内的季度业务汇报 PPT","base64_images":[]}'`,
-  },
-  {
     title: "创建 PSD 任务",
     method: "POST",
     path: "/v1/psd/generations",
@@ -209,7 +188,7 @@ const docs: ApiDoc[] = [
       ["file_path", "string", "由任务 result.primary_url 或 result.zip_url 返回，通常不需要手动拼接。"],
     ],
     output: [
-      ["binary", "file", "返回 pptx/psd/zip 文件流。"],
+      ["binary", "file", "返回 psd/zip 文件流。"],
     ],
     example: (baseUrl: string, _key: string) => `curl ${baseUrl.replace(/\/v1$/, "")}/files/<file_path> -o result.zip`,
   },

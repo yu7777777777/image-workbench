@@ -848,57 +848,50 @@ function AccountsPageContent() {
   };
 
   return (
-    <div className="space-y-6">
-      <section className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="space-y-1">
-          <div className="text-xs font-semibold tracking-[0.18em] text-stone-500 uppercase">
-            Account Pool
-          </div>
-          <h1 className="text-2xl font-semibold tracking-tight">号池管理</h1>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            className="h-10 rounded-xl border-stone-200 bg-white/80 px-4 text-stone-700 hover:bg-white"
-            onClick={() => void loadAccounts()}
-            disabled={isLoading || isRefreshing || isDeleting}
-          >
-            <RefreshCw className={cn("size-4", isLoading ? "animate-spin" : "")} />
-            刷新
-          </Button>
-          <Button
-            variant="outline"
-            className="h-10 rounded-xl border-stone-200 bg-white/80 px-4 text-stone-700 hover:bg-white"
-            onClick={() => void handleRefreshAccounts([], true)}
-            disabled={isLoading || isRefreshing || isDeleting || totalFilteredAccounts === 0}
-          >
-            <RefreshCw className={cn("size-4", isRefreshing ? "animate-spin" : "")} />
-            一键刷新所有账号信息和额度
-          </Button>
-          <AccountImportDialog
-            disabled={isLoading || isRefreshing || isDeleting}
-            onImported={() => {
-              void loadAccounts(1);
-              setSelectedIds([]);
-              setPage(1);
-            }}
-          />
-          <Button
-            variant="outline"
-            className="h-10 rounded-xl border-stone-200 bg-white/80 px-4 text-stone-700 hover:bg-white"
-            onClick={() => void handleExportAll()}
-            disabled={isExportingAll || totalFilteredAccounts === 0}
-          >
-            <Download className={cn("size-4", isExportingAll ? "animate-spin" : "")} />
-            {isExportingAll ? "正在导出..." : "导出全部 Token"}
-          </Button>
-        </div>
+    <div className="space-y-5 pt-5">
+      <h1 className="sr-only">号池管理</h1>
+      <section aria-label="号池操作" className="flex flex-wrap items-center gap-2">
+        <Button
+          variant="outline"
+          className="page-toolbar-control rounded-[10px] border-border bg-card px-4 text-foreground shadow-none"
+          onClick={() => void loadAccounts()}
+          disabled={isLoading || isRefreshing || isDeleting}
+        >
+          <RefreshCw className={cn("size-4", isLoading ? "animate-spin" : "")} />
+          刷新
+        </Button>
+        <Button
+          variant="outline"
+          className="page-toolbar-control rounded-[10px] border-border bg-card px-4 text-foreground shadow-none"
+          onClick={() => void handleRefreshAccounts([], true)}
+          disabled={isLoading || isRefreshing || isDeleting || totalFilteredAccounts === 0}
+          title="刷新所有账号信息和额度"
+        >
+          <RefreshCw className={cn("size-4", isRefreshing ? "animate-spin" : "")} />
+          刷新全部账号
+        </Button>
+        <AccountImportDialog
+          disabled={isLoading || isRefreshing || isDeleting}
+          onImported={() => {
+            void loadAccounts(1);
+            setSelectedIds([]);
+            setPage(1);
+          }}
+        />
+        <Button
+          variant="outline"
+          className="page-toolbar-control rounded-[10px] border-border bg-card px-4 text-foreground shadow-none"
+          onClick={() => void handleExportAll()}
+          disabled={isExportingAll || totalFilteredAccounts === 0}
+        >
+          <Download className={cn("size-4", isExportingAll ? "animate-spin" : "")} />
+          {isExportingAll ? "正在导出..." : "导出全部 Token"}
+        </Button>
       </section>
 
       {/* 进度条 */}
       {progress.visible && (
-        <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white/90 shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
           <div className="px-4 py-3">
             <div className="flex items-center justify-between text-sm">
               <span className="text-stone-600">
@@ -988,16 +981,16 @@ function AccountsPageContent() {
       </Dialog>
 
       <section className="space-y-3">
-        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
           {metricCards.map((item) => {
             const Icon = item.icon;
             const value = (refreshSummary ?? summary)[item.key];
             return (
-              <Card key={item.key} className="rounded-2xl border-white/80 bg-white/90 shadow-sm">
-                <CardContent className="p-4">
-                  <div className="mb-4 flex items-start justify-between">
+              <Card key={item.key} className="rounded-xl border-border bg-card shadow-none">
+                <CardContent className="p-3 sm:p-4">
+                  <div className="mb-2 flex items-start justify-between gap-1 sm:mb-4">
                     <span className="text-xs font-medium text-stone-400">{item.label}</span>
-                    <Icon className="size-4 text-stone-400" />
+                    <Icon className="size-4 shrink-0 text-stone-400" />
                   </div>
                   <div className={cn("text-[1.75rem] font-semibold tracking-tight", item.color)}>
                     <span className={typeof value === "number" ? "" : "text-[1.1rem]"}>
@@ -1009,7 +1002,7 @@ function AccountsPageContent() {
             );
           })}
         </div>
-        <Card className="rounded-2xl border-white/80 bg-white/90 shadow-sm">
+        <Card className="rounded-xl border-border bg-card shadow-none">
           <CardContent className="p-4">
             <div className="mb-3 text-sm font-medium text-stone-700">
               系统可用模型
@@ -1072,8 +1065,9 @@ function AccountsPageContent() {
                   setQuery(event.target.value);
                   setPage(1);
                 }}
+                aria-label="搜索邮箱"
                 placeholder="搜索邮箱"
-                className="h-10 rounded-xl border-stone-200 bg-white/85 pl-10"
+                className="page-toolbar-control rounded-[10px] border-border bg-card pl-10 shadow-none"
               />
             </div>
             <Select
@@ -1083,7 +1077,7 @@ function AccountsPageContent() {
                 setPage(1);
               }}
             >
-              <SelectTrigger className="h-10 w-full rounded-xl border-stone-200 bg-white/85 sm:w-[140px]">
+              <SelectTrigger className="page-toolbar-control w-full rounded-[10px] border-border bg-card shadow-none sm:w-[140px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1101,7 +1095,7 @@ function AccountsPageContent() {
                 setPage(1);
               }}
             >
-              <SelectTrigger className="h-10 w-full rounded-xl border-stone-200 bg-white/85 sm:w-[140px]">
+              <SelectTrigger className="page-toolbar-control w-full rounded-[10px] border-border bg-card shadow-none sm:w-[140px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1116,7 +1110,7 @@ function AccountsPageContent() {
         </div>
 
         {isLoading && accounts.length === 0 ? (
-          <Card className="rounded-2xl border-white/80 bg-white/90 shadow-sm">
+          <Card className="rounded-xl border-border bg-card shadow-none">
             <CardContent className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
               <div className="rounded-xl bg-stone-100 p-3 text-stone-500">
                 <LoaderCircle className="size-5 animate-spin" />
@@ -1131,7 +1125,7 @@ function AccountsPageContent() {
 
         <Card
           className={cn(
-            "overflow-hidden rounded-2xl border-white/80 bg-white/90 shadow-sm",
+            "overflow-hidden rounded-xl border-border bg-card shadow-none",
             isLoading && accounts.length === 0 ? "hidden" : "",
           )}
         >

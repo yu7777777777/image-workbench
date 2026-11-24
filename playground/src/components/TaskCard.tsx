@@ -367,16 +367,14 @@ export default function TaskCard({
 
       <div
         ref={cardRef}
-        className={`relative bg-white dark:bg-gray-900 rounded-2xl border overflow-hidden cursor-pointer touch-pan-y will-change-transform duration-200 hover:shadow-lg dark:hover:bg-gray-800/80 ${
-          isSwiping ? '!bg-white dark:!bg-gray-900' : ''
-        } ${
+        className={`studio-task-surface relative rounded-2xl border overflow-hidden cursor-pointer touch-pan-y will-change-transform duration-200 ${
           !isSwiping ? 'transition-[box-shadow,border-color,background-color,transform]' : 'transition-[box-shadow,border-color,background-color]'
         } ${
           task.status === 'running'
             ? 'border-blue-400 generating'
             : isSelected
             ? 'border-blue-500 shadow-md ring-2 ring-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.15)]'
-            : 'border-gray-200 dark:border-white/[0.08] hover:border-gray-300 dark:hover:border-white/[0.18]'
+            : 'studio-task-neutral'
         }`}
         onClick={(e) => {
           if (Date.now() < suppressClickUntilRef.current) {
@@ -418,10 +416,10 @@ export default function TaskCard({
           </svg>
         </div>
       )}
-      <div className="flex h-40">
+      <div className="studio-task-layout">
         {/* 左侧图片区域 */}
         <div
-          className="w-40 min-w-[10rem] h-full bg-gray-100 dark:bg-black/20 relative flex items-center justify-center overflow-hidden flex-shrink-0"
+          className="studio-task-media relative flex items-center justify-center overflow-hidden shrink-0"
           style={isTransparentOutput ? {
             backgroundImage: 'linear-gradient(45deg, #808080 25%, transparent 25%), linear-gradient(-45deg, #808080 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #808080 75%), linear-gradient(-45deg, transparent 75%, #808080 75%)',
             backgroundSize: '16px 16px',
@@ -579,7 +577,7 @@ export default function TaskCard({
         </div>
 
         {/* 右侧信息区域 */}
-        <div className="flex-1 p-3 flex flex-col min-w-0">
+        <div className="studio-task-info flex-1 p-3 flex flex-col min-w-0">
           <div className="flex-1 min-h-0 mb-2 overflow-hidden">
             {showPendingPrompt ? (
               <div className="leading-relaxed">
@@ -587,7 +585,7 @@ export default function TaskCard({
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">输入内容将在响应完成时接收</p>
               </div>
             ) : (
-              <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed line-clamp-3">
+              <p className="studio-task-prompt text-sm text-gray-700 dark:text-gray-300 leading-relaxed line-clamp-3">
                 {task.prompt || '(无提示词)'}
               </p>
             )}
@@ -774,7 +772,6 @@ export default function TaskCard({
                   </svg>
                 </TaskActionButton>
               </div>
-              <div className="absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-white dark:from-gray-900 pointer-events-none sm:hidden" />
             </div>
           </div>
         </div>

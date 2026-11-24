@@ -23,7 +23,7 @@ function typeVariant(type: string): "success" | "danger" | "info" | "violet" | "
   return "outline";
 }
 
-export function VersionReleaseDialog({ className }: { className?: string }) {
+export function VersionReleaseDialog({ className, compact = false }: { className?: string; compact?: boolean }) {
   const {
     open,
     setOpen,
@@ -65,7 +65,8 @@ export function VersionReleaseDialog({ className }: { className?: string }) {
       <button
         type="button"
         className={cn(
-          "relative inline-flex items-center rounded-full border border-stone-200/90 bg-stone-50/90 px-2 py-0.5 text-[11px] font-semibold text-stone-600 transition hover:border-stone-300 hover:bg-stone-100 hover:text-stone-900 dark:border-white/10 dark:bg-white/[0.05] dark:text-stone-300 dark:hover:bg-white/[0.1] dark:hover:text-white cursor-pointer select-none",
+          "relative inline-flex cursor-pointer select-none items-center",
+          compact ? "workspace-version-trigger" : "rounded-full border border-stone-200/90 bg-stone-50/90 px-2 py-0.5 text-[11px] font-semibold text-stone-600 transition hover:border-stone-300 hover:bg-stone-100 hover:text-stone-900 dark:border-white/10 dark:bg-white/[0.05] dark:text-stone-300 dark:hover:bg-white/[0.1] dark:hover:text-white",
           className,
         )}
         onClick={openReleaseModal}
@@ -73,7 +74,7 @@ export function VersionReleaseDialog({ className }: { className?: string }) {
       >
         v{webConfig.appVersion}
         {hasNewVersion ? (
-          <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-stone-900" />
+          <span className={cn("absolute rounded-full bg-emerald-500", compact ? "top-1 right-0 size-1" : "-top-0.5 -right-0.5 size-2 ring-2 ring-white dark:ring-stone-900")} />
         ) : null}
       </button>
       <Dialog open={open} onOpenChange={setOpen}>

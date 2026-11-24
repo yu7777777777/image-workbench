@@ -154,32 +154,27 @@ function LogsContent() {
   }, [type, startDate, endDate]);
 
   return (
-    <section className="space-y-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="space-y-1">
-          <div className="text-xs font-semibold tracking-[0.18em] text-stone-500 uppercase">Logs</div>
-          <h1 className="text-2xl font-semibold tracking-tight">日志管理</h1>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Select value={type} onValueChange={setType}>
-            <SelectTrigger className="h-10 w-[150px] rounded-xl border-stone-200 bg-white"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value={LogType.Call}>调用日志</SelectItem>
-              <SelectItem value={LogType.Account}>账号管理日志</SelectItem>
-            </SelectContent>
-          </Select>
-          <DateRangeFilter startDate={startDate} endDate={endDate} onChange={(start, end) => { setStartDate(start); setEndDate(end); }} />
-          <Button variant="outline" onClick={clearFilters} className="h-10 rounded-xl border-stone-200 bg-white px-4 text-stone-700">
-            清除筛选条件
-          </Button>
-          <Button onClick={() => void loadLogs()} disabled={isLoading} className="h-10 rounded-xl bg-stone-950 px-4 text-white hover:bg-stone-800">
-            {isLoading ? <LoaderCircle className="size-4 animate-spin" /> : <Search className="size-4" />}
-            查询
-          </Button>
-        </div>
+    <section className="space-y-5 pt-5">
+      <h1 className="sr-only">日志管理</h1>
+      <div role="group" aria-label="日志筛选" className="flex flex-wrap items-center gap-2">
+        <Select value={type} onValueChange={setType}>
+          <SelectTrigger className="page-toolbar-control w-[150px] rounded-[10px] border-border bg-card shadow-none"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value={LogType.Call}>调用日志</SelectItem>
+            <SelectItem value={LogType.Account}>账号管理日志</SelectItem>
+          </SelectContent>
+        </Select>
+        <DateRangeFilter startDate={startDate} endDate={endDate} onChange={(start, end) => { setStartDate(start); setEndDate(end); }} />
+        <Button variant="outline" onClick={clearFilters} className="page-toolbar-control rounded-[10px] border-border bg-card px-4 text-foreground shadow-none">
+          清除筛选条件
+        </Button>
+        <Button onClick={() => void loadLogs()} disabled={isLoading} className="page-toolbar-control rounded-[10px] px-4 shadow-none">
+          {isLoading ? <LoaderCircle className="size-4 animate-spin" /> : <Search className="size-4" />}
+          查询
+        </Button>
       </div>
 
-      <Card className="overflow-hidden rounded-2xl border-white/80 bg-white/90 shadow-sm">
+      <Card className="overflow-hidden rounded-xl border-border bg-card shadow-none">
         <CardContent className="p-0">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 px-5 py-4">
             <div className="flex flex-wrap items-center gap-3 text-sm text-stone-600">
@@ -295,6 +290,7 @@ function LogsContent() {
               </TableBody>
             </Table>
           </div>
+          {!isLoading && items.length === 0 ? <div className="px-6 py-14 text-center text-sm text-stone-500">没有找到日志</div> : null}
           <div className="flex items-center justify-end gap-2 border-t border-stone-100 px-4 py-3 text-sm text-stone-500">
             <span>第 {safePage} / {pageCount} 页，共 {items.length} 条</span>
             <Button variant="outline" size="icon" className="size-9 rounded-lg border-stone-200 bg-white" disabled={safePage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>
@@ -304,7 +300,6 @@ function LogsContent() {
               <ChevronRight className="size-4" />
             </Button>
           </div>
-          {!isLoading && items.length === 0 ? <div className="px-6 py-14 text-center text-sm text-stone-500">没有找到日志</div> : null}
         </CardContent>
       </Card>
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useRef, useCallback, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { isPoolBuild } from '../lib/accountPool'
 import type { AgentMessage, AgentRound, TaskRecord } from '../types'
 import { editOutputs, regenerateAgentAssistantMessage, removeMultipleTasks, removeTask, reuseConfig, useStore } from '../store'
 import { getActiveAgentRounds, getAgentBranchLeafId, getConversationSearchText, getAgentRoundTaskIds, getAgentSiblingRounds } from '../lib/agentConversationState'
@@ -48,7 +49,7 @@ function ChatImageThumb({ imageId, imageIndex, maskImageId }: { imageId: string;
   }, [imageId, maskImageId])
 
   return (
-    <div 
+    <div
       className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-lg shadow-sm cursor-pointer transition-opacity hover:opacity-90 ${
         maskImageId ? 'border-2 border-blue-500' : 'border border-gray-200 dark:border-white/[0.08]'
       }`}
@@ -113,10 +114,8 @@ function QuickPrompt({ label }: { label: string }) {
   return (
     <button
       type="button"
-      className="px-3 py-1.5 rounded-full bg-gray-100 dark:bg-zinc-800 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors"
-      onClick={() => {
-        // 这里可以将文本填入输入框，但当前先不实现发送逻辑，只做视觉
-      }}
+      className="studio-agent-example"
+      onClick={() => useStore.getState().setPrompt(label)}
     >
       {label}
     </button>
@@ -206,7 +205,7 @@ export default function AgentWorkspace() {
   const handleHeaderTouchStart = (e: React.TouchEvent) => {
     touchStartY.current = e.touches[0].clientY
   }
-   
+
   const handleTouchMove = (e: React.TouchEvent) => {
     if (touchStartY.current <= 0 || agentMobileHeaderVisible) return
 
@@ -312,7 +311,7 @@ export default function AgentWorkspace() {
   useEffect(() => {
     if (appMode !== 'agent') return
     if (!conversationsLoaded) return
-    
+
     if (conversations.length === 0) {
       createConversation()
     } else if (!conversation) {
@@ -613,13 +612,13 @@ export default function AgentWorkspace() {
   }
 
   return (
-    <main 
-      data-agent-workspace 
+    <main
+      data-agent-workspace
       className="safe-area-x mx-auto flex min-h-[calc(100vh-100px)] flex-col lg:flex-row max-w-[1440px] lg:gap-3 px-4 sm:px-6 lg:px-8 relative overflow-visible transition-all duration-300"
     >
       {/* Pull Down Indicator */}
       {pullDownOffset > 0 && !agentMobileHeaderVisible && (
-        <div 
+        <div
           className="fixed top-0 left-0 right-0 z-50 flex justify-center items-end pointer-events-none sm:hidden"
           style={{ height: `${pullDownOffset + 10}px`, opacity: pullDownOffset / MOBILE_HEADER_PULL_MAX_OFFSET }}
         >
@@ -629,13 +628,13 @@ export default function AgentWorkspace() {
         </div>
       )}
 
-      {/* Mobile Left Sidebar Overlay Backdrop */}
-      {!sidebarCollapsed && (
+      {/* 独立工作台的移动端历史侧栏 */}
+      {!isPoolBuild && !sidebarCollapsed && (
         <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setSidebarCollapsed(true)} />
       )}
-      
+
       {/* Left Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-50 flex w-4/5 max-w-[320px] flex-col border-r border-gray-200 bg-white/95 shadow-2xl backdrop-blur transition-transform duration-300 dark:border-white/[0.08] dark:bg-gray-950/95 lg:hidden ${!sidebarCollapsed ? 'translate-x-0' : '-translate-x-full'}`}>
+      {!isPoolBuild && <aside inert={sidebarCollapsed} className={`fixed inset-y-0 left-0 z-50 flex w-4/5 max-w-[320px] flex-col border-r border-gray-200 bg-white/95 shadow-2xl backdrop-blur transition-transform duration-300 dark:border-white/[0.08] dark:bg-gray-950/95 lg:hidden ${!sidebarCollapsed ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="pl-[max(1rem,env(safe-area-inset-left))] flex h-full min-h-0 w-full flex-col">
           <div className="safe-area-top shrink-0">
             <div className="flex h-14 items-center justify-between gap-2 px-4">
@@ -722,12 +721,12 @@ export default function AgentWorkspace() {
           })}
         </div>
         </div>
-      </aside>
+      </aside>}
 
       {/* Center Chat Area */}
       <section className="min-w-0 flex-1 flex flex-col relative">
         {/* Mobile Header Toggles */}
-        <div className={`sticky top-0 z-20 lg:hidden overflow-hidden transition-all duration-300 ease-in-out ${mobileTopBarVisible ? 'max-h-16 opacity-100 mb-2' : 'max-h-0 opacity-0 mb-0 pointer-events-none'}`}>
+        {!isPoolBuild && <div className={`sticky top-0 z-20 lg:hidden overflow-hidden transition-all duration-300 ease-in-out ${mobileTopBarVisible ? 'max-h-16 opacity-100 mb-2' : 'max-h-0 opacity-0 mb-0 pointer-events-none'}`}>
           <div
             className="flex h-14 items-center justify-between border-b border-gray-200 bg-white/80 px-2 backdrop-blur dark:border-white/[0.08] dark:bg-gray-950/80"
             onTouchStart={handleHeaderTouchStart}
@@ -753,34 +752,32 @@ export default function AgentWorkspace() {
               <EditIcon className="w-5 h-5" />
             </button>
           </div>
-        </div>
+        </div>}
 
-        <div 
+        <div
           ref={scrollContainerRef}
-          className="flex-1 space-y-4 overflow-visible pb-[calc(var(--input-bar-clearance,12rem)+1.5rem)] px-1 lg:pt-14 lg:px-4"
+          className="studio-agent-content flex-1 space-y-4 overflow-visible px-1 lg:px-4"
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
         >
           {!conversation ? (
-            <div className="py-20 text-center text-gray-400">
-              <p className="mb-3">还没有 Agent 对话</p>
-              <button type="button" onClick={createConversation} className="rounded-lg bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 transition-colors">创建对话</button>
+            <div className="studio-agent-welcome">
+              <h1 className="studio-empty-title">开始新对话</h1>
+              <p className="studio-empty-description">描述想法，或引用图片继续修改。</p>
+              {!isPoolBuild && <button type="button" onClick={createConversation} className="studio-agent-example">创建对话</button>}
             </div>
           ) : (
             (() => {
               if (activeMessages.length === 0) {
                 return (
-                  <div className="flex flex-col items-center justify-center h-full text-center px-6 py-12">
-                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center mb-4">
-                      <span className="text-3xl">✨</span>
-                    </div>
-                    <h3 className="text-base font-medium text-gray-700 dark:text-gray-300 mb-2">开始 AI 对话</h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-500 mb-6 max-w-sm">描述你想生成的图片，AI 会帮你实现</p>
-                    <div className="flex flex-wrap gap-2 justify-center">
-                      <QuickPrompt label="🌅 美丽的日落风景" />
-                      <QuickPrompt label="🐱 可爱的卡通猫咪" />
-                      <QuickPrompt label="🏙️ 未来城市概念图" />
+                  <div className="studio-agent-welcome">
+                    <h1 className="studio-empty-title">开始新对话</h1>
+                    <p className="studio-empty-description">描述想法，或引用图片继续修改。</p>
+                    <div className="studio-empty-actions">
+                      <QuickPrompt label="海岸日落的胶片照片" />
+                      <QuickPrompt label="水彩风格的猫咪插画" />
+                      <QuickPrompt label="雨夜里的未来城市" />
                     </div>
                   </div>
                 )
@@ -805,11 +802,6 @@ export default function AgentWorkspace() {
                 const parts = getPromptMentionParts(message.content, inputImagesForRound)
                 return (
                   <div key={message.id} className={`flex w-full mb-6 ${isAssistant ? 'justify-start' : 'justify-end'}`}>
-                    {isAssistant && (
-                      <div className="w-6 h-6 rounded-full bg-purple-500/20 flex items-center justify-center flex-shrink-0 mt-1 mr-2">
-                        <span className="text-xs">✨</span>
-                      </div>
-                    )}
                     <div
                       ref={(node) => {
                         if (!isAssistant && node) messageRefs.current.set(message.roundId, node)
@@ -817,19 +809,19 @@ export default function AgentWorkspace() {
                       }}
                       className={`group flex max-w-[95%] flex-col md:max-w-[85%] lg:max-w-[75%] ${isAssistant ? 'items-start' : 'items-end'}`}
                     >
-                      <article 
+                      <article
                         className={`relative flex min-w-[16rem] max-w-full flex-col rounded-2xl p-4 transition-all duration-200 ${
-                        isAssistant 
-                          ? 'bg-white/70 dark:bg-white/[0.03] border border-gray-200 dark:border-white/[0.08] rounded-tl-sm hover:bg-white dark:hover:bg-white/[0.04]' 
-                          : `bg-gray-100 dark:bg-[#2A2D31] rounded-tr-sm ${isEditing ? 'ring-2 ring-blue-500/50 dark:ring-blue-400/50' : ''}`
+                        isAssistant
+                          ? 'studio-agent-answer'
+                          : `studio-agent-message ${isEditing ? 'ring-2 ring-neutral-400' : ''}`
                       }`}
                       >
                     <div className="mb-2 flex items-center justify-between gap-4 text-sm text-gray-500 dark:text-gray-400">
                       <span className="font-medium">
-                         <span className={isAssistant ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-700 dark:text-gray-200 font-semibold'}>{isAssistant ? 'Agent' : '用户'}</span> <span className="opacity-60 font-normal ml-1">· 第 {round?.index ?? '?'} 轮</span>
+                         <span className="font-semibold text-neutral-700 dark:text-neutral-200">{isAssistant ? 'Agent' : '用户'}</span> <span className="opacity-60 font-normal ml-1">· 第 {round?.index ?? '?'} 轮</span>
                       </span>
                     </div>
-                    
+
                     {message.role === 'user' && round && round.inputImageIds.length > 0 && (
                       <div className="flex gap-2 mb-3 overflow-x-auto pb-1" onClick={e => e.stopPropagation()}>
                           {round.inputImageIds.map((imgId, imageIndex) => (
