@@ -115,10 +115,9 @@ export default function InputParamsPanel({
   onAgentImageProfileChange?: (profileId: string) => void
   poolProfileAvailable?: boolean
 }) {
-  // Build combined image options: pool model names + external image profiles (both Gallery and Agent modes)
-  // 账号池可用时不再追加配置条目（本站账号池/默认与池模型指向同一资源，只保留池模型一项）；
-  // 池不可用时才列出外部配置作为后备入口。
-  const profileEntries = poolProfileAvailable ? [] : (agentImageProfiles ?? [])
+  const profileEntries = (agentImageProfiles ?? []).filter((profile) =>
+    !poolProfileAvailable || (profile.id !== POOL_PROFILE_ID && Boolean(profile.apiKey)),
+  )
   const combinedImageOptions = (poolProfileAvailable || (agentImageProfiles && agentImageProfiles.length > 0))
     ? [
         ...(availableModels ?? []).map((m) => {
@@ -177,7 +176,9 @@ export default function InputParamsPanel({
           <span className="text-gray-400 dark:text-gray-500 ml-1 truncate">{isAgentMode ? '生图模型' : '模型'}</span>
           {combinedImageOptions ? (
             <Select
-              value={combinedImageValue ?? combinedImageOptions[0]?.value ?? ''}
+              value={combinedImageOptions.find((option) => option.value === combinedImageValue)?.value
+                ?? (combinedImageOptions.length ? '选择生图模型' : '暂无可用模型')}
+              disabled={combinedImageOptions.length === 0}
               onChange={handleCombinedImageChange}
               options={combinedImageOptions}
               showValueTooltips={false}

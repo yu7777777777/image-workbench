@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { MessageCircle } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CHAT_FAMILIES, CHAT_LEVELS, chatSelection } from "@/lib/chat-models";
+import { useChatModels } from "@/hooks/use-chat-models";
+import { CHAT_LEVELS, chatChoice, chatFamilies, chatLevelAvailable, chatSelection } from "@/lib/chat-models";
 import {
-  chatSettingsFromChoice,
   DEFAULT_STANDALONE_CHAT_SETTINGS,
   readStandaloneChatSettings,
   saveStandaloneChatSettings,
@@ -20,14 +20,15 @@ export function StandaloneChatSettingsCard({ owner }: { owner: string }) {
     setSettings(readStandaloneChatSettings(owner));
   }, [owner]);
 
-  const selection = useMemo(
-    () => chatSelection(settings.model, settings.effort) || { family: "gpt-6", level: "instant" },
-    [settings],
-  );
+  const { models, isLoadingModels, modelError, retry } = useChatModels(owner);
+  const selection = chatSelection(settings.model, settings.effort);
+  const families = chatFamilies(models);
+  const family = families.find(({ id }) => id === selection?.family)?.id ?? "";
+  const levels = CHAT_LEVELS.filter((level) => chatLevelAvailable(family, level.id, models));
 
   const update = (family: string, level: string) => {
-    const next = chatSettingsFromChoice(family, level);
-    if (!next) return;
+    const next = chatChoice(family, level, models);
+    if (!next || !models.includes(next.model)) return;
     setSettings(next);
     saveStandaloneChatSettings(owner, next);
   };
@@ -46,12 +47,16 @@ export function StandaloneChatSettingsCard({ owner }: { owner: string }) {
       <CardContent className="grid gap-4 sm:grid-cols-2">
         <label className="space-y-2">
           <span className="text-sm text-stone-700">默认模型</span>
-          <Select value={selection.family} onValueChange={(family) => update(family, selection.level)}>
+          <Select value={family} disabled={!families.length} onValueChange={(id) => {
+            const choices = CHAT_LEVELS.filter((level) => chatLevelAvailable(id, level.id, models));
+            const level = choices.find((item) => item.id === selection?.level) ?? choices[0];
+            if (level) update(id, level.id);
+          }}>
             <SelectTrigger className="h-10 rounded-[10px] border-border bg-card shadow-none">
-              <SelectValue />
+              <SelectValue placeholder={isLoadingModels ? "正在加载模型…" : families.length ? "选择模型" : "暂无可用模型"} />
             </SelectTrigger>
             <SelectContent>
-              {CHAT_FAMILIES.map((family) => (
+              {families.map((family) => (
                 <SelectItem key={family.id} value={family.id}>{family.label}</SelectItem>
               ))}
             </SelectContent>
@@ -59,17 +64,19 @@ export function StandaloneChatSettingsCard({ owner }: { owner: string }) {
         </label>
         <label className="space-y-2">
           <span className="text-sm text-stone-700">默认思考程度</span>
-          <Select value={selection.level} onValueChange={(level) => update(selection.family, level)}>
+          <Select value={levels.find(({ id }) => id === selection?.level)?.id ?? ""} disabled={!levels.length}
+            onValueChange={(level) => update(family, level)}>
             <SelectTrigger className="h-10 rounded-[10px] border-border bg-card shadow-none">
-              <SelectValue />
+              <SelectValue placeholder="选择思考程度" />
             </SelectTrigger>
             <SelectContent>
-              {CHAT_LEVELS.map((level) => (
+              {levels.map((level) => (
                 <SelectItem key={level.id} value={level.id}>{level.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </label>
+        {modelError && <button type="button" className="text-left text-xs underline" onClick={retry}>{modelError}</button>}
       </CardContent>
     </Card>
   );

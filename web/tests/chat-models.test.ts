@@ -18,3 +18,12 @@ test("legacy and unknown models are never silently relabelled", () => {
   expect(chatChoice("unknown", "standard")).toBeNull();
   expect(chatChoice("gpt-6", "unknown")).toBeNull();
 });
+
+test("bare upstream family models can use thinking effort presets", () => {
+  expect(chatSelection("gpt-6", "")).toEqual({ family: "gpt-6", level: "instant" });
+  expect(chatChoice("gpt-6", "extended", ["gpt-6"])).toEqual({ model: "gpt-6", effort: "extended" });
+  expect(chatLevelAvailable("gpt-6", "instant", ["gpt-6"])).toBe(true);
+  expect(chatLevelAvailable("gpt-6", "extended", ["gpt-6"])).toBe(true);
+  expect(chatLevelAvailable("gpt-6", "max", ["gpt-6"])).toBe(false);
+  expect(chatLevelAvailable("gpt-6", "pro", ["gpt-6"])).toBe(false);
+});

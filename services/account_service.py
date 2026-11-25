@@ -979,6 +979,19 @@ class AccountService:
                and self._image_unavailable_until.get(token, 0.0) <= time.monotonic()
         ]
 
+    def available_image_account_plans(self) -> set[tuple[str, str]]:
+        with self._lock:
+            plans = set()
+            for token in self._list_ready_candidate_tokens():
+                account = self._accounts[token]
+                remaining = self._token_expires_in(token)
+                if remaining is not None and remaining <= 0 and not account.get("refresh_token"):
+                    continue
+                source = self._normalize_source_type(account.get("source_type"))
+                plan = self._normalize_account_type(account.get("type"))
+                plans.add((source, (plan or "").lower()))
+            return plans
+
     def _image_candidate_priority(self, token: str) -> tuple[int, bool, bool]:
         account = self._accounts.get(token) or {}
         remaining = self._token_expires_in(token)

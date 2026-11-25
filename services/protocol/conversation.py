@@ -18,7 +18,9 @@ from services.openai_backend_api import ImageContentPolicyError, ImagePollTimeou
 from services.upload_limits import UPLOAD_LIMIT_MESSAGE, is_file_upload_limit, mark_upload_limited, upload_limited_tokens
 from utils.helper import (
     IMAGE_MODELS,
+    IMAGE_MODEL_PLAN_TYPES,
     UpstreamHTTPError,
+    WEB_IMAGE_ACCOUNT_SOURCES,
     extract_image_from_message_content,
     is_codex_image_model,
     is_supported_image_model,
@@ -1494,8 +1496,8 @@ def _generate_single_image(
                 plan_type=plan_type,
                 # 官网 /backend-api/f/conversation 不接受 Codex OAuth 账号；
                 # Codex 账号必须走 /backend-api/codex/responses。
-                source_type="codex" if codex_model else ("oauth_login", "password", "web"),
-                plan_types=("plus", "team", "pro") if codex_model and not plan_type else None,
+                source_type="codex" if codex_model else WEB_IMAGE_ACCOUNT_SOURCES,
+                plan_types=IMAGE_MODEL_PLAN_TYPES if codex_model and not plan_type else None,
                 **({"excluded_tokens": exclusions} if exclusions else {}),
             )
         except RuntimeError as exc:

@@ -22,6 +22,7 @@ BASE_IMAGE_MODELS = {
     "gpt-image-2.5-sunburst",
 }
 IMAGE_MODEL_PLAN_TYPES = ("plus", "team", "pro")
+WEB_IMAGE_ACCOUNT_SOURCES = ("oauth_login", "password", "web")
 CODEX_IMAGE_MODEL = "codex-gpt-image-2"
 CODEX_IMAGE_MODELS = {
     "codex-gpt-image-2",
@@ -148,6 +149,10 @@ def is_codex_image_model(model: object) -> bool:
     if not base_model:
         return False
     return base_model in CODEX_IMAGE_MODELS or "codex" in base_model or "2.5" in base_model
+
+
+def looks_like_image_model(model: str) -> bool:
+    return bool(re.search(r"(?:^|[-_])image(?:[-_.]|$)", model, re.IGNORECASE))
 
 
 def is_image_chat_request(body: dict[str, object]) -> bool:

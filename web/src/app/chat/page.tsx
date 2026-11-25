@@ -40,9 +40,16 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthGuard } from "@/lib/use-auth-guard";
-import { fetchModels } from "@/lib/api";
-import { createChatId, isChatModel } from "@/lib/chat-stream";
-import { CHAT_FAMILIES, CHAT_LEVELS, chatSelection, chatChoice, chatModelLabel } from "@/lib/chat-models";
+import { useChatModels } from "@/hooks/use-chat-models";
+import { createChatId } from "@/lib/chat-stream";
+import {
+  CHAT_LEVELS,
+  chatFamilies,
+  chatLevelAvailable,
+  chatSelection,
+  chatChoice,
+  chatModelLabel,
+} from "@/lib/chat-models";
 import { useChatStore, type ChatImage, type ChatThread } from "@/store/chat";
 import "./chat.css";
 
@@ -105,8 +112,6 @@ function readImage(file: File): Promise<ChatImage> {
 export default function ChatPage() {
   const { session, isCheckingAuth } = useAuthGuard();
   const chat = useChatStore();
-  const [models, setModels] = useState<string[]>([]);
-  const [modelError, setModelError] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [settings, setSettings] = useState(false);
   const [query, setQuery] = useState("");
@@ -119,6 +124,7 @@ export default function ChatPage() {
   const following = useRef(true);
   const thread = chat.threads.find((t) => t.id === chat.activeId);
   const owner = session ? `${session.role}:${session.subjectId}` : "";
+  const { models, modelError, isLoadingModels, retry: loadModels } = useChatModels(owner);
   useEffect(() => {
     if (owner) void useChatStore.getState().load(owner);
   }, [owner]);
@@ -129,25 +135,15 @@ export default function ChatPage() {
       useChatStore.getState().stop();
     };
   }, []);
-  const loadModels = () => {
-    setModelError("");
-    void fetchModels({ force: true })
-      .then((result) =>
-        setModels(
-          Array.from(
-            new Set([
-              ...result.data.map((m) => m.id).filter(isChatModel),
-            ]),
-          ),
-        ),
-      )
-      .catch(() =>
-        setModelError("模型列表加载失败，请点击重试。"),
-      );
-  };
   useEffect(() => {
-    if (owner) loadModels();
-  }, [owner]);
+    if (!thread || !models.length) return;
+    const current = chatSelection(thread.model, thread.effort);
+    if (!current) return;
+    const next = chatChoice(current.family, current.level, models);
+    if (next && models.includes(next.model) && next.model !== thread.model) {
+      useChatStore.getState().update(thread.id, next);
+    }
+  }, [models, thread?.effort, thread?.id, thread?.model]);
   useEffect(() => {
     following.current = true;
     setAtBottom(true);
@@ -171,10 +167,12 @@ export default function ChatPage() {
     );
   const busy = chat.busyId === thread.id;
   const selection = chatSelection(thread.model, thread.effort);
+  const families = chatFamilies(models);
+  const selectedFamily = families.find(({ id }) => id === selection?.family)?.id ?? "";
   const canSend = !!selection && models.includes(thread.model) && !modelError
-    && (selection.level !== "max" || models.includes(`${selection.family}-pro`));
+    && chatLevelAvailable(selection.family, selection.level, models);
   const choose = (family: string, level: string) => {
-    const next = chatChoice(family, level);
+    const next = chatChoice(family, level, models);
     if (next && models.includes(next.model)) chat.update(thread.id, next);
   };
   const list = (
@@ -247,8 +245,10 @@ export default function ChatPage() {
 
   const notices = (
     <>
-      {!selection && <div className="chat-notice">历史模型设置已保留（{thread.model}）。请选择输入框下方的模型后继续，已有消息不会改变。</div>}
-      {selection && !models.includes(thread.model) && !modelError && <div className="chat-notice">正在确认模型目录；若当前模型不可用，请切换模型或思考程度。</div>}
+      {isLoadingModels && <div className="chat-notice">正在加载模型目录…</div>}
+      {!isLoadingModels && !modelError && !canSend && <div className="chat-notice">
+        {models.length ? "当前模型设置不可用，请选择可用的模型和思考程度。" : "当前账号池暂无可用的对话模型。"}
+      </div>}
       {modelError && (
         <button className="chat-notice text-left" onClick={loadModels}>
           {modelError}
@@ -279,11 +279,11 @@ export default function ChatPage() {
   const modelControls = (
     <div className="chat-model-controls">
       <Select
-        value={selection?.family || ""}
-        disabled={busy}
+        value={selectedFamily}
+        disabled={busy || !families.length}
         onValueChange={(family) => {
-          const level = CHAT_LEVELS.find((item) => item.id === selection?.level && models.includes(`${family}-${item.suffix}`))
-            || CHAT_LEVELS.find((item) => models.includes(`${family}-${item.suffix}`));
+          const levels = CHAT_LEVELS.filter((item) => chatLevelAvailable(family, item.id, models));
+          const level = levels.find((item) => item.id === selection?.level) ?? levels[0];
           if (level) choose(family, level.id);
         }}
       >
@@ -294,23 +294,21 @@ export default function ChatPage() {
           <SelectValue placeholder="选择模型" />
         </SelectTrigger>
         <SelectContent>
-          {CHAT_FAMILIES.map((family) => (
-            <SelectItem key={family.id} value={family.id}
-              disabled={!CHAT_LEVELS.some((level) => models.includes(`${family.id}-${level.suffix}`))}>
+          {families.map((family) => (
+            <SelectItem key={family.id} value={family.id}>
               {family.label}
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
-      <Select value={selection?.level || ""} disabled={busy || !selection}
+      <Select value={selection && chatLevelAvailable(selection.family, selection.level, models) ? selection.level : ""} disabled={busy || !selectedFamily}
         onValueChange={(level) => selection && choose(selection.family, level)}>
         <SelectTrigger aria-label="选择思考程度" className="chat-model-control">
           <SelectValue placeholder="思考程度" />
         </SelectTrigger>
         <SelectContent>
-          {CHAT_LEVELS.map((level) => <SelectItem key={level.id} value={level.id}
-            disabled={!selection || !models.includes(`${selection.family}-${level.suffix}`)
-              || (level.id === "max" && !models.includes(`${selection.family}-pro`))}>
+          {CHAT_LEVELS.filter((level) => selection && chatLevelAvailable(selection.family, level.id, models))
+            .map((level) => <SelectItem key={level.id} value={level.id}>
             {level.label}
           </SelectItem>)}
         </SelectContent>

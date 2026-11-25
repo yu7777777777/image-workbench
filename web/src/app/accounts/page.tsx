@@ -286,32 +286,38 @@ function AccountsPageContent() {
     [page, pageSize, query, statusFilter, typeFilter],
   );
 
-  const loadModels = async () => {
+  const loadModels = useCallback(async () => {
+    if (document.hidden) return;
     setIsLoadingModels(true);
     setModelLoadError(null);
     try {
-      const data = await fetchModels();
+      const data = await fetchModels({ force: true });
       setAvailableModels(Array.isArray(data.data) ? data.data : []);
     } catch (error) {
       const message = error instanceof Error ? error.message : "加载模型列表失败";
+      setAvailableModels([]);
       setModelLoadError(message);
       toast.error(message);
     } finally {
       setIsLoadingModels(false);
     }
-  };
+  }, []);
 
   // 初始加载模型
   useEffect(() => {
     mountedRef.current = true;
     void loadModels();
+    window.addEventListener("focus", loadModels);
+    const timer = window.setInterval(loadModels, 60_000);
     return () => {
+      window.removeEventListener("focus", loadModels);
+      window.clearInterval(timer);
       mountedRef.current = false;
       pollTimersRef.current.forEach(clearInterval);
       pollTimersRef.current.clear();
       if (progressRef.current) clearInterval(progressRef.current);
     };
-  }, []);
+  }, [loadModels]);
 
   // 分页、筛选变化时加载数据
   useEffect(() => {
@@ -1008,6 +1014,9 @@ function AccountsPageContent() {
               系统可用模型
               <span className="ml-1 text-stone-400">({availableModels.length})</span>
             </div>
+            <p className="mb-3 text-xs leading-5 text-stone-500">
+              根据账号池的模型目录和生图额度更新。
+            </p>
             <div className="flex flex-wrap gap-2">
               {availableModels.length > 0 ? (
                 availableModels.map((model) => (

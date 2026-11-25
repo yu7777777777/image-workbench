@@ -761,12 +761,32 @@ input[type="number"] {
 
 .studio-task-media {
   width: 100%;
-  aspect-ratio: 16 / 8;
+  aspect-ratio: 1 / 1;
   background: hsl(var(--panel-surface));
 }
 
 .studio-task-info {
-  min-height: 6.5rem;
+  min-height: 3.5rem;
+}
+
+.studio-task-prompt-wrap {
+  display: none;
+}
+
+.studio-task-actions {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 12;
+  border: 1px solid rgb(255 255 255 / 0.72);
+  border-radius: 0.55rem;
+  background: rgb(255 255 255 / 0.86);
+  box-shadow: 0 2px 8px rgb(15 23 42 / 0.12);
+  backdrop-filter: blur(8px);
+}
+
+.studio-task-actions > div {
+  padding: 0.125rem;
 }
 
 .studio-task-prompt {
@@ -775,11 +795,35 @@ input[type="number"] {
 
 .studio-agent-content {
   padding-top: 1rem;
-  padding-bottom: calc(var(--input-bar-clearance, 12rem) + 1.5rem);
+  padding-bottom: 1.5rem;
+}
+
+.studio-agent-shell {
+  display: flex;
+  height: 100dvh;
+  flex-direction: column;
+}
+
+.studio-agent-workspace {
+  width: 100%;
+}
+
+.studio-agent-input-bar {
+  padding: 0.5rem 0.75rem max(0.75rem, env(safe-area-inset-bottom));
+}
+
+.studio-agent-input-bar > .studio-conversation-actions,
+.studio-agent-input-bar > .studio-input-card {
+  width: min(100%, 64rem);
+  margin-inline: auto;
+}
+
+.studio-agent-input-bar > .studio-conversation-actions {
+  padding-inline: 0.75rem;
 }
 
 .studio-agent-welcome {
-  min-height: max(13rem, calc(100dvh - var(--input-bar-clearance, 12rem) - 3.5rem));
+  min-height: max(13rem, calc(100% - 3.5rem));
   display: flex;
   flex-direction: column;
   align-items: center;

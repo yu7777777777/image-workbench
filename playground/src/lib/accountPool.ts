@@ -10,12 +10,6 @@ export const POOL_KEY = 'chatgpt2api-session'
 export const isPoolBuild = import.meta.env.VITE_ACCOUNT_POOL === 'true'
 /** 共享模型列表可能已更新（后台重试成功 / 外层页面通知）时广播，界面据此重读配置列表。 */
 export const SHARED_PROFILES_SYNCED_EVENT = 'chatgpt2api:shared-profiles-synced'
-export const POOL_IMAGE_MODELS = new Set([
-  'gpt-image-2',
-  'gpt-image-2.5',
-  'gpt-image-2.5-flare',
-  'gpt-image-2.5-sunburst',
-])
 
 export interface SharedProfileItem {
   id: string
@@ -182,8 +176,8 @@ export function poolSettings(settings: AppSettings, origin: string): Partial<App
     description: '使用当前登录账号。支持文生图、参考图和局部编辑；单次最多 4 张。',
     baseUrl: `${origin}/v1`,
     apiKey: POOL_KEY,
-    model: existing?.model && POOL_IMAGE_MODELS.has(existing.model) ? existing.model : 'gpt-image-2',
-    imageGenerationModel: existing?.imageGenerationModel && POOL_IMAGE_MODELS.has(existing.imageGenerationModel) ? existing.imageGenerationModel : 'gpt-image-2',
+    model: existing?.model || 'gpt-image-2',
+    imageGenerationModel: existing?.imageGenerationModel || 'gpt-image-2',
     apiMode: 'images',
     apiProxy: false,
     codexCli: false,
@@ -199,7 +193,7 @@ export function poolSettings(settings: AppSettings, origin: string): Partial<App
     baseUrl: `${origin}/v1`,
     apiKey: POOL_KEY,
     model: 'auto',
-    imageGenerationModel: existingAgent?.imageGenerationModel && POOL_IMAGE_MODELS.has(existingAgent.imageGenerationModel) ? existingAgent.imageGenerationModel : 'gpt-image-2',
+    imageGenerationModel: existingAgent?.imageGenerationModel || 'gpt-image-2',
     apiMode: 'responses',
     apiProxy: false,
     codexCli: false,

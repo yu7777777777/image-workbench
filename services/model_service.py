@@ -151,8 +151,9 @@ class ModelCatalogService:
             self._account_signature = signature
             self._expires_at = self._clock() + self._cache_ttl_seconds
 
-    def _ensure_catalog(self) -> None:
-        groups = self._active_accounts_by_type()
+    def _ensure_catalog(self, groups: dict[str, list[str]] | None = None) -> None:
+        if groups is None:
+            groups = self._active_accounts_by_type()
         signature = self._signature(groups)
         with self._lock:
             if signature == self._account_signature and self._clock() < self._expires_at:
@@ -171,20 +172,29 @@ class ModelCatalogService:
                 if not self._anonymous_models and not self._models_by_account_type:
                     raise RuntimeError("上游模型列表暂时不可用，请稍后重试") from None
 
-    def list_models(self) -> dict[str, Any]:
-        self._ensure_catalog()
+    def _list_models(self, include_anonymous: bool) -> dict[str, Any]:
+        groups = self._active_accounts_by_type()
+        if not include_anonymous and not groups:
+            return {"object": "list", "data": []}
+        self._ensure_catalog(groups)
         with self._lock:
             union: dict[str, dict[str, Any]] = {
                 model_id: dict(item)
                 for model_id, item in self._anonymous_models.items()
-            }
-            for account_type in sorted(self._models_by_account_type):
-                for model_id, item in self._models_by_account_type[account_type].items():
+            } if include_anonymous else {}
+            for account_type in sorted(groups):
+                for model_id, item in self._models_by_account_type.get(account_type, {}).items():
                     union.setdefault(model_id, dict(item))
         return {
             "object": "list",
             "data": [union[model_id] for model_id in sorted(union)],
         }
+
+    def list_models(self) -> dict[str, Any]:
+        return self._list_models(True)
+
+    def list_account_models(self) -> dict[str, Any]:
+        return self._list_models(False)
 
     def route_for_model(self, model: str) -> ModelRoute:
         model = str(model or "").strip()

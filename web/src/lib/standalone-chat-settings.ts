@@ -1,4 +1,5 @@
-import { CHAT_FAMILIES, CHAT_LEVELS, chatChoice } from "@/lib/chat-models";
+import { CHAT_FAMILIES, CHAT_LEVELS } from "@/lib/chat-models";
+import { isChatModel } from "@/lib/chat-stream";
 
 export type StandaloneChatSettings = {
   model: string;
@@ -6,7 +7,7 @@ export type StandaloneChatSettings = {
 };
 
 export const DEFAULT_STANDALONE_CHAT_SETTINGS: StandaloneChatSettings = {
-  model: "gpt-6-instant",
+  model: "gpt-6",
   effort: "",
 };
 
@@ -17,13 +18,12 @@ function storageKey(owner: string): string {
 }
 
 export function isStandaloneChatModel(model: string): boolean {
-  return CHAT_FAMILIES.some((family) =>
-    CHAT_LEVELS.some((level) => model === `${family.id}-${level.suffix}`),
-  );
+  return Boolean(model.trim()) && isChatModel(model);
 }
 
 export function defaultEffortForStandaloneChatModel(model: string): string {
   for (const family of CHAT_FAMILIES) {
+    if (model === family.id) return "";
     const level = CHAT_LEVELS.find((item) => model === `${family.id}-${item.suffix}`);
     if (level) return level.effort;
   }
@@ -56,9 +56,4 @@ export function readStandaloneChatSettings(owner: string): StandaloneChatSetting
 export function saveStandaloneChatSettings(owner: string, settings: StandaloneChatSettings): void {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(storageKey(owner), JSON.stringify(settings));
-}
-
-export function chatSettingsFromChoice(family: string, level: string): StandaloneChatSettings | null {
-  const choice = chatChoice(family, level);
-  return choice ? { model: choice.model, effort: choice.effort } : null;
 }
