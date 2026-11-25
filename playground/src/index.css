@@ -809,10 +809,7 @@ input[type="number"] {
 }
 
 .studio-agent-input-bar {
-  padding: 0.5rem 0 max(0.35rem, env(safe-area-inset-bottom));
-  background: hsl(var(--background) / 0.94);
-  border-top: 1px solid hsl(var(--border) / 0.7);
-  backdrop-filter: blur(14px);
+  padding: 0.5rem 0.75rem max(0.75rem, env(safe-area-inset-bottom));
 }
 
 .studio-agent-input-bar > .studio-conversation-actions,

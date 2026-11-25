@@ -494,7 +494,11 @@ export default function InputBar() {
   ), [activeProfile.id, settingsActiveProfile.id, settings])
 
   const [quotaData, setQuotaData] = useState<QuotaData | null>(null)
-  const [availableModels, setAvailableModels] = useState<string[]>(filterHiddenImageModels(['gpt-image-2']))
+  const [availableModels, setAvailableModels] = useState<string[]>(() => (
+    isPoolBuild ? [] : filterHiddenImageModels(['gpt-image-2'])
+  ))
+  const poolProfileAvailable = settings.profiles.some((profile) => profile.id === POOL_PROFILE_ID)
+  const showImageModelControl = poolProfileAvailable || agentImageProfiles.length > 0 || availableModels.length > 0
 
   const isPoolProfile = isPoolProfileId(activeProfile.id)
   const isSharedProfile = activeProfile.id.startsWith('shared-')
@@ -532,14 +536,27 @@ export default function InputBar() {
   }, [refreshQuota])
 
   useEffect(() => {
-    fetchAvailableImageModels(
-      isPoolBuild ? POOL_KEY : activeProfile.apiKey,
-      activeProfile.baseUrl,
-      activeProfile.apiProxy,
-    ).then((models) => {
-      const filtered = filterHiddenImageModels(models)
-      if (filtered.length > 0) setAvailableModels(filtered)
-    })
+    let active = true
+    let pending = false
+    const refreshModels = async () => {
+      if (pending) return
+      pending = true
+      try {
+        const models = await fetchAvailableImageModels(activeProfile.apiKey, activeProfile.baseUrl, activeProfile.apiProxy)
+        if (active) setAvailableModels(filterHiddenImageModels(models))
+      } finally {
+        pending = false
+      }
+    }
+    void refreshModels()
+    if (!isPoolBuild) return () => { active = false }
+    window.addEventListener('focus', refreshModels)
+    const timer = window.setInterval(refreshModels, 30_000)
+    return () => {
+      active = false
+      window.removeEventListener('focus', refreshModels)
+      window.clearInterval(timer)
+    }
   }, [activeProfile.apiKey, activeProfile.apiProxy, activeProfile.baseUrl, activeProfile.id])
 
   const runningTaskCount = useMemo(() => tasks.filter((t) => t.status === 'running').length, [tasks])
@@ -571,7 +588,9 @@ export default function InputBar() {
   // 评论锚点/标注笔迹只存在于画布节点上，画布走 submitTask({ input }) 且不经过 InputBar，
   // 因此这里只需要放行遮罩草稿这一种「无提示词编辑」草稿。
   const hasMaskEditDraft = Boolean(maskDraft)
-  const canSubmit = Boolean((prompt.trim() || hasMaskEditDraft) && hasSubmitApiConfig && !activeAgentIsRunning)
+  const canUseImageModel = !isPoolBuild || !isPoolProfile || availableModels.includes(selectedModel)
+  const canSubmit = Boolean((prompt.trim() || hasMaskEditDraft) && hasSubmitApiConfig && !activeAgentIsRunning
+    && (isAgentMode || canUseImageModel))
   const submitButtonAriaLabel = activeAgentIsRunning
     ? '停止生成'
     : hasSubmitApiConfig
@@ -1718,7 +1737,7 @@ export default function InputBar() {
       currentAgentTextProfileId={currentAgentTextProfileId}
       onAgentTextProfileChange={(id) => setSettings({ agentTextProfileId: id })}
       agentImageProfiles={agentImageProfiles}
-      poolProfileAvailable={settings.profiles.some((profile) => profile.id === POOL_PROFILE_ID)}
+      poolProfileAvailable={poolProfileAvailable}
       currentAgentImageProfileId={
         appMode === 'agent'
           ? (settings.agentImageProfileId || POOL_PROFILE_ID)
@@ -1972,10 +1991,10 @@ export default function InputBar() {
             <div className="studio-composer-controls hidden sm:flex items-end justify-between gap-3">
               {renderParams(
                 appMode === 'agent'
-                  ? (availableModels && availableModels.length > 0
+                  ? (showImageModelControl
                       ? 'grid-cols-[minmax(120px,1.2fr)_minmax(120px,1.2fr)_repeat(5,minmax(56px,0.9fr))_minmax(40px,0.55fr)]'
                       : 'grid-cols-[minmax(120px,1.2fr)_repeat(5,minmax(56px,0.9fr))_minmax(40px,0.55fr)]')
-                  : (availableModels && availableModels.length > 0
+                  : (showImageModelControl
                       ? 'grid-cols-[minmax(140px,1.4fr)_repeat(5,minmax(64px,1fr))_minmax(44px,0.6fr)]'
                       : 'grid-cols-[repeat(5,minmax(64px,1fr))_minmax(44px,0.6fr)]')
               )}

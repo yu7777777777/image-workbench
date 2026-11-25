@@ -50,6 +50,7 @@ export type AccountImportPayload = {
 
 export type Model = {
   id: string;
+  kind?: "text" | "image";
   object: string;
   created: number;
   owned_by: string;

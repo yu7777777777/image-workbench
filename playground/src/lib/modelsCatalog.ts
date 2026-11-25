@@ -1,19 +1,13 @@
 import { isPoolBuild, POOL_KEY } from './accountPool'
-import { buildApiUrl, readClientDevProxyConfig, shouldUseApiProxy, shouldUseApiProxyForCredential } from './devProxy'
+import { buildApiUrl, readClientDevProxyConfig, shouldUseApiProxyForCredential } from './devProxy'
 
 export interface ModelItem {
   id: string
-  object?: string
+  kind?: 'text' | 'image'
 }
 
 export const DEFAULT_IMAGE_MODELS = [
   'gpt-image-2',
-]
-export const DEFAULT_POOL_IMAGE_MODELS = [
-  'gpt-image-2',
-  'gpt-image-2.5',
-  'gpt-image-2.5-flare',
-  'gpt-image-2.5-sunburst',
 ]
 
 // 部署配置注入：从模型选择中隐藏号池无法使用的型号（构建期 VITE_HIDDEN_IMAGE_MODELS 注入，逗号分隔）。
@@ -27,29 +21,26 @@ export function filterHiddenImageModels(models: string[]): string[] {
 }
 
 export async function fetchAvailableImageModels(apiKey?: string, baseUrl = '', apiProxy = false): Promise<string[]> {
+  const fallback = isPoolBuild ? [] : DEFAULT_IMAGE_MODELS
   try {
-    // The pool build must read the pool catalog even when the currently
-    // selected profile is a shared/local provider. Otherwise the selector
-    // loses the site's 2.5 models after switching profiles.
     const proxyConfig = readClientDevProxyConfig()
-    const useApiProxy = shouldUseApiProxyForCredential(apiKey, apiProxy, proxyConfig)
-    const authKey = useApiProxy ? 'local-proxy-placeholder' : (isPoolBuild ? POOL_KEY : (apiKey || POOL_KEY))
-    const res = await fetch(buildApiUrl(baseUrl, 'models', proxyConfig, useApiProxy), {
+    const useApiProxy = !isPoolBuild && shouldUseApiProxyForCredential(apiKey, apiProxy, proxyConfig)
+    const authKey = isPoolBuild ? POOL_KEY : useApiProxy ? 'local-proxy-placeholder' : apiKey || POOL_KEY
+    const url = isPoolBuild ? `${window.location.origin}/v1/models` : buildApiUrl(baseUrl, 'models', proxyConfig, useApiProxy)
+    const res = await fetch(url, {
       cache: 'no-store',
       headers: {
         Accept: 'application/json',
         ...(authKey ? { Authorization: `Bearer ${authKey}` } : {}),
       },
     })
-    if (!res.ok) return useApiProxy || isPoolBuild ? DEFAULT_POOL_IMAGE_MODELS : DEFAULT_IMAGE_MODELS
+    if (!res.ok) return fallback
     const data = (await res.json()) as { data?: ModelItem[] }
     if (Array.isArray(data?.data)) {
       const filtered = data.data
+        .filter((m) => m.kind === 'image' || (!m.kind && /image/i.test(m.id) && !/codex/i.test(m.id)))
         .map((m) => String(m.id || '').trim())
-        .filter((id, idx, arr) => {
-          const lower = id.toLowerCase()
-          return lower.includes('image') && !lower.includes('codex') && arr.indexOf(id) === idx
-        })
+        .filter((id, idx, arr) => id && arr.indexOf(id) === idx)
       if (filtered.length > 0) {
         const order = [
           'gpt-image-2',
@@ -71,8 +62,8 @@ export async function fetchAvailableImageModels(apiKey?: string, baseUrl = '', a
         return filtered
       }
     }
-    return useApiProxy || isPoolBuild ? DEFAULT_POOL_IMAGE_MODELS : DEFAULT_IMAGE_MODELS
+    return fallback
   } catch {
-    return isPoolBuild || readClientDevProxyConfig()?.enabled ? DEFAULT_POOL_IMAGE_MODELS : DEFAULT_IMAGE_MODELS
+    return fallback
   }
 }

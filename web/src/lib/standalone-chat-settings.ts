@@ -1,4 +1,5 @@
-import { CHAT_FAMILIES, CHAT_LEVELS, chatChoice } from "@/lib/chat-models";
+import { CHAT_FAMILIES, CHAT_LEVELS } from "@/lib/chat-models";
+import { isChatModel } from "@/lib/chat-stream";
 
 export type StandaloneChatSettings = {
   model: string;
@@ -17,10 +18,7 @@ function storageKey(owner: string): string {
 }
 
 export function isStandaloneChatModel(model: string): boolean {
-  return CHAT_FAMILIES.some((family) =>
-    model === family.id
-      || CHAT_LEVELS.some((level) => model === `${family.id}-${level.suffix}`),
-  );
+  return Boolean(model.trim()) && isChatModel(model);
 }
 
 export function defaultEffortForStandaloneChatModel(model: string): string {
@@ -58,12 +56,4 @@ export function readStandaloneChatSettings(owner: string): StandaloneChatSetting
 export function saveStandaloneChatSettings(owner: string, settings: StandaloneChatSettings): void {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(storageKey(owner), JSON.stringify(settings));
-}
-
-export function chatSettingsFromChoice(family: string, level: string): StandaloneChatSettings | null {
-  const choice = chatChoice(family, level);
-  if (!choice) return null;
-  return level === "pro"
-    ? { model: choice.model, effort: choice.effort }
-    : { model: family, effort: choice.effort };
 }
