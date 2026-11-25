@@ -6,7 +6,7 @@ export type StandaloneChatSettings = {
 };
 
 export const DEFAULT_STANDALONE_CHAT_SETTINGS: StandaloneChatSettings = {
-  model: "gpt-6-instant",
+  model: "gpt-6",
   effort: "",
 };
 
@@ -18,12 +18,14 @@ function storageKey(owner: string): string {
 
 export function isStandaloneChatModel(model: string): boolean {
   return CHAT_FAMILIES.some((family) =>
-    CHAT_LEVELS.some((level) => model === `${family.id}-${level.suffix}`),
+    model === family.id
+      || CHAT_LEVELS.some((level) => model === `${family.id}-${level.suffix}`),
   );
 }
 
 export function defaultEffortForStandaloneChatModel(model: string): string {
   for (const family of CHAT_FAMILIES) {
+    if (model === family.id) return "";
     const level = CHAT_LEVELS.find((item) => model === `${family.id}-${item.suffix}`);
     if (level) return level.effort;
   }
@@ -60,5 +62,8 @@ export function saveStandaloneChatSettings(owner: string, settings: StandaloneCh
 
 export function chatSettingsFromChoice(family: string, level: string): StandaloneChatSettings | null {
   const choice = chatChoice(family, level);
-  return choice ? { model: choice.model, effort: choice.effort } : null;
+  if (!choice) return null;
+  return level === "pro"
+    ? { model: choice.model, effort: choice.effort }
+    : { model: family, effort: choice.effort };
 }

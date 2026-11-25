@@ -1008,6 +1008,9 @@ function AccountsPageContent() {
               系统可用模型
               <span className="ml-1 text-stone-400">({availableModels.length})</span>
             </div>
+            <p className="mb-3 text-xs leading-5 text-stone-500">
+              这里显示当前账号池模型目录中的模型标识。能看到模型不代表每个账号都有额度，实际请求仍会按账号状态和上游可用性执行。
+            </p>
             <div className="flex flex-wrap gap-2">
               {availableModels.length > 0 ? (
                 availableModels.map((model) => (

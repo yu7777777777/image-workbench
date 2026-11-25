@@ -12,19 +12,61 @@ export const CHAT_LEVELS = [
   { id: "max", label: "极高 · Pro 账号", suffix: "thinking", effort: "max" },
   { id: "pro", label: "Pro", suffix: "pro", effort: "" },
 ] as const;
+
+type AvailableModels = readonly string[];
+
+function exactModel(family: string, level: string): string | null {
+  const preset = CHAT_LEVELS.find((item) => item.id === level);
+  return preset ? `${family}-${preset.suffix}` : null;
+}
+
+function familyModelAvailable(family: string, models: AvailableModels): boolean {
+  return models.includes(family);
+}
+
+export function chatLevelAvailable(
+  family: string,
+  level: string,
+  models: AvailableModels,
+): boolean {
+  const exact = exactModel(family, level);
+  if (!exact) return false;
+  if (models.includes(exact)) return true;
+  if (level === "max") return false;
+  return level !== "pro" && familyModelAvailable(family, models);
+}
+
 export function chatSelection(model: string, effort: string) {
   for (const family of CHAT_FAMILIES) {
     const level = CHAT_LEVELS.find(
       (item) => model === `${family.id}-${item.suffix}` && effort === item.effort,
     );
     if (level) return { family: family.id, level: level.id };
+    if (model === family.id) {
+      const baseLevel = CHAT_LEVELS.find((item) => item.effort === effort);
+      if (baseLevel && baseLevel.id !== "pro") {
+        return { family: family.id, level: baseLevel.id };
+      }
+    }
   }
   return null;
 }
-export function chatChoice(family: string, level: string) {
+export function chatChoice(
+  family: string,
+  level: string,
+  models?: AvailableModels,
+) {
   const group = CHAT_FAMILIES.find((item) => item.id === family);
   const preset = CHAT_LEVELS.find((item) => item.id === level);
   if (!group || !preset) return null;
+  if (models && chatLevelAvailable(family, level, models)) {
+    return {
+      model: models.includes(`${family}-${preset.suffix}`)
+        ? `${family}-${preset.suffix}`
+        : family,
+      effort: preset.effort,
+    };
+  }
   return { model: `${group.id}-${preset.suffix}`, effort: preset.effort };
 }
 export function chatModelLabel(model: string): string {

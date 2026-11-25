@@ -42,7 +42,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuthGuard } from "@/lib/use-auth-guard";
 import { fetchModels } from "@/lib/api";
 import { createChatId, isChatModel } from "@/lib/chat-stream";
-import { CHAT_FAMILIES, CHAT_LEVELS, chatSelection, chatChoice, chatModelLabel } from "@/lib/chat-models";
+import {
+  CHAT_FAMILIES,
+  CHAT_LEVELS,
+  chatLevelAvailable,
+  chatSelection,
+  chatChoice,
+  chatModelLabel,
+} from "@/lib/chat-models";
 import { useChatStore, type ChatImage, type ChatThread } from "@/store/chat";
 import "./chat.css";
 
@@ -149,6 +156,15 @@ export default function ChatPage() {
     if (owner) loadModels();
   }, [owner]);
   useEffect(() => {
+    if (!thread || !models.length) return;
+    const current = chatSelection(thread.model, thread.effort);
+    if (!current) return;
+    const next = chatChoice(current.family, current.level, models);
+    if (next && next.model !== thread.model) {
+      useChatStore.getState().update(thread.id, next);
+    }
+  }, [models, thread?.effort, thread?.id, thread?.model]);
+  useEffect(() => {
     following.current = true;
     setAtBottom(true);
   }, [chat.activeId]);
@@ -172,9 +188,9 @@ export default function ChatPage() {
   const busy = chat.busyId === thread.id;
   const selection = chatSelection(thread.model, thread.effort);
   const canSend = !!selection && models.includes(thread.model) && !modelError
-    && (selection.level !== "max" || models.includes(`${selection.family}-pro`));
+    && chatLevelAvailable(selection.family, selection.level, models);
   const choose = (family: string, level: string) => {
-    const next = chatChoice(family, level);
+    const next = chatChoice(family, level, models);
     if (next && models.includes(next.model)) chat.update(thread.id, next);
   };
   const list = (
@@ -296,7 +312,7 @@ export default function ChatPage() {
         <SelectContent>
           {CHAT_FAMILIES.map((family) => (
             <SelectItem key={family.id} value={family.id}
-              disabled={!CHAT_LEVELS.some((level) => models.includes(`${family.id}-${level.suffix}`))}>
+              disabled={!CHAT_LEVELS.some((level) => chatLevelAvailable(family.id, level.id, models))}>
               {family.label}
             </SelectItem>
           ))}
@@ -309,8 +325,7 @@ export default function ChatPage() {
         </SelectTrigger>
         <SelectContent>
           {CHAT_LEVELS.map((level) => <SelectItem key={level.id} value={level.id}
-            disabled={!selection || !models.includes(`${selection.family}-${level.suffix}`)
-              || (level.id === "max" && !models.includes(`${selection.family}-pro`))}>
+            disabled={!selection || !chatLevelAvailable(selection.family, level.id, models)}>
             {level.label}
           </SelectItem>)}
         </SelectContent>

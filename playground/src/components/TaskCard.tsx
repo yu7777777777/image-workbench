@@ -430,7 +430,7 @@ export default function TaskCard({
             <>
               <img
                 src={streamPreviewSrc}
-                className={`h-full w-full object-cover ${streamPreviewLoaded ? '' : 'hidden'}`}
+                className={`h-full w-full object-contain ${streamPreviewLoaded ? '' : 'hidden'}`}
                 alt=""
                 onLoad={() => setStreamPreviewLoaded(true)}
                 onError={() => setStreamPreviewLoaded(false)}
@@ -512,7 +512,7 @@ export default function TaskCard({
                 src={thumbSrc}
                 data-image-id={task.outputImages[0]}
                 data-output-image-ids={task.outputImages.join(',')}
-                className="saveable-image w-full h-full object-cover"
+                className="saveable-image w-full h-full object-contain"
                 loading="lazy"
                 alt=""
               />
@@ -578,7 +578,7 @@ export default function TaskCard({
 
         {/* 右侧信息区域 */}
         <div className="studio-task-info flex-1 p-3 flex flex-col min-w-0">
-          <div className="flex-1 min-h-0 mb-2 overflow-hidden">
+          <div className="studio-task-prompt-wrap flex-1 min-h-0 mb-2 overflow-hidden">
             {showPendingPrompt ? (
               <div className="leading-relaxed">
                 <p className="text-sm text-gray-700 dark:text-gray-300">正在生成……</p>
@@ -669,7 +669,7 @@ export default function TaskCard({
               )}
             </div>
             {/* 操作按钮 */}
-            <div className="relative ml-auto max-w-full">
+            <div className="studio-task-actions relative ml-auto max-w-full">
               <div
                 data-tag-scroll-area
                 className="flex items-center gap-1 flex-shrink-0 mt-0.5 max-w-full overflow-x-auto hide-scrollbar mask-edge-r pr-2"

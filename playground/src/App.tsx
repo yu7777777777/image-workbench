@@ -185,7 +185,10 @@ export default function App() {
       ) : appMode === 'agent' ? (
         <ErrorBoundary>
           <Suspense fallback={<div className="flex items-center justify-center h-screen text-gray-400">加载中…</div>}>
-            <AgentWorkspace />
+            <div className="studio-agent-shell">
+              <AgentWorkspace />
+              <InputBar />
+            </div>
           </Suspense>
         </ErrorBoundary>
       ) : (
@@ -196,7 +199,7 @@ export default function App() {
           </div>
         </main>
       )}
-      {appMode !== 'canvas' && <InputBar />}
+      {appMode === 'gallery' && <InputBar />}
       <DetailModal />
       <GalleryAnnotatorHost />
       <Lightbox />

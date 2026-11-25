@@ -93,6 +93,7 @@ function AtImageOptionThumb({ option }: { option: AtImageOption }) {
 export default function InputBar() {
   const prompt = useStore((s) => s.prompt)
   const appMode = useStore((s) => s.appMode)
+  const isAgentMode = appMode === 'agent'
   const createConversation = useStore((s) => s.createAgentConversation)
   const [historyOpen, setHistoryOpen] = useState(false)
   const historyButtonRef = useRef<HTMLButtonElement>(null)
@@ -377,6 +378,10 @@ export default function InputBar() {
   }, [])
 
   useLayoutEffect(() => {
+    if (isAgentMode) {
+      document.documentElement.style.removeProperty('--input-bar-clearance')
+      return
+    }
     const bar = cardRef.current?.closest<HTMLElement>('[data-input-bar]')
     if (!bar) return
 
@@ -397,7 +402,7 @@ export default function InputBar() {
       visualViewport?.removeEventListener('scroll', updateInputBarClearance)
       document.documentElement.style.removeProperty('--input-bar-clearance')
     }
-  }, [updateInputBarClearance])
+  }, [isAgentMode, updateInputBarClearance])
 
   useLayoutEffect(() => {
     if (!promptExpanded) return
@@ -1750,8 +1755,11 @@ export default function InputBar() {
 
       <div
         data-input-bar
-        className={`fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-30 w-full max-w-5xl px-3 sm:px-4 transition-all duration-300${promptExpanded ? ' flex flex-col' : ''}`}
-        style={promptExpanded ? { top: `${promptExpandedTop}px`, transitionProperty: 'none' } : undefined}
+        className={`${isAgentMode
+          ? 'studio-agent-input-bar relative z-20 w-full shrink-0'
+          : 'fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-30 w-full max-w-5xl px-3 sm:px-4'
+        } transition-all duration-300${promptExpanded ? ' flex flex-col' : ''}`}
+        style={!isAgentMode && promptExpanded ? { top: `${promptExpandedTop}px`, transitionProperty: 'none' } : undefined}
       >
         <InputBatchBars
           showFavoriteCollectionBatchBar={showFavoriteCollectionBatchBar}
