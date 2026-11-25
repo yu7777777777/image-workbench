@@ -800,8 +800,7 @@ input[type="number"] {
 
 .studio-agent-shell {
   display: flex;
-  min-height: 0;
-  flex: 1;
+  height: 100dvh;
   flex-direction: column;
 }
 

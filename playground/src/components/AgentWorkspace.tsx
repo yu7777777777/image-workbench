@@ -724,7 +724,7 @@ export default function AgentWorkspace() {
       </aside>}
 
       {/* Center Chat Area */}
-      <section className="min-w-0 flex-1 flex flex-col relative">
+      <section className="min-h-0 min-w-0 flex-1 flex flex-col relative">
         {/* Mobile Header Toggles */}
         {!isPoolBuild && <div className={`sticky top-0 z-20 lg:hidden overflow-hidden transition-all duration-300 ease-in-out ${mobileTopBarVisible ? 'max-h-16 opacity-100 mb-2' : 'max-h-0 opacity-0 mb-0 pointer-events-none'}`}>
           <div
