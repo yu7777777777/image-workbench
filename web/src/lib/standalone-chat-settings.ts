@@ -16,10 +16,23 @@ function storageKey(owner: string): string {
   return `${STORAGE_PREFIX}:${owner || "anonymous"}`;
 }
 
-function isSupportedModel(model: string): boolean {
+export function isStandaloneChatModel(model: string): boolean {
   return CHAT_FAMILIES.some((family) =>
     CHAT_LEVELS.some((level) => model === `${family.id}-${level.suffix}`),
   );
+}
+
+export function defaultEffortForStandaloneChatModel(model: string): string {
+  for (const family of CHAT_FAMILIES) {
+    const level = CHAT_LEVELS.find((item) => model === `${family.id}-${item.suffix}`);
+    if (level) return level.effort;
+  }
+  return "";
+}
+
+export function hasStoredStandaloneChatSettings(owner: string): boolean {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(storageKey(owner)) !== null;
 }
 
 export function readStandaloneChatSettings(owner: string): StandaloneChatSettings {
@@ -28,13 +41,12 @@ export function readStandaloneChatSettings(owner: string): StandaloneChatSetting
   }
   try {
     const parsed = JSON.parse(window.localStorage.getItem(storageKey(owner)) || "null") as Partial<StandaloneChatSettings> | null;
-    const model = typeof parsed?.model === "string" && isSupportedModel(parsed.model)
+    const model = typeof parsed?.model === "string" && isStandaloneChatModel(parsed.model)
       ? parsed.model
       : DEFAULT_STANDALONE_CHAT_SETTINGS.model;
-    const fallback = CHAT_LEVELS.find((level) => model === `gpt-6-${level.suffix}`);
     return {
       model,
-      effort: typeof parsed?.effort === "string" ? parsed.effort : fallback?.effort || "",
+      effort: typeof parsed?.effort === "string" ? parsed.effort : defaultEffortForStandaloneChatModel(model),
     };
   } catch {
     return DEFAULT_STANDALONE_CHAT_SETTINGS;

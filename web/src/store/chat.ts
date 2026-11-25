@@ -10,6 +10,9 @@ import {
   type RequestMessage,
 } from "@/lib/chat-stream";
 import {
+  defaultEffortForStandaloneChatModel,
+  hasStoredStandaloneChatSettings,
+  isStandaloneChatModel,
   readStandaloneChatSettings,
   saveStandaloneChatSettings,
 } from "@/lib/standalone-chat-settings";
@@ -33,11 +36,13 @@ export type ChatThread = {
   system: string;
   messages: ChatMessage[];
 };
-type Snapshot = { threads: ChatThread[]; activeId: string; lastModel: string };
-type ChatState = Snapshot & {
+type Snapshot = { threads: ChatThread[]; activeId: string; lastModel?: string };
+type ChatState = {
   owner: string;
   ready: boolean;
   storageError: string;
+  threads: ChatThread[];
+  activeId: string;
   busyId: string | null;
   load: (owner: string) => Promise<void>;
   createThread: () => void;
@@ -69,10 +74,10 @@ const makeThread = (model: string, effort = model.endsWith("-thinking") ? "stand
 });
 
 function persist(): void {
-  const { owner, ready, threads, activeId, lastModel } =
+  const { owner, ready, threads, activeId } =
     useChatStore.getState();
   if (!owner || !ready) return;
-  const snapshot: Snapshot = { threads, activeId, lastModel };
+  const snapshot: Snapshot = { threads, activeId };
   writeQueue = writeQueue
     .then(async () => {
       await storage.setItem(owner, snapshot);
@@ -87,8 +92,10 @@ function persist(): void {
 }
 function saveSoon(): void {
   if (saveTimer) return;
+  const owner = useChatStore.getState().owner;
   saveTimer = setTimeout(() => {
     saveTimer = undefined;
+    if (useChatStore.getState().owner !== owner) return;
     persist();
   }, 500);
 }
@@ -99,11 +106,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
   storageError: "",
   threads: [],
   activeId: "",
-  lastModel: "gpt-6-instant",
   busyId: null,
   load: async (owner) => {
     if (get().owner === owner && get().ready) return;
     controller?.abort();
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = undefined;
+    }
     const ticket = ++generation;
     set({
       owner,
@@ -112,12 +122,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
       activeId: "",
       busyId: null,
       storageError: "",
-      lastModel: readStandaloneChatSettings(owner).model,
     });
     try {
       await writeQueue;
       const saved = await storage.getItem<Snapshot>(owner);
       if (ticket !== generation) return;
+      if (
+        saved?.lastModel
+        && !hasStoredStandaloneChatSettings(owner)
+        && isStandaloneChatModel(saved.lastModel)
+      ) {
+        saveStandaloneChatSettings(owner, {
+          model: saved.lastModel,
+          effort: defaultEffortForStandaloneChatModel(saved.lastModel),
+        });
+      }
+      const defaults = readStandaloneChatSettings(owner);
       const threads = (saved?.threads || []).map((thread) => ({
         ...thread,
         messages: thread.messages.map((message) =>
@@ -127,15 +147,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
         ),
       }));
       if (!threads.length) {
-        const defaults = readStandaloneChatSettings(owner);
-        threads.push(makeThread(saved?.lastModel || defaults.model, saved?.lastModel ? undefined : defaults.effort));
+        threads.push(makeThread(defaults.model, defaults.effort));
       }
       set({
         threads,
         activeId: threads.some((t) => t.id === saved?.activeId)
           ? saved!.activeId
           : threads[0].id,
-        lastModel: saved?.lastModel || "gpt-6-instant",
         ready: true,
       });
     } catch {
@@ -163,20 +181,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
   update: (id, patch) => {
     set({
       threads: get().threads.map((t) => (t.id === id ? { ...t, ...patch } : t)),
-      ...(patch.model ? { lastModel: patch.model } : {}),
     });
-    if (patch.model && get().owner) {
-      saveStandaloneChatSettings(get().owner, {
-        model: patch.model,
-        effort: patch.effort ?? get().threads.find((thread) => thread.id === id)?.effort ?? "",
-      });
-    }
     persist();
   },
   remove: (id) => {
     if (get().busyId === id) get().stop();
     const threads = get().threads.filter((t) => t.id !== id);
-    if (!threads.length) threads.push(makeThread(get().lastModel));
+    if (!threads.length) {
+      const defaults = readStandaloneChatSettings(get().owner);
+      threads.push(makeThread(defaults.model, defaults.effort));
+    }
     set({
       threads,
       activeId: get().activeId === id ? threads[0].id : get().activeId,
