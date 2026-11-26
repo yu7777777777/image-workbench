@@ -1,0 +1,26 @@
+{@body const [gear,setGear] = DIL.useState("橙色装备为主")}
+{@body const [drop,setDrop] = DIL.useState("爆率大约100%~150%")}
+{@body const [weapon,setWeapon] = DIL.useState("高能镭射步枪")}
+{@body const [fund,setFund] = DIL.useState("100M以下")}
+<box border radius="lg" padding={3} gap={3}>
+  **1. 目前装备品质**
+  <radio-group direction="col" value={gear} onChange={setGear}>
+    {#each ["橙色装备为主","红色装备为主","天穹套装","橙色和红色混搭"] as v}<radio value={v}>{v}</radio>{/each}
+  </radio-group>
+  <divider color="subtle"/>
+  **2. 当前爆率大约多少？**
+  <radio-group direction="col" value={drop} onChange={setDrop}>
+    {#each ["100%以下","100%~150%","150%~200%","200%以上","不知道怎么看"] as v}<radio value={v}>{v}</radio>{/each}
+  </radio-group>
+  <divider color="subtle"/>
+  **3. 你目前使用的主武器**
+  <radio-group direction="col" value={weapon} onChange={setWeapon}>
+    {#each ["高能镭射步枪","机器人召唤器","电磁炮","火神","其他武器"] as v}<radio value={v}>{v}</radio>{/each}
+  </radio-group>
+  <divider color="subtle"/>
+  **4. 目前现金储备**
+  <radio-group direction="col" value={fund} onChange={setFund}>
+    {#each ["100M以下","100M~500M","500M~1B","1B以上"] as v}<radio value={v}>{v}</radio>{/each}
+  </radio-group>
+  <button block onClick={()=>GenUI.issueNewTurn("装备品质："+gear+"；爆率："+drop+"；主武器："+weapon+"；现金："+fund+"。请为我制定刷资源路线。")}>生成我的专属刷资源方案</button>
+</box>

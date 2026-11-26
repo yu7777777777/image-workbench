@@ -18,6 +18,13 @@ const observedReplies = require("./fixtures/chat-observed-replies.json");
 const extendedReplies = require("./fixtures/chat-extended-replies.json");
 const expandedWidgets = require("./fixtures/chat-widget-expansion.json");
 const componentPlayground = readFile(join(__dirname, "fixtures/chat-component-playground.txt"), "utf8");
+const compatibilityReply = readFile(join(__dirname, "fixtures/chat-widget-compatibility.txt"), "utf8");
+const compatibilityMode = process.argv.includes("--widget-compatibility");
+const compatibilityPrompt = "检查截图组件";
+const radioDefaultPrompt = "检查单选默认值";
+const radioDefaultReply = readFile(join(__dirname, "fixtures/chat-widget-radio-default.txt"), "utf8");
+const tablesAndMenusPrompt = "检查列表表格和菜单";
+const tablesAndMenusReply = readFile(join(__dirname, "fixtures/chat-widget-tables-and-menus.txt"), "utf8");
 const imageQueries = ["园区 游戏地图", "装备背包", "园区战斗"];
 const imageReply = `## 资源路线
 
@@ -55,6 +62,8 @@ const observedPrompts = new Map([
   ...Object.entries(extendedReplies).map(([name, reply]) => [`检查 ${name}`, reply]),
   ...Object.entries(expandedWidgets).map(([name, reply]) => [`检查组件 ${name}`, reply]),
   ["检查图文路线", imageReply],
+  [tablesAndMenusPrompt, tablesAndMenusReply],
+  [radioDefaultPrompt, radioDefaultReply],
 ]);
 const server = createServer(async (req, res) => {
   try {
@@ -87,8 +96,8 @@ const server = createServer(async (req, res) => {
       const data = JSON.parse(body);
       requests.push(data);
       const last = data.messages.at(-1).content;
-      const rich = last === "展示写作模板" || last === "展示其他表单" || last === "检查组件实验室" || observedPrompts.has(last);
-      const reply = last === "检查组件实验室" ? await componentPlayground : observedPrompts.get(last) ?? (rich ? await richReply : answer);
+      const rich = last === "展示写作模板" || last === "展示其他表单" || last === "检查组件实验室" || last === compatibilityPrompt || observedPrompts.has(last);
+      const reply = last === "检查组件实验室" ? await componentPlayground : last === compatibilityPrompt ? await compatibilityReply : await observedPrompts.get(last) ?? (rich ? await richReply : answer);
       const contentText = last === "展示其他表单" ? reply.replace("+kind+", "+window.location.href+") : reply;
       if (
         last === "失败测试" &&
@@ -104,7 +113,7 @@ const server = createServer(async (req, res) => {
       });
       let index = 0;
       const slow = last === "停止测试" || last === "切换测试";
-      const chunkSize = slow ? 2 : last === "检查组件实验室" ? 170 : rich ? 17 : 12;
+      const chunkSize = slow ? 2 : ["检查组件实验室", compatibilityPrompt, tablesAndMenusPrompt].includes(last) ? 170 : rich ? 17 : 12;
       const timer = setInterval(
         () => {
           const content = contentText.slice(index, index + chunkSize);
@@ -119,6 +128,14 @@ const server = createServer(async (req, res) => {
               terminal.workbench = { blocks: [
                 { id: "route", type: "image", queries: ["监控室 游戏地图"], title: "监控室测试图片", imageUrl: "https://example.org/chat-fixtures/route.svg" },
                 ...imageQueries.map((title, i) => ({ id: `group-${i}`, type: "image", queries: imageQueries, title, imageUrl: `https://example.org/chat-fixtures/${i}.svg` })),
+              ] };
+            }
+            if (last === compatibilityPrompt) {
+              const queries = ["桌面示例", "卡片示例"];
+              terminal.workbench = { blocks: [
+                { id: "demo-image", ref: "demo-image", type: "image", title: "单图示例", imageUrl: "https://example.org/chat-fixtures/one.svg" },
+                { id: "demo-group-1", type: "image", queries, title: "桌面示例", imageUrl: "https://example.org/chat-fixtures/two.svg" },
+                { id: "demo-group-2", type: "image", queries, title: "卡片示例", imageUrl: "https://example.org/chat-fixtures/three.svg" },
               ] };
             }
             res.end(`data: ${JSON.stringify(terminal)}\n\ndata: [DONE]\n\n`);
@@ -233,7 +250,7 @@ async function checkRichReplies(page, context) {
   await page.getByRole("button", { name: "新建对话", exact: true }).click();
   await send(page, "展示其他表单");
   await waitAnswer(page);
-  const source = page.locator(".chat-reply-source");
+  const source = page.locator(".chat-widget-unsupported");
   assert.equal(await source.getAttribute("open"), null);
   assert.equal(await page.getByRole("button", { name: "开始学习" }).count(), 0);
   await source.locator("summary").click();
@@ -299,6 +316,43 @@ async function checkObservedReplies(page) {
   const download = await pending;
   assert.equal(download.suggestedFilename(), "format-check.csv");
   assert.match(await readFile(await download.path(), "utf8"), /^\uFEFFitem,count\napple,1\npear,2\n$/);
+}
+
+async function checkRadioDefaultMismatch(page) {
+  await send(page, radioDefaultPrompt);
+  await waitAnswer(page);
+  const form = page.locator(".chat-reply-form");
+  const groups = form.getByRole("group");
+  assert.equal(await groups.count(), 4);
+  assert.equal(await form.getByRole("radio").count(), 18);
+  assert.equal(await page.getByRole("checkbox").count(), 0);
+  assert.equal(await page.locator(".chat-reply-source, .chat-widget-unsupported").count(), 0);
+  for (const name of ["橙色装备为主", "高能镭射步枪", "100M以下"]) {
+    assert(await form.getByRole("radio", { name, exact: true }).isChecked());
+  }
+  assert.equal(await groups.nth(1).locator("input:checked").count(), 0);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await groups.nth(1).scrollIntoViewIfNeeded();
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await page.screenshot({ path: join(artifacts, "radio-default-mismatch-mobile.png") });
+
+  const submit = form.getByRole("button", { name: "生成我的专属刷资源方案" });
+  await submit.press("Enter");
+  assert.equal(requests.length, 1);
+  assert.equal(await form.evaluate((element) => element.checkValidity()), false);
+  assert.match(await page.locator(":focus").getAttribute("name"), /-drop$/);
+
+  await form.getByRole("radio", { name: "150%~200%", exact: true }).check();
+  assert.equal(await form.evaluate((element) => element.checkValidity()), true);
+  const response = page.waitForResponse((item) => item.url().endsWith("/v1/chat/completions") && item.request().method() === "POST");
+  await submit.click();
+  const followUp = "装备品质：橙色装备为主；爆率：150%~200%；主武器：高能镭射步枪；现金：100M以下。请为我制定刷资源路线。";
+  await page.getByText(followUp, { exact: true }).waitFor();
+  assert.equal((await response).status(), 200);
+  assert.equal(requests.length, 2);
+  assert.equal(requests.at(-1).messages.at(-1).content, followUp);
+  await waitAnswer(page);
 }
 
 async function checkExtendedReplies(page) {
@@ -525,10 +579,12 @@ async function checkComponentPlayground(page) {
   await reply.getByText("第二张幻灯片", { exact: true }).waitFor();
   await reply.getByText("当前幻灯片: 2/3", { exact: true }).waitFor();
   await reply.getByText("点击打开弹出层", { exact: true }).click();
-  await reply.getByText("这里可以放说明。", { exact: true }).waitFor();
-  await reply.getByRole("button", { name: "切换卡片状态" }).press("Space");
+  await page.getByText("这里可以放说明。", { exact: true }).waitFor();
+  await page.keyboard.press("Escape");
+  const pressable = reply.getByRole("button", { name: /点击整个卡片/ });
+  await pressable.press("Space");
   await reply.getByText("已点击", { exact: true }).waitFor();
-  assert.equal(await reply.getByRole("button", { name: "切换卡片状态" }).getAttribute("aria-pressed"), "true");
+  assert.equal(await pressable.getAttribute("aria-pressed"), "true");
   await reply.getByRole("combobox", { name: "地图标记" }).selectOption("1");
   const location = await reply.getByRole("link", { name: "在 OpenStreetMap 中查找地址" }).getAttribute("href");
   assert.equal(new URL(location).searchParams.get("query"), "San Francisco, California, USA");
@@ -545,6 +601,247 @@ async function checkComponentPlayground(page) {
   await page.screenshot({ path: join(artifacts, "playground-controls-mobile.png") });
   await reply.getByRole("img", { name: "矢量图" }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: join(artifacts, "playground-media-mobile.png") });
+}
+
+async function checkWidgetCompatibility(page) {
+  await page.route("https://example.org/chat-fixtures/**", (route) => route.fulfill({
+    contentType: "image/svg+xml",
+    body: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80"><rect width="120" height="80" fill="#dceaf5"/></svg>',
+  }));
+  await send(page, compatibilityPrompt);
+  await waitAnswer(page);
+  const reply = page.locator(".chat-message.assistant").last();
+  assert.equal(await reply.locator(".chat-widget-unsupported, .chat-reply-source").count(), 0);
+  assert.equal(await page.evaluate(() => window.isSecureContext), false);
+  assert.equal(await page.evaluate(() => typeof navigator.clipboard), "undefined");
+
+  await reply.getByRole("button", { name: "主要按钮", exact: true }).click();
+  await reply.getByText("点击次数：1", { exact: true }).waitFor();
+  await reply.getByRole("button", { name: "次要按钮", exact: true }).click();
+  await reply.getByText("点击次数：0", { exact: true }).waitFor();
+  assert.equal(await reply.getByRole("button", { name: "不可点击" }).isDisabled(), true);
+  await reply.getByRole("button", { name: "搜索", exact: true }).waitFor();
+  const loading = reply.getByRole("button", { name: "加载中（点击停止）" });
+  await reply.getByRole("button", { name: "点击演示加载状态" }).click();
+  assert.equal(await loading.getAttribute("aria-busy"), "true");
+  await loading.click();
+  await reply.getByRole("button", { name: "已关闭" }).click();
+  assert.equal(await reply.getByRole("button", { name: "已开启" }).getAttribute("data-widget-color"), "success");
+
+  const first = reply.getByRole("checkbox", { name: "选项一" });
+  const second = reply.getByRole("checkbox", { name: "选项二" });
+  assert.equal(await first.isChecked(), true);
+  await second.check();
+  assert.equal(await first.isChecked(), true);
+  await second.uncheck();
+  await reply.getByRole("checkbox", { name: "UX", exact: true }).check();
+  await reply.getByText("选择：UI、UX", { exact: true }).waitFor();
+  const dataTab = reply.getByRole("radio", { name: "数据", exact: true });
+  await dataTab.press("Space");
+  await reply.getByText("当前标签：数据页面", { exact: true }).waitFor();
+  await reply.getByRole("combobox", { name: "下拉选择" }).selectOption("高级");
+  await reply.getByText("当前：高级", { exact: true }).waitFor();
+  await reply.getByRole("slider", { name: "调整 RANGE" }).press("ArrowRight");
+  assert.equal(await reply.getByRole("progressbar", { name: "音量" }).getAttribute("value"), "51");
+  await reply.getByRole("button", { name: "主要按钮", exact: true }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: join(artifacts, "chat-widgets-desktop.png") });
+
+  const trigger = reply.getByRole("button", { name: "点击打开弹层" });
+  await trigger.click();
+  const popover = page.getByRole("dialog", { name: "点击打开弹层" });
+  await popover.getByRole("button", { name: "弹层内点击 0" }).click();
+  await popover.getByRole("button", { name: "弹层内点击 1" }).waitFor();
+  await page.screenshot({ path: join(artifacts, "chat-widgets-popover.png") });
+  await page.keyboard.press("Escape");
+  await popover.waitFor({ state: "hidden" });
+  assert.equal(await trigger.evaluate((element) => element === document.activeElement), true);
+  await reply.getByRole("button", { name: "下一项" }).click();
+  await reply.getByText("第二页", { exact: true }).waitFor();
+  await reply.getByText("当前轮播页：2 / 3", { exact: true }).waitFor();
+  const submit = reply.getByRole("button", { name: "提交表单" });
+  assert.equal(await submit.isDisabled(), true);
+  await reply.getByRole("textbox", { name: "姓名", exact: true }).fill("测试用户");
+  const email = reply.getByRole("textbox", { name: "邮箱", exact: true });
+  await email.fill("invalid");
+  await submit.click();
+  assert.equal(await reply.getByText("提交成功", { exact: true }).count(), 0);
+  await email.fill("test@example.test");
+  await submit.click();
+  await reply.getByText("提交成功", { exact: true }).waitFor();
+  await email.fill("edit@example.test");
+  await reply.getByText("提交成功", { exact: true }).waitFor({ state: "hidden" });
+  assert.equal(requests.length, 1);
+
+  const table = reply.getByRole("table", { name: "产品状态表" });
+  await table.getByRole("columnheader", { name: "数量" }).waitFor();
+  assert.equal(await table.getByRole("row").count(), 4);
+  await table.getByRole("row", { name: "产品 B 处理中 86" }).waitFor();
+  await reply.locator(".katex-display .katex").waitFor();
+  await reply.getByText("缺图示例（图片未返回）", { exact: true }).waitFor();
+  for (const name of ["单图示例", "桌面示例", "卡片示例"]) {
+    const picture = reply.getByRole("img", { name, exact: true });
+    await picture.scrollIntoViewIfNeeded();
+    assert.equal(await picture.evaluate(async (image) => { await image.decode(); return image.naturalWidth; }), 120);
+  }
+  const code = reply.getByRole("button", { name: "复制代码", exact: true });
+  await code.click();
+  assert.equal(await code.innerText(), "已复制");
+  assert.equal(await code.evaluate((element) => element === document.activeElement), true);
+  const composer = page.getByRole("textbox", { name: "输入消息", exact: true });
+  await composer.press("Control+v");
+  assert.equal(await composer.inputValue(), 'const greeting = "你好";\nconsole.log(greeting);');
+  await composer.fill("");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await waitReady(page);
+  await table.scrollIntoViewIfNeeded();
+  await reply.locator(".katex-display .katex").waitFor();
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await page.screenshot({ path: join(artifacts, "chat-widgets-mobile.png") });
+}
+
+async function checkTablesAndMenus(page) {
+  page.setDefaultTimeout(8000);
+  await send(page, tablesAndMenusPrompt);
+  await waitAnswer(page);
+  const reply = page.locator(".chat-message.assistant").last();
+  const widget = (section) => reply.getByRole("heading", { name: section, exact: true }).locator("xpath=following-sibling::*[1]");
+  const fallbackSources = (selector) => reply.locator(selector).allTextContents().then((sources) => sources.map((source) => source.slice(0, 100)));
+  assert.deepEqual(await fallbackSources(".chat-reply-source pre"), []);
+  assert.deepEqual(await fallbackSources(".chat-widget-unsupported pre"), ['<UnknownWidget option="sample">截图未识别的组件</UnknownWidget>']);
+
+  const staticTable = widget("表格布局").getByRole("table");
+  await staticTable.getByRole("columnheader", { name: "数量" }).waitFor();
+  assert.equal(await staticTable.getByRole("row").count(), 3);
+  await staticTable.getByRole("row", { name: "项目 B 进行中 50" }).waitFor();
+  await staticTable.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: join(artifacts, "tables-and-menus-layout.png") });
+
+  const containers = widget("可点击布局容器");
+  const moduleA = containers.getByRole("button", { name: "模块 A", exact: true });
+  const moduleB = containers.getByRole("button", { name: "模块 B", exact: true });
+  assert.equal(await moduleA.getAttribute("aria-pressed"), "true");
+  await moduleB.press("Enter");
+  assert.equal(await moduleB.getAttribute("aria-pressed"), "true");
+  assert.equal(await moduleA.getAttribute("aria-pressed"), "false");
+  await containers.getByText("当前选中", { exact: true }).waitFor();
+
+  const overlay = widget("浮层布局").getByRole("button", { name: "打开浮层布局" });
+  await overlay.press("Space");
+  const dialog = page.getByRole("dialog", { name: "打开浮层布局" });
+  await dialog.getByText("浮层内容区域", { exact: true }).waitFor();
+  await dialog.getByRole("button", { name: "执行操作" }).click();
+  await page.keyboard.press("Escape");
+  await dialog.waitFor({ state: "hidden" });
+  assert.equal(await overlay.evaluate((element) => element === document.activeElement), true);
+
+  const grid = widget("功能菜单");
+  assert.equal(await grid.locator(".chat-widget-grid-item").count(), 3);
+  assert.equal(await grid.locator(".chat-widget-grid-item svg").count(), 3);
+  await grid.getByText("报表", { exact: true }).waitFor();
+
+  const selectable = widget("可选择列表");
+  const design = selectable.getByRole("button", { name: "设计", exact: true });
+  const development = selectable.getByRole("button", { name: "开发", exact: true });
+  assert.equal(await design.getAttribute("aria-pressed"), "true");
+  await development.press("Space");
+  await selectable.getByText("已选 2 项：设计、开发", { exact: true }).waitFor();
+  await design.click();
+  await selectable.getByText("已选 1 项：开发", { exact: true }).waitFor();
+  await development.click();
+  await selectable.getByText("已选 0 项：暂无", { exact: true }).waitFor();
+
+  const expandable = widget("可展开列表");
+  await expandable.getByText("用户列表", { exact: true }).waitFor();
+  const orders = expandable.getByRole("button", { name: "订单管理", exact: true });
+  assert.equal(await orders.getAttribute("aria-expanded"), "false");
+  await orders.press("Enter");
+  await expandable.getByText("待处理订单", { exact: true }).waitFor();
+  assert.equal(await orders.getAttribute("aria-expanded"), "true");
+  await expandable.getByText("用户列表", { exact: true }).waitFor({ state: "hidden" });
+  await orders.click();
+  await expandable.getByText("待处理订单", { exact: true }).waitFor({ state: "hidden" });
+
+  const cards = widget("卡片式列表");
+  await cards.getByText("项目负责人", { exact: true }).waitFor();
+  await cards.getByText("离线", { exact: true }).waitFor();
+  assert.equal(await cards.locator("svg").count(), 2);
+
+  const selectionTable = widget("带复选框的表格");
+  const option = (name) => selectionTable.getByRole("checkbox", { name, exact: true });
+  assert.equal(await selectionTable.getByRole("checkbox").count(), 3);
+  assert.equal(await option("P001").isChecked(), true);
+  await option("P002").check();
+  await selectionTable.getByText("2 项已选", { exact: true }).waitFor();
+  await selectionTable.getByRole("button", { name: "全选" }).click();
+  await selectionTable.getByText("3 项已选", { exact: true }).waitFor();
+  await option("P003").uncheck();
+  await selectionTable.getByText("2 项已选", { exact: true }).waitFor();
+
+  const editableTable = widget("可编辑表格");
+  const field = editableTable.getByRole("textbox", { name: "输入内容" });
+  assert.equal(await field.inputValue(), "张三");
+  await field.fill("赵六");
+  await editableTable.getByRole("cell", { name: "赵六" }).waitFor();
+
+  const actions = widget("带操作按钮的表格").getByRole("table");
+  const row1 = actions.getByRole("row", { name: /订单 1/ });
+  const row2 = actions.getByRole("row", { name: /订单 2/ });
+  await row2.getByRole("button", { name: "完成" }).click();
+  await row2.getByRole("cell", { name: "已完成" }).waitFor();
+  assert.equal(await row2.getByRole("button", { name: "完成" }).isDisabled(), true);
+  await row1.getByRole("cell", { name: "待处理" }).waitFor();
+  assert.equal(await row1.getByRole("button", { name: "完成" }).isEnabled(), true);
+  await actions.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: join(artifacts, "tables-and-menus-tables.png") });
+
+  const dropdown = widget("下拉菜单");
+  const chooseAction = dropdown.getByRole("button", { name: "选择操作" });
+  await chooseAction.click();
+  const dropdownDialog = page.getByRole("dialog", { name: "选择操作" });
+  await dropdownDialog.getByRole("button", { name: "归档", exact: true }).waitFor();
+  await page.screenshot({ path: join(artifacts, "tables-and-menus-dropdown.png") });
+  await dropdownDialog.getByRole("button", { name: "归档", exact: true }).click();
+  await dropdown.getByText("当前操作：归档", { exact: true }).waitFor();
+  await page.keyboard.press("Escape");
+  await dropdownDialog.waitFor({ state: "hidden" });
+
+  const contextMenu = widget("上下文菜单");
+  await contextMenu.getByRole("button", { name: "项目文件.txt", exact: true }).click();
+  const rename = contextMenu.getByRole("button", { name: "重命名", exact: true });
+  await rename.click();
+  await rename.waitFor({ state: "hidden" });
+  await contextMenu.getByText("执行结果：重命名", { exact: true }).waitFor();
+
+  const menuList = widget("菜单列表");
+  const settings = menuList.getByRole("button", { name: "设置", exact: true });
+  await settings.click();
+  await menuList.getByText("当前菜单：设置", { exact: true }).waitFor();
+  assert.equal(await settings.getAttribute("aria-pressed"), "true");
+
+  const nestedMenu = widget("多级菜单");
+  await nestedMenu.getByText("当前路径：文件 / 新建", { exact: true }).waitFor();
+  await nestedMenu.getByRole("radio", { name: "编辑", exact: true }).check();
+  await nestedMenu.getByText("当前路径：编辑 / 未选择", { exact: true }).waitFor();
+  await nestedMenu.getByRole("button", { name: "新建", exact: true }).waitFor({ state: "hidden" });
+  await nestedMenu.getByRole("button", { name: "撤销", exact: true }).press("Enter");
+  await nestedMenu.getByText("当前路径：编辑 / 撤销", { exact: true }).waitFor();
+
+  const fallback = widget("局部降级");
+  await fallback.getByText("前面的内容仍可阅读。", { exact: true }).waitFor();
+  await fallback.getByText("后面的内容仍可阅读。", { exact: true }).waitFor();
+  await fallback.locator(".chat-widget-unsupported summary").click();
+  assert.match(await fallback.locator("pre").textContent(), /<UnknownWidget option="sample">/);
+  assert.equal(requests.length, 1);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await waitReady(page);
+  await nestedMenu.getByText("当前路径：文件 / 新建", { exact: true }).waitFor();
+  await nestedMenu.scrollIntoViewIfNeeded();
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await page.screenshot({ path: join(artifacts, "tables-and-menus-mobile.png") });
 }
 
 async function checkImageWidgets(page) {
@@ -587,9 +884,11 @@ async function checkImageWidgets(page) {
 (async () => {
   await mkdir(artifacts, { recursive: true });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
-  const base = `http://127.0.0.1:${server.address().port}`;
+  const host = compatibilityMode ? "chat-workbench.test" : "127.0.0.1";
+  const base = `http://${host}:${server.address().port}`;
   const browser = await chromium.launch({
     headless: true,
+    ...(compatibilityMode ? { args: ["--host-resolver-rules=MAP chat-workbench.test 127.0.0.1", "--no-proxy-server"] } : {}),
     ...(process.env.CHAT_BROWSER_PATH
       ? { executablePath: process.env.CHAT_BROWSER_PATH }
       : {}),
@@ -607,6 +906,24 @@ async function checkImageWidgets(page) {
     await page.goto(base + "/chat/");
     await waitReady(page);
     await page.emulateMedia({ reducedMotion: "reduce" });
+    if (process.argv.includes("--widget-radio-default")) {
+      await checkRadioDefaultMismatch(page);
+      assert.deepEqual(errors, []);
+      console.log(JSON.stringify({ ok: true, cases: ["radio-default-mismatch", "radio-selection-required", "radio-follow-up-value"], artifacts }));
+      return;
+    }
+    if (compatibilityMode) {
+      await checkWidgetCompatibility(page);
+      assert.deepEqual(errors, []);
+      console.log(JSON.stringify({ ok: true, cases: ["button-states", "indexed-checkboxes", "multi-select", "numeric-tabs", "inline-state", "linked-progress", "popover-focus", "carousel", "local-email-form", "table", "math", "image-binding", "missing-image", "http-clipboard-paste", "mobile-reload"], artifacts }));
+      return;
+    }
+    if (process.argv.includes("--widget-tables-and-menus")) {
+      await checkTablesAndMenus(page);
+      assert.deepEqual(errors, []);
+      console.log(JSON.stringify({ ok: true, cases: ["standalone-table", "conditional-pressable", "standalone-popover", "tuple-grid", "selectable-list", "expandable-object-list", "record-cards", "select-all-table", "editable-table", "row-action-table", "dropdown", "context-menu", "menu-list", "nested-menu", "component-fallback", "mobile-reload"], artifacts }));
+      return;
+    }
     if (process.argv.includes("--component-playground")) {
       await checkComponentPlayground(page);
       assert.deepEqual(errors, []);
