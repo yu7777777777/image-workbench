@@ -353,6 +353,8 @@ export default function ChatPage() {
                     <ChatReply
                       text={message.text}
                       writingDrafts={message.writingDrafts}
+                      resources={message.resources}
+                      owner={owner}
                       streaming={message.status === "streaming"}
                       canSend={canSend && !chat.busyId}
                       onSend={(text) => { void chat.send(text, []); }}

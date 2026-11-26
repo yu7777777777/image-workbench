@@ -3,7 +3,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Iterator
+from typing import Any, Callable, Iterator
 from unittest.mock import Mock
 
 import pytest
@@ -40,7 +40,7 @@ def load_retry_functions() -> dict[str, Any]:
     tree = ast.parse(Path('services/protocol/conversation.py').read_text(encoding='utf-8-sig'))
     names = {'ImageGenerationError', 'public_image_error_message', 'stream_text_deltas', '_generate_single_image'}
     selected = ast.Module(body=[node for node in tree.body if isinstance(node, (ast.FunctionDef, ast.ClassDef)) and node.name in names], type_ignores=[])
-    namespace: dict[str, Any] = {'Any': Any, 'Iterator': Iterator, 'OpenAIBackendAPI': object,
+    namespace: dict[str, Any] = {'Any': Any, 'Callable': Callable, 'Iterator': Iterator, 'OpenAIBackendAPI': object,
         'ConversationRequest': object, 'ImageOutput': object, 'ImagePollTimeoutError': type('PollError', (Exception,), {}),
         'ImageContentPolicyError': type('PolicyError', (Exception,), {}),
         'UpstreamHTTPError': type('UpstreamHTTPError', (Exception,), {'status_code': 0}),

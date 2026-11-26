@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from functools import partial
+
 from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
@@ -7,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from api.image_inputs import parse_image_edit_request, read_image_sources
 from api.support import require_identity, resolve_image_base_url
+from services.chat_attachments import chat_attachment_store
 from services.content_filter import check_request, request_shape, request_text
 from services.editable_file_task_service import editable_file_task_service
 from services.log_service import LoggedCall
@@ -135,7 +138,22 @@ def create_router() -> APIRouter:
             request_shape=request_shape(payload.get("messages")),
         )
         await filter_or_log(call, request_preview)
+        if payload.get("rich_content") is True and payload.get("stream") is True:
+            handler = partial(openai_v1_chat_complete.handle, rich_owner_id=str(identity.get("id") or ""))
+            return await call.run(handler, payload)
         return await call.run(openai_v1_chat_complete.handle, payload)
+
+    @router.get("/v1/chat/attachments/{attachment_id}")
+    async def download_chat_attachment(attachment_id: str, authorization: str | None = Header(default=None)):
+        identity = require_identity(authorization)
+        result = await run_in_threadpool(chat_attachment_store.locate, str(identity.get("id") or ""), attachment_id)
+        if result is None:
+            raise HTTPException(status_code=404, detail={"error": "file not found"})
+        path, filename = result
+        return FileResponse(path, filename=filename, media_type="application/octet-stream", headers={
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        })
 
     @router.post("/v1/responses")
     async def create_response(body: ResponseCreateRequest, authorization: str | None = Header(default=None)):

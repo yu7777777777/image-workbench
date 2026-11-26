@@ -7,7 +7,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
-from typing import Any, Iterable, Iterator
+from typing import Any, Callable, Iterable, Iterator
 
 import tiktoken
 
@@ -510,7 +510,7 @@ def strip_history(text: str, history_text: str = "") -> str:
     return text
 
 
-def sanitize_output_text(text: str) -> str:
+def sanitize_output_text(text: str, *, preserve_citations: bool = False) -> str:
     text = str(text or "")
 
     def is_internal_annotation_part(part: str) -> bool:
@@ -542,6 +542,10 @@ def sanitize_output_text(text: str) -> str:
                 return f"{label} ({url})"
             return label or url
         if kind == "cite":
+            if preserve_citations:
+                refs = [part for part in data if re.fullmatch(r"turn\d+[a-z_]+\d+", part, re.IGNORECASE)]
+                if refs:
+                    return f"<Cite refs={{{json.dumps(refs)}}}/>"
             return readable_annotation_part(data)
         return readable_annotation_part(data)
 
@@ -738,7 +742,8 @@ def conversation_base_event(event_type: str, state: ConversationState, **extra: 
 
 
 def iter_conversation_payloads(payloads: Iterator[str], history_text: str = "",
-                               history_messages: list[str] | None = None) -> Iterator[dict[str, Any]]:
+                               history_messages: list[str] | None = None,
+                               *, preserve_citations: bool = False) -> Iterator[dict[str, Any]]:
     state = ConversationState()
     history_messages = history_messages or []
     history_index = 0
@@ -765,7 +770,7 @@ def iter_conversation_payloads(payloads: Iterator[str], history_text: str = "",
             state.text = ""
             continue
         next_raw_text = assistant_raw_text(event, state.raw_text, history_text)
-        next_text = sanitize_output_text(next_raw_text)
+        next_text = sanitize_output_text(next_raw_text, preserve_citations=preserve_citations)
         state.raw_text = next_raw_text
         if next_text != state.text:
             delta = next_text[len(state.text):] if next_text.startswith(state.text) else next_text
@@ -786,6 +791,7 @@ def conversation_events(
     thinking_effort: str = "",
     comments: list[ImageComment] | None = None,
     markup: bool = False,
+    preserve_citations: bool = False,
 ) -> Iterator[dict[str, Any]]:
     normalized = normalize_messages(messages or ([{"role": "user", "content": prompt}] if prompt else []))
     image_model = is_supported_image_model(model)
@@ -806,7 +812,7 @@ def conversation_events(
         comments=comments if image_model else None,
         markup=markup if image_model else False,
     )
-    yield from iter_conversation_payloads(payloads, history_text, history_messages)
+    yield from iter_conversation_payloads(payloads, history_text, history_messages, preserve_citations=preserve_citations)
 
 
 def text_backend(model: str = "auto") -> OpenAIBackendAPI:
@@ -815,7 +821,13 @@ def text_backend(model: str = "auto") -> OpenAIBackendAPI:
     ))
 
 
-def stream_text_deltas(backend: OpenAIBackendAPI, request: ConversationRequest) -> Iterator[str]:
+def stream_text_deltas(
+    backend: OpenAIBackendAPI,
+    request: ConversationRequest,
+    *,
+    on_event: Callable[[OpenAIBackendAPI, dict[str, Any]], None] | None = None,
+    on_complete: Callable[[OpenAIBackendAPI], None] | None = None,
+) -> Iterator[str]:
     attempted_tokens: set[str] = set()
     token = getattr(backend, "access_token", "")
     emitted = False
@@ -835,7 +847,10 @@ def stream_text_deltas(backend: OpenAIBackendAPI, request: ConversationRequest) 
                 model=request.model,
                 prompt=request.prompt,
                 thinking_effort=request.thinking_effort,
+                **({"preserve_citations": True} if on_event is not None else {}),
             ):
+                if on_event is not None:
+                    on_event(active_backend, event)
                 if event.get("type") != "conversation.delta":
                     continue
                 delta = str(event.get("delta") or "")
@@ -843,6 +858,8 @@ def stream_text_deltas(backend: OpenAIBackendAPI, request: ConversationRequest) 
                     emitted = True
                     yield delta
             account_service.mark_text_used(token)
+            if on_complete is not None:
+                on_complete(active_backend)
             return
         except Exception as exc:
             error_message = str(exc)

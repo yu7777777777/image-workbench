@@ -4,6 +4,7 @@ import { create } from "zustand";
 import localforage from "localforage";
 import webConfig from "@/constants/common-env";
 import { getStoredAuthSession } from "@/store/auth";
+import { mergeChatResources, readChatResources, type ChatResource } from "@/lib/chat-resources";
 import {
   createChatId,
   readChatResponse,
@@ -23,6 +24,7 @@ export type ChatMessage = {
   role: "user" | "assistant";
   text: string;
   writingDrafts?: Record<number, string>;
+  resources?: ChatResource[];
   images?: ChatImage[];
   model?: string;
   status?: "streaming" | "done" | "stopped" | "error";
@@ -141,13 +143,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
         });
       }
       const defaults = readStandaloneChatSettings(owner);
-      const threads = (saved?.threads || []).map((thread) => ({
+      const threads: ChatThread[] = (saved?.threads || []).map((thread) => ({
         ...thread,
-        messages: thread.messages.map((message) =>
-          message.status === "streaming"
-            ? { ...message, status: "stopped" as const }
-            : message,
-        ),
+        messages: thread.messages.map((message) => ({
+          ...message,
+          status: message.status === "streaming" ? "stopped" as const : message.status,
+          ...(message.resources !== undefined ? { resources: readChatResources(message.resources) } : {}),
+        })),
       }));
       if (!threads.length) {
         threads.push(makeThread(defaults.model, defaults.effort));
@@ -305,17 +307,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
           model: thread.model,
           messages,
           stream: true,
+          rich_content: true,
           ...(thread.effort ? { reasoning_effort: thread.effort } : {}),
           ...(retry ? { metadata: { chat_retry_id: answer.id } } : {}),
         }),
         signal: abort.signal,
       });
       let output = "";
-      await readChatResponse(response, (delta) => {
-        output += delta;
-        patchAnswer({ text: output });
-        saveSoon();
-      });
+      let resources: ChatResource[] = [];
+      await readChatResponse(
+        response,
+        (delta) => {
+          if (abort.signal.aborted) return;
+          output += delta;
+          patchAnswer({ text: output });
+          saveSoon();
+        },
+        (incoming) => {
+          if (abort.signal.aborted) return;
+          resources = mergeChatResources(resources, incoming);
+          patchAnswer({ resources });
+          saveSoon();
+        },
+      );
       patchAnswer({ status: "done" });
     } catch (error) {
       patchAnswer({

@@ -384,9 +384,12 @@ class LoggedCall:
         failed = False
         try:
             for item in items:
-                urls.extend(_collect_urls(item))
-                account_emails.extend(_collect_account_emails(item))
-                conversation_ids.extend(_collect_conversation_ids(item))
+                log_item = item
+                if self.endpoint == "/v1/chat/completions" and isinstance(item, dict) and "workbench" in item:
+                    log_item = {key: value for key, value in item.items() if key != "workbench"}
+                urls.extend(_collect_urls(log_item))
+                account_emails.extend(_collect_account_emails(log_item))
+                conversation_ids.extend(_collect_conversation_ids(log_item))
                 yield _strip_internal_response_fields(item)
         except Exception as exc:
             failed = True
