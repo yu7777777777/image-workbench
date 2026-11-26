@@ -765,6 +765,11 @@ input[type="number"] {
   background: hsl(var(--panel-surface));
 }
 
+.studio-task-media-adaptive {
+  aspect-ratio: 4 / 3;
+  max-height: 20rem;
+}
+
 .studio-task-info {
   min-height: 3.5rem;
 }
@@ -947,6 +952,8 @@ input[type="number"] {
   .studio-task-layout { min-height: 9rem; flex-direction: row; }
   .studio-task-media { width: 37%; aspect-ratio: auto; }
   .studio-task-info { min-height: 0; }
+  .studio-agent-workspace .studio-task-layout { min-height: 0; flex-direction: column; }
+  .studio-agent-workspace .studio-task-media-adaptive { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { LoaderCircle } from "lucide-react";
+import { Eye, EyeOff, LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -17,13 +17,15 @@ import { FishLogo } from "@/components/fish-logo";
 export default function LoginPage() {
   const router = useRouter();
   const [authKey, setAuthKey] = useState("");
+  const [showAuthKey, setShowAuthKey] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { isCheckingAuth } = useRedirectIfAuthenticated();
 
   const handleLogin = async () => {
+    if (isSubmitting) return;
     const normalizedAuthKey = authKey.trim();
     if (!normalizedAuthKey) {
-      toast.error("请输入 密钥");
+      toast.error("请输入密钥");
       return;
     }
 
@@ -66,33 +68,49 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <div className="space-y-3">
-            <label htmlFor="auth-key" className="block text-sm font-medium text-stone-700">
-              密钥
-            </label>
-            <Input
-              id="auth-key"
-              type="password"
-              value={authKey}
-              onChange={(event) => setAuthKey(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  void handleLogin();
-                }
-              }}
-              placeholder="请输入密钥"
-              className="h-13 rounded-2xl border-border bg-background px-4"
-            />
-          </div>
+          <form className="space-y-7" onSubmit={(event) => {
+            event.preventDefault();
+            void handleLogin();
+          }}>
+            <div className="space-y-3">
+              <label htmlFor="auth-key" className="block text-sm font-medium text-foreground">
+                密钥
+              </label>
+              <div className="relative">
+                <Input
+                  id="auth-key"
+                  name="password"
+                  type={showAuthKey ? "text" : "password"}
+                  autoComplete="current-password"
+                  spellCheck={false}
+                  value={authKey}
+                  onChange={(event) => setAuthKey(event.target.value)}
+                  placeholder="请输入密钥"
+                  className="h-13 rounded-2xl border-border bg-background pl-4 pr-12 [&::-ms-reveal]:hidden"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute inset-y-0 right-1 my-auto rounded-xl text-muted-foreground"
+                  aria-label={showAuthKey ? "隐藏密钥" : "显示密钥"}
+                  aria-controls="auth-key"
+                  onClick={() => setShowAuthKey((visible) => !visible)}
+                >
+                  {showAuthKey ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+                </Button>
+              </div>
+            </div>
 
-          <Button
-            className="h-13 w-full rounded-2xl bg-[var(--brand-gold)] text-[var(--brand-on-gold)] hover:bg-[var(--brand-gold-hover)]"
-            onClick={() => void handleLogin()}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? <LoaderCircle className="size-4 animate-spin" /> : null}
-            登录
-          </Button>
+            <Button
+              type="submit"
+              className="h-13 w-full rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? <LoaderCircle className="size-4 animate-spin" /> : null}
+              登录
+            </Button>
+          </form>
         </CardContent>
       </Card>
     </div>

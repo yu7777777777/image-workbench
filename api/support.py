@@ -262,6 +262,17 @@ def resolve_web_asset(requested_path: str) -> Path | None:
         base_dir / clean_path / "index.html",
         base_dir / f"{clean_path}.html",
     ]
+    # webpack 导出目录中的页面数据也可由 Next 的扁平预取地址访问。
+    asset_name = Path(clean_path).name
+    if asset_name.startswith("__next.") and asset_name.endswith(".__PAGE__.txt"):
+        # 原位部署会保留旧文件。先读取当前目录式导出的产物，避免命中旧的扁平文件。
+        candidates.insert(0, base_dir / clean_path.removesuffix(".__PAGE__.txt") / "__PAGE__.txt")
+    # Next 静态导出会按路由尾斜杠请求 route.txt 或 route/index.txt。
+    elif clean_path.endswith(".txt") and not asset_name.startswith("__next."):
+        if clean_path.endswith("/index.txt"):
+            candidates.append(base_dir / f"{clean_path[:-len('/index.txt')]}.txt")
+        else:
+            candidates.insert(0, base_dir / clean_path[:-4] / "index.txt")
     for candidate in candidates:
         try:
             candidate.resolve().relative_to(base_dir)

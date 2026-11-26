@@ -490,10 +490,10 @@ export const useStore = create<AppState>()(
           const prev = state.appMode
           if (prev === 'gallery') {
             const galleryInputDraft = saveGalleryInputDraft(state)
-            set({ appMode: 'canvas', galleryInputDraft })
+            set({ appMode: 'canvas', galleryInputDraft, ...clearInputDraftState() })
           } else if (prev === 'agent') {
             const agentInputDrafts = saveActiveAgentInputDrafts(state)
-            set({ appMode: 'canvas', agentInputDrafts })
+            set({ appMode: 'canvas', agentInputDrafts, ...clearInputDraftState() })
           } else {
             set({ appMode: 'canvas' })
           }
@@ -555,7 +555,7 @@ export const useStore = create<AppState>()(
             agentAssetPanelCollapsed: true,
             selectedTaskIds: [],
             selectedFavoriteCollectionIds: [],
-            ...restoreAgentInputDraftState(state.agentInputDrafts, state.activeAgentConversationId),
+            ...(state.appMode !== 'agent' ? restoreAgentInputDraftState(state.agentInputDrafts, state.activeAgentConversationId) : {}),
           }))
           return
         }
@@ -583,7 +583,7 @@ export const useStore = create<AppState>()(
               agentAssetPanelCollapsed: true,
               selectedTaskIds: [],
               selectedFavoriteCollectionIds: [],
-              ...restoreAgentInputDraftState(state.agentInputDrafts, state.activeAgentConversationId),
+              ...(state.appMode !== 'agent' ? restoreAgentInputDraftState(state.agentInputDrafts, state.activeAgentConversationId) : {}),
             }))
             return
           }
@@ -1497,6 +1497,8 @@ export async function initStore() {
   }
   for (const node of useStore.getState().canvasNodes) if (node.imageId) referencedIds.add(node.imageId)
   const state = useStore.getState()
+  const initialAppMode = state.appMode
+  const initialAgentConversationId = state.activeAgentConversationId
   const persistedInputImages = state.inputImages
   const galleryInputDraft = state.galleryInputDraft
   const agentConversations = state.agentConversations
@@ -1543,7 +1545,14 @@ export async function initStore() {
     }
   }
   if (restoredInputImages.length !== persistedInputImages.length || restoredInputImages.some((img, index) => img.dataUrl !== persistedInputImages[index]?.dataUrl)) {
-    useStore.getState().setInputImages(restoredInputImages)
+    const latest = useStore.getState()
+    const sameContext = latest.appMode === initialAppMode
+      && (initialAppMode !== 'agent' || latest.activeAgentConversationId === initialAgentConversationId)
+      && latest.inputImages.length === persistedInputImages.length
+      && latest.inputImages.every((img, index) => img.id === persistedInputImages[index]?.id)
+    if (sameContext) {
+      latest.setInputImages(restoredInputImages)
+    }
   }
 
   if (galleryInputDraft) {
@@ -1644,6 +1653,7 @@ export async function submitTask(options: {
   allowFullMask?: boolean
   useCurrentApiProfileWhenReusedMissing?: boolean
   input?: SubmitTaskInput
+  canvas?: { poolModel?: string }
 } = {}): Promise<string | undefined> {
   const { settings, reusedTaskApiProfileId, reusedTaskApiProfileName, reusedTaskApiProfileMissing, showToast, setConfirmDialog } =
     useStore.getState()
@@ -1663,6 +1673,9 @@ export async function submitTask(options: {
   if (!activeProfile) {
     showToast('节点所用的 API 配置已移除，请重新选择。', 'error')
     return
+  }
+  if (activeProfile.id === POOL_PROFILE_ID && options.canvas?.poolModel) {
+    activeProfile = { ...activeProfile, model: options.canvas.poolModel }
   }
   let requestSettings = createSettingsForApiProfile(normalizedSettings, activeProfile)
   if (!options.input && normalizedSettings.reuseTaskApiProfileTemporarily && (reusedTaskApiProfileId || reusedTaskApiProfileMissing)) {
@@ -1688,9 +1701,10 @@ export async function submitTask(options: {
     }
   }
 
-  if (validateApiProfile(activeProfile)) {
-    showToast(`请先完善请求 API 配置：${validateApiProfile(activeProfile)}`, 'error')
-    useStore.getState().setShowSettings(true)
+  const profileError = validateApiProfile(activeProfile)
+  if (profileError) {
+    showToast(`请先完善请求 API 配置：${profileError}`, 'error')
+    if (!isPoolBuild || !options.canvas) useStore.getState().setShowSettings(true)
     return
   }
 
@@ -1776,6 +1790,7 @@ export async function submitTask(options: {
     apiProfileName: activeProfile.name,
     apiMode: activeProfile.apiMode,
     apiModel: activeProfile.model,
+    ...(options.canvas ? { sourceMode: 'canvas' as const } : {}),
     inputImageIds: orderedInputImages.map((i) => i.id),
     ...(taskComments.length ? { comments: taskComments } : {}),
     maskTargetImageId,
@@ -3622,7 +3637,10 @@ async function executeTask(taskId: string) {
     })
     return
   }
-  const activeProfile = taskProfile ?? getActiveApiProfile(settings)
+  const profile = taskProfile ?? getActiveApiProfile(settings)
+  const activeProfile = task.sourceMode === 'canvas' && profile.id === POOL_PROFILE_ID && task.apiModel
+    ? { ...profile, model: task.apiModel }
+    : profile
   const requestSettings = createSettingsForApiProfile(settings, activeProfile)
   const taskProvider = taskProfile?.provider ?? task.apiProvider ?? activeProfile.provider
   let falRequestInfo: { requestId: string; endpoint: string } | null = task.falRequestId && task.falEndpoint

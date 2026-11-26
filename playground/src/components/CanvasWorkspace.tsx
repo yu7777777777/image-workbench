@@ -5,7 +5,7 @@ import { DEFAULT_PARAMS } from '../types'
 import { getImage, storeImage } from '../lib/db'
 import { ensureImageCached } from '../lib/imageCache'
 import { downloadImageIds } from '../lib/downloadImages'
-import { buildCanvasInput, canConnectCanvasNodes, canvasGroupPortId, getCanvasImageId, normalizeCanvasProject } from '../lib/canvasWorkflow'
+import { buildCanvasInput, canConnectCanvasNodes, CANVAS_GENERATION_CONNECTED_MIN_HEIGHT, canvasGroupPortId, canvasNodeDefaultSize, findNonOverlappingCanvasPosition, getCanvasImageId, normalizeCanvasProject } from '../lib/canvasWorkflow'
 import { rewriteCanvasPrompt } from '../lib/canvasPromptRewrite'
 import { fitToRect, getPinchTransform, screenToWorld, zoomAtScreenPoint, zoomByDelta } from '../lib/canvasTransform'
 import { isPoolBuild } from '../lib/accountPool'
@@ -21,7 +21,9 @@ import { CanvasMiniMap } from './canvas/CanvasMiniMap'
 import { CanvasImageEditorModal } from './canvas/CanvasImageEditorModal'
 import type { CanvasImageEditResult } from './canvas/CanvasImageEditorModal'
 import { createLocalId } from '../lib/id'
-import { isPresetConfigOnlyEnabled, isPresetProfile } from '../lib/presetConfig'
+import { getCanvasGenerationProfiles, resolveCanvasGenerationProfile } from '../lib/canvasGenerationProfiles'
+import { fetchAvailableImageModels, filterHiddenImageModels } from '../lib/modelsCatalog'
+import { POOL_PROFILE_ID } from '../lib/poolProfileIds'
 import './canvas/canvas.css'
 
 type Point = { x: number; y: number }
@@ -231,13 +233,20 @@ export default function CanvasWorkspace() {
     checkpoint()
     const state = useStore.getState()
     const generation = type === 'generation'
-    const position = point || centerPoint()
+    const defaults = canvasNodeDefaultSize(type)
+    const width = defaults.width
+    const height = generation ? defaults.height : type === 'text' ? defaults.height : 300
+    const anchor = point || centerPoint()
+    const rawPosition = { x: anchor.x - Math.round(width / 2), y: anchor.y - Math.min(Math.round(height / 2), 180) }
+    const position = point ? rawPosition : findNonOverlappingCanvasPosition(rawPosition, state.canvasNodes)
     const selectedSources = sourceIds ?? state.canvasSelectedNodeIds.filter((id) => state.canvasNodes.some((node) => node.id === id))
-    const canvasProfileId = state.settings.profiles.find((profile) => profile.id === state.settings.activeProfileId && !isAgentTextApiProfile(profile))?.id
-      ?? state.settings.profiles.find((profile) => !isAgentTextApiProfile(profile))?.id
+    const hasConnectedText = generation && selectedSources.some((id) => state.canvasNodes.find((node) => node.id === id)?.type === 'text')
+    const canvasProfileId = generation
+      ? resolveCanvasGenerationProfile(state.settings, getCanvasGenerationProfiles(state.settings))?.id
+      : undefined
     const node: CanvasNode = {
       id: createLocalId('canvas'), type, label: generation ? 'API 生成' : type === 'text' ? '提示词' : '图片',
-      position: { x: position.x - 150, y: position.y - 140 }, width: generation ? 320 : 280, height: generation ? 400 : type === 'text' ? 280 : 300,
+      position, width, height: hasConnectedText ? Math.max(height, CANVAS_GENERATION_CONNECTED_MIN_HEIGHT) : height,
       zIndex: Math.max(0, ...state.canvasNodes.map((node) => node.zIndex)) + 1,
       ...(generation ? { prompt: '', sourceNodeIds: selectedSources, params: { size: '1254x1254', quality: 'auto', n: 1 }, profileId: canvasProfileId } : {}),
     }
@@ -279,10 +288,12 @@ export default function CanvasWorkspace() {
 
   const addHistoryImage = (taskId: string, imageId: string, outputIndex: number) => {
     checkpoint()
-    const position = centerPoint()
+    const state = useStore.getState()
+    const anchor = centerPoint()
+    const position = findNonOverlappingCanvasPosition({ x: anchor.x - 140, y: anchor.y - 140 }, state.canvasNodes)
     const id = createLocalId('canvas-history')
-    useStore.getState().addCanvasNode({ id, type: 'task', taskId, imageId, outputIndex, label: '历史图片', position: { x: position.x - 140, y: position.y - 140 }, width: 280, height: 300, zIndex: Date.now() })
-    useStore.getState().setCanvasSelectedNodeIds([id])
+    state.addCanvasNode({ id, type: 'task', taskId, imageId, outputIndex, label: '历史图片', position, width: 280, height: 300, zIndex: Date.now() })
+    state.setCanvasSelectedNodeIds([id])
   }
 
   const runNode = async (nodeId: string) => {
@@ -292,17 +303,27 @@ export default function CanvasWorkspace() {
     submitting.current.add(nodeId)
     setBusy([...submitting.current])
     try {
+      const profile = resolveCanvasGenerationProfile(state.settings, getCanvasGenerationProfiles(state.settings), node.profileId)
+      if (!profile) {
+        state.showToast('暂无可用的生图配置，请稍后重试。', 'error')
+        return
+      }
       // buildCanvasInput 会把节点自身与上游节点的评论锚点合并进 input.comments，
       // 由 submitTask 落到任务上，executeTask 再透传给 CallApiOptions.comments
       const input = await buildCanvasInput(node, state.canvasNodes, state.tasks)
-      const requestedProfile = state.settings.profiles.find((profile) => profile.id === node.profileId)
-      const usableProfileId = requestedProfile && !isAgentTextApiProfile(requestedProfile)
-        ? requestedProfile.id
-        : state.settings.profiles.find((profile) => !isAgentTextApiProfile(profile))?.id
-      const profileId = isPresetConfigOnlyEnabled() && !isPresetProfile(usableProfileId ?? '')
-        ? state.settings.profiles.find((profile) => isPresetProfile(profile.id) && !isAgentTextApiProfile(profile))?.id
-        : usableProfileId
-      const taskId = await submitTask({ input: { ...input, params: { ...DEFAULT_PARAMS, ...node.params }, profileId } })
+      let poolModel: string | undefined
+      if (isPoolBuild && profile.id === POOL_PROFILE_ID) {
+        const models = filterHiddenImageModels(await fetchAvailableImageModels())
+        poolModel = models.includes(profile.model) ? profile.model : models[0]
+        if (!poolModel) {
+          state.showToast('本站账号池暂无可用的生图模型，请稍后重试。', 'error')
+          return
+        }
+      }
+      const taskId = await submitTask({
+        input: { ...input, params: { ...DEFAULT_PARAMS, ...node.params }, profileId: profile.id },
+        canvas: { poolModel },
+      })
       if (taskId) useStore.getState().updateCanvasNode(nodeId, { taskId })
     } catch (error) { state.showToast(error instanceof Error ? error.message : '生成失败', 'error') }
     finally { submitting.current.delete(nodeId); setBusy([...submitting.current]) }
@@ -357,13 +378,17 @@ export default function CanvasWorkspace() {
       if (!canConnectCanvasNodes(state.canvasNodes, sourceId, targetId)) { state.showToast('不能连接到自身或形成循环', 'error'); return }
       const target = state.canvasNodes.find((node) => node.id === targetId)!
       const ids = [...new Set([...(target.sourceNodeIds || []), sourceId])]
-      checkpoint(); state.updateCanvasNode(targetId, { sourceNodeIds: ids }); return
+      const connectsText = groupMembers.some((member) => member.type === 'text')
+      const nextHeight = target.type === 'generation' && connectsText ? Math.max(target.height, CANVAS_GENERATION_CONNECTED_MIN_HEIGHT) : target.height
+      checkpoint(); state.updateCanvasNode(targetId, { sourceNodeIds: ids, ...(nextHeight !== target.height ? { height: nextHeight } : {}) }); return
     }
     if (!canConnectCanvasNodes(state.canvasNodes, sourceId, targetId)) { state.showToast('不能连接到自身或形成循环', 'error'); return }
     const target = state.canvasNodes.find((node) => node.id === targetId)!
     if (target.sourceNodeIds?.includes(sourceId)) return
+    const sourceNode = state.canvasNodes.find((node) => node.id === sourceId)
+    const nextHeight = target.type === 'generation' && sourceNode?.type === 'text' ? Math.max(target.height, CANVAS_GENERATION_CONNECTED_MIN_HEIGHT) : target.height
     checkpoint()
-    state.updateCanvasNode(targetId, { sourceNodeIds: [...(target.sourceNodeIds || []), sourceId] })
+    state.updateCanvasNode(targetId, { sourceNodeIds: [...(target.sourceNodeIds || []), sourceId], ...(nextHeight !== target.height ? { height: nextHeight } : {}) })
   }
 
   const pointerDown = (event: React.PointerEvent, nodeId?: string) => {
@@ -485,6 +510,11 @@ export default function CanvasWorkspace() {
 
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && shortcutHelpOpen) {
+        event.preventDefault()
+        setShortcutHelpOpen(false)
+        return
+      }
       if (editable(event.target) || !loaded) return
       const state = useStore.getState()
       const modifier = event.ctrlKey || event.metaKey
@@ -503,7 +533,7 @@ export default function CanvasWorkspace() {
       else if (event.key === '?' || (event.shiftKey && event.key === '/')) { event.preventDefault(); setShortcutHelpOpen((open) => !open) }
       else if (event.key.toLowerCase() === 'v') setTool('select')
       else if (event.key.toLowerCase() === 'h') setTool('hand')
-      else if (event.key === 'Escape') { setMenu(null); setConnection(null); gesture.current = null; state.setCanvasSelectedNodeIds([]) }
+      else if (event.key === 'Escape') { setShortcutHelpOpen(false); setMenu(null); setConnection(null); gesture.current = null; state.setCanvasSelectedNodeIds([]) }
     }
     const release = () => { space.current = false }
     const keyup = (event: KeyboardEvent) => { if (event.code === 'Space') release() }
@@ -514,7 +544,7 @@ export default function CanvasWorkspace() {
     }
     window.addEventListener('keydown', keydown); window.addEventListener('keyup', keyup); window.addEventListener('blur', release); window.addEventListener('paste', paste)
     return () => { window.removeEventListener('keydown', keydown); window.removeEventListener('keyup', keyup); window.removeEventListener('blur', release); window.removeEventListener('paste', paste) }
-  }, [loaded, undo, save, removeSelected, libraryOpen])
+  }, [loaded, undo, save, removeSelected, libraryOpen, shortcutHelpOpen])
 
   const collapsedGroupIds = new Set(nodes.filter((node) => node.groupId && node.groupCollapsed).map((node) => node.groupId))
   const visibleNodeIds = new Set(nodes.filter((node) => !node.groupCollapsed).map((node) => node.id))
@@ -670,7 +700,13 @@ export default function CanvasWorkspace() {
     return { groupId, name: members.find((node) => node.groupName)?.groupName || '未命名分组', collapsed: members.every((node) => node.groupCollapsed), count: members.length, x, y, width: right - x, height: bottom - y }
   })
 
-  return <div ref={viewport} className={`canvas-workspace ${tool === 'hand' ? 'hand-tool' : ''}`} data-standalone={!isPoolBuild || undefined} onPointerDown={(event) => pointerDown(event)} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp} onContextMenu={(event) => { if (!(event.target as Element).closest('[data-canvas-ui],input,textarea,select')) openMenu(event) }}
+  const sideDrawerClass = libraryOpen
+    ? 'has-side-drawer has-library'
+    : promptLibraryOpen
+      ? 'has-side-drawer has-prompt-library'
+      : ''
+
+  return <div ref={viewport} className={`canvas-workspace ${tool === 'hand' ? 'hand-tool' : ''} ${sideDrawerClass}`.trim()} data-standalone={!isPoolBuild || undefined} onPointerDown={(event) => pointerDown(event)} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp} onContextMenu={(event) => { if (!(event.target as Element).closest('[data-canvas-ui],input,textarea,select')) openMenu(event) }}
     onDragOver={(event) => { if (loaded && event.dataTransfer.types.includes('Files')) { event.preventDefault(); setDropActive(true) } }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDropActive(false) }} onDrop={(event) => { event.preventDefault(); setDropActive(false); if (loaded) void importFiles(Array.from(event.dataTransfer.files), screenToWorld(screenPoint({ x: event.clientX, y: event.clientY }), transform)) }}>
     {showGrid && <div className="canvas-dot-grid" style={{ backgroundSize: `${Math.max(12, 24 * transform.scale)}px ${Math.max(12, 24 * transform.scale)}px`, backgroundPosition: `${transform.x}px ${transform.y}px` }} />}
     <div className="canvas-world" style={{ transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})` }}>
@@ -690,7 +726,7 @@ export default function CanvasWorkspace() {
         return <g key={`${sourceId}-${target.id}`}><path d={d} className={`canvas-edge ${lineage ? 'is-lineage' : inactivePrompt ? 'is-inactive' : ''}`} />{!lineage && <path d={d} className="canvas-edge-hit" onPointerDown={(event) => event.stopPropagation()} onDoubleClick={(event) => { event.preventDefault(); event.stopPropagation(); checkpoint(); useStore.getState().updateCanvasNode(target.id, { sourceNodeIds: target.sourceNodeIds?.filter((id) => id !== sourceId) }); useStore.getState().showToast('已删除连接线', 'success') }}><title>双击断开输入连线</title></path>}</g>
       }))}{connection && (() => { const source = nodes.find((node) => node.id === connection.sourceId); const group = groupFrames.find((item) => item.groupId === connection.sourceId.replace('canvas-group-output-', '')); return (source || group) && <path className="canvas-edge is-preview" d={path(source ? { x: source.position.x + source.width + 8, y: source.position.y + 56 } : { x: group!.x + group!.width + 8, y: group!.y + 18 }, connection.point)} /> })()}</svg>
       {groupFrames.map((group) => <button key={group.groupId} type="button" data-canvas-ui className={`canvas-group-frame ${group.collapsed ? 'is-collapsed' : ''}`} style={{ left: group.x, top: group.y, width: group.width, height: group.height }} onPointerDown={(event) => { if ((event.target as Element).closest('[data-canvas-group-connect]')) return; groupPointerDown(event, group.groupId) }} onClick={(event) => { event.stopPropagation(); if (!suppressGroupClick.current) toggleGroup(group.groupId); suppressGroupClick.current = false }}><span>{group.name}</span><small>{group.collapsed ? `${group.count} 个节点 · 拖动移动 · 点击展开` : '拖动移动 · 点击折叠'}</small><i className="canvas-group-port" data-canvas-group-connect aria-label="连接整组素材" title="连接整组素材" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); const point = { x: event.clientX, y: event.clientY }; viewport.current?.setPointerCapture(event.pointerId); const sourceId = canvasGroupPortId(group.groupId); gesture.current = { kind: 'connect', sourceId, start: point, origin: point, moved: false }; setConnection({ sourceId, point: screenToWorld(screenPoint(point), transform) }) }} /></button>)}
-      {nodes.filter((node) => !node.groupCollapsed).map((node) => <CanvasNodeCard key={node.id} node={node} hasConnectedText={Boolean(node.sourceNodeIds?.some((id) => nodes.find((source) => source.id === id)?.type === 'text'))} isSelected={selected.includes(node.id)} busy={busy.includes(node.id)} promptRewriteBusy={promptRewriteBusy.includes(node.id)} isConnectionTarget={Boolean(connection && node.type === 'generation' && connection.sourceId !== node.id && canConnectCanvasNodes(nodes, connection.sourceId, node.id))} onPointerDown={pointerDown} onResizeStart={resizePointerDown} onRun={(id) => void runNode(id)} onEdit={edit} onDownload={(id) => void download(id)} onDoubleClick={preview} onMenu={openMenu} onPromptLibrary={(id) => { setPromptLibraryTarget(id); setPromptLibraryOpen(true) }} onPromptRewrite={(id, profileId) => {
+      {nodes.filter((node) => !node.groupCollapsed).map((node) => <CanvasNodeCard key={node.id} node={node} hasConnectedText={Boolean(node.sourceNodeIds?.some((id) => nodes.find((source) => source.id === id)?.type === 'text'))} isSelected={selected.includes(node.id)} busy={busy.includes(node.id)} promptRewriteBusy={promptRewriteBusy.includes(node.id)} isConnectionTarget={Boolean(connection && node.type === 'generation' && connection.sourceId !== node.id && canConnectCanvasNodes(nodes, connection.sourceId, node.id))} onPointerDown={pointerDown} onResizeStart={resizePointerDown} onRun={(id) => void runNode(id)} onEdit={edit} onDownload={(id) => void download(id)} onDoubleClick={preview} onMenu={openMenu} onPromptLibrary={(id) => { setPromptLibraryTarget(id); setLibraryOpen(false); setPromptLibraryOpen(true) }} onPromptRewrite={(id, profileId) => {
           const current = nodes.find((item) => item.id === id)?.prompt?.trim()
           if (!current || promptRewriteBusy.includes(id)) return
           const profile = settings.profiles.find((item) => item.id === profileId) || getAgentTextApiProfile(settings)
@@ -745,8 +781,8 @@ export default function CanvasWorkspace() {
         <button type="button" disabled={!loaded} title="上传图片（支持拖入 / 粘贴）" onClick={() => uploadInput.current?.click()}><CanvasIcon name="image" />图片</button>
         <button type="button" disabled={!loaded} onClick={() => addNode('text')}><CanvasIcon name="text" />提示词</button>
         <button type="button" disabled={!loaded} onClick={() => addNode('generation')}><CanvasIcon name="generate" />生成</button>
-        <button type="button" disabled={!loaded} aria-pressed={libraryOpen} className={libraryOpen ? 'active' : ''} onClick={() => setLibraryOpen(!libraryOpen)}><CanvasIcon name="library" />素材库</button>
-        <button type="button" disabled={!loaded} aria-pressed={promptLibraryOpen} className={promptLibraryOpen ? 'active' : ''} onClick={() => setPromptLibraryOpen(!promptLibraryOpen)}><CanvasIcon name="text" />词库</button>
+        <button type="button" disabled={!loaded} aria-pressed={libraryOpen} className={libraryOpen ? 'active' : ''} onClick={() => { setLibraryOpen((open) => !open); setPromptLibraryOpen(false) }}><CanvasIcon name="library" />素材库</button>
+        <button type="button" disabled={!loaded} aria-pressed={promptLibraryOpen} className={promptLibraryOpen ? 'active' : ''} onClick={() => { setPromptLibraryOpen((open) => !open); setLibraryOpen(false) }}><CanvasIcon name="text" />词库</button>
       </div>
       <CanvasToolbar tool={tool} scale={transform.scale} grid={showGrid} onTool={setTool} onZoom={(factor) => { const element = viewport.current!; useStore.getState().setCanvasTransform(zoomAtScreenPoint(transform, { x: element.clientWidth / 2, y: element.clientHeight / 2 }, transform.scale * factor)) }} onFocus={focusSelected} onHelp={() => setShortcutHelpOpen(true)} onFit={fit} onGrid={() => useStore.getState().setCanvasShowGrid(!showGrid)} onUndo={() => undo()} onRedo={() => undo(true)} canUndo={history.current.undo.length > 0} canRedo={history.current.redo.length > 0} />
     </div>
@@ -764,7 +800,7 @@ export default function CanvasWorkspace() {
       {menuNode.type !== 'text' && menuNode.type !== 'generation' && <><button onClick={() => { edit(menuNode.id); setMenu(null) }}>以此图创建编辑节点</button><button onClick={() => { void openImageEditor(menuNode.id); setMenu(null) }}>裁剪 / 画笔编辑</button><button onClick={() => { void download(menuNode.id); setMenu(null) }}>下载图片</button></>}
        {menuNode.groupId && <><button onClick={() => { renameSelectedGroup(); setMenu(null) }}>重命名分组</button><button onClick={() => { toggleGroup(menuNode.groupId!); setMenu(null) }}>{menuNode.groupCollapsed ? '展开分组' : '折叠分组'}</button><button onClick={() => { ungroupSelected(); setMenu(null) }}>解散分组</button></>}
       <button className="danger" disabled={menuNode.locked} onClick={removeSelected}>从画布移除</button>
-    </> : <>{selected.length >= 2 && <button onClick={() => { groupSelected(); setMenu(null) }}>添加分组 <span className="canvas-menu-shortcut">Ctrl/Cmd + G</span></button>}<button onClick={() => addNode('generation', menu.point)}>添加生成节点</button><button onClick={() => addNode('text', menu.point)}>添加提示词节点</button><button onClick={() => { uploadInput.current?.click(); setMenu(null) }}>上传图片</button><button onClick={() => { setLibraryOpen(true); setMenu(null) }}>打开素材库</button></>}</div>}
+    </> : <>{selected.length >= 2 && <button onClick={() => { groupSelected(); setMenu(null) }}>添加分组 <span className="canvas-menu-shortcut">Ctrl/Cmd + G</span></button>}<button onClick={() => addNode('generation', menu.point)}>添加生成节点</button><button onClick={() => addNode('text', menu.point)}>添加提示词节点</button><button onClick={() => { uploadInput.current?.click(); setMenu(null) }}>上传图片</button><button onClick={() => { setPromptLibraryOpen(false); setLibraryOpen(true); setMenu(null) }}>打开素材库</button></>}</div>}
     <input ref={uploadInput} type="file" accept="image/*" multiple hidden onChange={(event) => { void importFiles(Array.from(event.target.files || [])); event.target.value = '' }} />
     <input ref={projectInput} type="file" accept=".json,application/json" hidden onChange={(event) => { void importProject(event.target.files?.[0]); event.target.value = '' }} />
     <CanvasMiniMap nodes={overviewNodes} transform={transform} onNavigate={(world) => { const element = viewport.current; if (!element) return; useStore.getState().setCanvasTransform({ ...transform, x: element.clientWidth / 2 - world.x * transform.scale, y: element.clientHeight / 2 - world.y * transform.scale }) }} />

@@ -287,7 +287,7 @@ export function GallerySettingsCard({ showSharedProfiles = true }: { showSharedP
             <CardTitle className="text-base font-semibold">Agent 配置</CardTitle>
           </div>
           <CardDescription className="text-xs text-stone-500">
-            配置 Agent 对话模式的接口方式、联网搜索与生图助手的执行轮次。具体使用哪个对话 / 生图模型，请在画廊「对话」模式的输入栏里选择。
+            配置 Agent 对话模式的接口方式、联网搜索与生图助手的执行轮次。具体使用哪个对话 / 生图模型，请在 Agent 输入栏选择。
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -307,7 +307,7 @@ export function GallerySettingsCard({ showSharedProfiles = true }: { showSharedP
               </SelectContent>
             </Select>
             <p className="text-xs text-stone-500">
-              默认混合模式：在画廊「对话」模式输入栏选择对话与生图模型，默认即「本站账号池 (Agent)」与「本站账号池」，直接用登录账号，无需填写 API Key。
+              默认混合模式：在 Agent 输入栏选择对话与生图模型，默认即「本站账号池 (Agent)」与「本站账号池」，直接用登录账号，无需填写 API Key。
             </p>
           </div>
 

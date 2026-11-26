@@ -112,6 +112,19 @@ export default function Select({ value, onChange, onReorder, options, disabled, 
 
   useEffect(() => {
     if (!isOpen) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown, true)
+    return () => document.removeEventListener('keydown', handleKeyDown, true)
+  }, [isOpen])
+
+  useEffect(() => {
+    if (!isOpen) return
 
     const updateMenuMaxHeight = () => {
       if (!triggerRef.current) return

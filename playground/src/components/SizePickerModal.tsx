@@ -101,6 +101,18 @@ export default function SizePickerModal({ currentSize, onSelect, onClose, allowA
 
   }, [])
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        onClose()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown, true)
+    return () => window.removeEventListener('keydown', handleKeyDown, true)
+  }, [onClose])
+
   const normalizeSize = codexCli ? normalizeCodexCliImageSize : normalizeImageSize
   const sizeLimitText = codexCli ? CODEX_CLI_SIZE_LIMIT_TEXT : SIZE_LIMIT_TEXT
 
@@ -192,7 +204,7 @@ export default function SizePickerModal({ currentSize, onSelect, onClose, allowA
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
             <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">设置图像尺寸</h3>
-            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">当前：{currentSize || 'auto'}</p>
+            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">当前：{!currentSize || currentSize === 'auto' ? '自动' : currentSize}</p>
           </div>
           <button
             onClick={onClose}

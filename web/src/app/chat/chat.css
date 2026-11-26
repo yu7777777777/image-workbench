@@ -564,6 +564,7 @@ html.chat-route-lock,
 .chat-composer textarea {
   display: block;
   resize: none;
+  overflow-y: auto;
   background: var(--muted);
   outline: none;
   border: 1px solid var(--chat-line);
@@ -574,6 +575,9 @@ html.chat-route-lock,
   padding: 12px 16px;
   font-size: 16px;
   line-height: 1.7;
+}
+.chat-composer textarea::-webkit-scrollbar-button {
+  display: none;
 }
 .chat-composer textarea::placeholder {
   color: var(--muted-foreground);

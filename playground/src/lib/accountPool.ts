@@ -271,14 +271,14 @@ export function connectAccountPool(): Promise<void> {
         return
       }
       if (event.data?.type !== 'account-pool-session' || typeof event.data.key !== 'string' || !event.data.key) return
+      if (event.data.key === key) return
+      const hadSession = Boolean(key)
       key = event.data.key
       currentSessionKey = key
       window.clearInterval(timer)
-      // 会话 key 由父页面下发后，正常请求（含共享模型刷新）都使用它；仍保留注入方式以便重新握手。
-      setSharedProfilesAuth(null)
-      fetchSharedProfiles(key, window.location.origin)
-        .catch(() => {})
-        .finally(() => resolve())
+      // 共享配置可在工作台挂载后加载，避免慢请求阻塞首屏。
+      resolve()
+      if (hadSession) void refreshSharedProfiles(window.location.origin)
     }
     window.addEventListener('message', receive)
     window.addEventListener('focus', () => {

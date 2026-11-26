@@ -14,6 +14,8 @@ vi.mock('../lib/accountPool', async (importOriginal) => ({
 vi.mock('../lib/quota', () => ({ fetchQuotaData: vi.fn().mockResolvedValue(null) }))
 vi.mock('../lib/modelsCatalog', () => ({
   fetchAvailableImageModels: vi.fn().mockResolvedValue(['gpt-image-2']),
+  fetchAvailableImageModelsResult: vi.fn().mockResolvedValue({ ok: true, models: ['gpt-image-2'] }),
+  getCachedAvailableImageModels: vi.fn().mockReturnValue(['gpt-image-2']),
   filterHiddenImageModels: (models: string[]) => models,
 }))
 // 参数面板不参与历史入口交互，避免它的模型目录影响本用例。

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { CanvasNode, TaskRecord } from '../types'
-import { buildCanvasInput, canConnectCanvasNodes, canvasGroupPortId, getCanvasImageId, getCanvasPromptImageRefs, normalizeCanvasProject, resolveCanvasSourceIds } from './canvasWorkflow'
+import { buildCanvasInput, canConnectCanvasNodes, CANVAS_GENERATION_MIN_HEIGHT, CANVAS_NODE_DEFAULTS, canvasGroupPortId, findNonOverlappingCanvasPosition, getCanvasImageId, getCanvasPromptImageRefs, normalizeCanvasProject, resolveCanvasSourceIds } from './canvasWorkflow'
 
 vi.mock('./imageCache', () => ({ ensureImageCached: vi.fn(async (id: string) => id === 'missing' ? undefined : `data:image/png;base64,${id}`) }))
 const node = (id: string, patch: Partial<CanvasNode> = {}): CanvasNode => ({ id, type: 'image', position: { x: 0, y: 0 }, width: 280, height: 300, zIndex: 1, ...patch })
@@ -122,5 +122,22 @@ describe('canvas node workflow', () => {
     expect(project.nodes[0].groupName).toBe('参考图')
     expect(project.nodes[0].groupCollapsed).toBe(true)
     expect(project.nodes[0].promptMode).toBe('combine')
+  })
+
+  it('staggers newly placed canvas nodes away from occupied origins and sizes generation nodes for all controls', () => {
+    expect(CANVAS_NODE_DEFAULTS.generation).toEqual({ width: 340, height: 450 })
+    expect(CANVAS_GENERATION_MIN_HEIGHT).toBeGreaterThanOrEqual(445)
+
+    const base = { x: 100, y: 120 }
+    expect(findNonOverlappingCanvasPosition(base, [])).toEqual(base)
+
+    const firstOffset = findNonOverlappingCanvasPosition(base, [node('a', { position: base })])
+    expect(firstOffset).toEqual({ x: 144, y: 156 })
+
+    const secondOffset = findNonOverlappingCanvasPosition(base, [
+      node('a', { position: base }),
+      node('b', { position: firstOffset }),
+    ])
+    expect(secondOffset).toEqual({ x: 188, y: 192 })
   })
 })

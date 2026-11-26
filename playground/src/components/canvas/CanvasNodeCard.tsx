@@ -4,7 +4,9 @@ import { useStore } from '../../store'
 import { ensureImageCached } from '../../lib/imageCache'
 import { CanvasIcon } from './CanvasIcon'
 import { isAgentTextApiProfile } from '../../lib/apiProfiles'
-import { isPresetConfigOnlyEnabled, isPresetProfile } from '../../lib/presetConfig'
+import { isPoolBuild } from '../../lib/accountPool'
+import { getCanvasGenerationProfiles, resolveCanvasGenerationProfile } from '../../lib/canvasGenerationProfiles'
+import { POOL_PROFILE_ID } from '../../lib/poolProfileIds'
 import { CANVAS_ASSET_ROLE_LABELS, getCanvasImageId, getCanvasPromptImageRefs, resolveCanvasSourceIds } from '../../lib/canvasWorkflow'
 
 interface CanvasNodeCardProps {
@@ -48,12 +50,10 @@ export const CanvasNodeCard = memo(function CanvasNodeCard(props: CanvasNodeCard
   const running = props.busy || task?.status === 'running'
   const title = node.label || (generation ? 'API 生成' : text ? '提示词' : '图片')
   const updateParams = (params: Partial<TaskParams>) => patch(node.id, { params: { ...node.params, ...params } })
-  const profiles = (isPresetConfigOnlyEnabled() ? settings.profiles.filter((profile) => isPresetProfile(profile.id)) : settings.profiles)
-    .filter((profile) => !isAgentTextApiProfile(profile))
+  const profiles = generation ? getCanvasGenerationProfiles(settings) : []
   const textProfiles = settings.profiles.filter((profile) => isAgentTextApiProfile(profile))
   const [rewriteProfileId, setRewriteProfileId] = useState(settings.agentTextProfileId || textProfiles[0]?.id || '')
-  const fallbackProfileId = profiles.find((profile) => profile.id === settings.activeProfileId)?.id ?? profiles[0]?.id ?? ''
-  const profileId = profiles.some((profile) => profile.id === node.profileId) ? node.profileId : fallbackProfileId
+  const profileId = resolveCanvasGenerationProfile(settings, profiles, node.profileId)?.id ?? ''
   const promptMode = props.hasConnectedText ? node.promptMode ?? 'connected' : 'own'
   const insertPrompt = (text: string) => patch(node.id, { prompt: `${node.prompt?.trim() ? `${node.prompt.trim()}\n` : ''}${text}` })
   const hasPrompt = Boolean(node.prompt?.trim() || node.label?.trim())
@@ -146,14 +146,19 @@ export const CanvasNodeCard = memo(function CanvasNodeCard(props: CanvasNodeCard
       <header className="canvas-node-header"><span className="canvas-node-title"><CanvasIcon name={generation ? 'generate' : text ? 'text' : 'image'} /><span>{title}</span></span><span className="canvas-node-badge">{node.locked ? '锁定' : generation ? 'IMAGE' : text ? 'TEXT' : '素材'}</span><button className="canvas-node-more" title="节点菜单" aria-label={`${title}节点菜单`} onClick={(event) => props.onMenu(event, node.id)}>···</button></header>
       {text ? <div className="canvas-text-body"><textarea aria-label="提示词节点内容" className="canvas-prompt canvas-text-node" placeholder="写下画面描述，连接到生成节点…" value={node.prompt ?? node.label ?? ''} onChange={(event) => patch(node.id, { prompt: event.target.value })} /><div className="canvas-prompt-presets"><button type="button" onClick={() => props.onPromptLibrary?.(node.id)}>模板库</button>{textProfiles.length > 0 && <select aria-label="润色模型" value={rewriteProfileId} onChange={(event) => setRewriteProfileId(event.target.value)}>{textProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name} · {profile.model}</option>)}</select>}<button type="button" disabled={!hasPrompt || !textProfiles.length || props.promptRewriteBusy} onClick={() => props.onPromptRewrite?.(node.id, rewriteProfileId)}>{props.promptRewriteBusy ? 'AI润色中…' : 'AI润色'}</button></div></div> : generation ? (
         <div className={`canvas-generation-body ${props.hasConnectedText ? 'has-prompt-source' : ''}`}>
-          <label>生图配置<select aria-label="生图配置" value={profileId} onChange={(event) => patch(node.id, { profileId: event.target.value })}>{profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name} · {profile.imageGenerationModel || profile.model}</option>)}</select></label>
+          <label>生图配置<select aria-label="生图配置" value={profileId} disabled={!profiles.length} onChange={(event) => patch(node.id, { profileId: event.target.value })}>
+            {!profiles.length && <option value="">暂无可用配置</option>}
+            {profiles.map((profile) => <option key={profile.id} value={profile.id}>
+              {profile.name} · {isPoolBuild && profile.id === POOL_PROFILE_ID ? '自动选择模型' : profile.model}
+            </option>)}
+          </select></label>
           {props.hasConnectedText && <div className="canvas-prompt-source" aria-label="提示词来源"><span>提示词</span>{([['connected', '连线'], ['own', '本节点'], ['combine', '合并']] as const).map(([mode, label]) => <button key={mode} type="button" className={promptMode === mode ? 'active' : ''} aria-pressed={promptMode === mode} title={mode === 'connected' ? '只使用连入的提示词节点' : mode === 'own' ? '只使用当前生成节点的提示词' : '合并连入节点与当前节点的提示词'} onClick={() => patch(node.id, { promptMode: mode })}>{label}</button>)}</div>}
           <div className="canvas-prompt-wrap">
             <textarea aria-label="生成提示词" className={`canvas-prompt ${props.hasConnectedText && promptMode === 'connected' ? 'is-inactive' : ''}`} disabled={props.hasConnectedText && promptMode === 'connected'} placeholder={props.hasConnectedText ? '切换到“本节点”或“合并”后填写…' : '描述画面或修改要求…\n输入 @ 引用参考图，如 @图1 的姿态、@图2 的服装。'} ref={promptRef} value={node.prompt || ''} onChange={(event) => { patch(node.id, { prompt: event.target.value }); setCaret(event.target.selectionStart); syncMention(event.target.value, event.target.selectionStart) }} onKeyDown={onPromptKeyDown} onBlur={() => setMention(null)} />
             {mentionOpen && <div className="canvas-mention-popup" role="listbox" aria-label="引用参考图" ref={mentionListRef}>{mentionOptions.map((ref, position) => <button key={ref.assetId} type="button" role="option" aria-selected={position === (mention?.active ?? 0)} data-mention-index={position} className={position === (mention?.active ?? 0) ? 'active' : ''} onMouseDown={(event) => { event.preventDefault(); acceptMention(ref.index) }}><b>{mentionLabel(ref.index)}</b><span>{CANVAS_ASSET_ROLE_LABELS[ref.role]}</span></button>)}</div>}
           </div>
           <div className="canvas-prompt-presets" aria-label="提示词快捷片段"><span>快速加入</span><button type="button" onClick={() => insertPrompt('主体：')} >主体</button><button type="button" onClick={() => insertPrompt('构图与姿态：')} >构图</button><button type="button" onClick={() => insertPrompt('场景与光线：')} >场景</button><button type="button" onClick={() => insertPrompt('限制：保持产品细节，不添加文字。')} >约束</button>{imageRefs.length > 0 && <button type="button" className="canvas-mention-trigger" title="插入参考图引用" onClick={() => insertAtCaret('@')}>@ 引用</button>}</div>
-          <div className="canvas-params"><label>尺寸<select aria-label="节点尺寸" value={node.params?.size || '1254x1254'} onChange={(event) => updateParams({ size: event.target.value })}>{['auto', '1254x1254', '1024x1536', '1536x1024', '940x1672', '1672x940'].map((size) => <option key={size} value={size}>{size === 'auto' ? '自动' : size.replace('x', ' × ')}</option>)}</select></label><label>质量<select aria-label="节点质量" value={node.params?.quality || 'auto'} onChange={(event) => updateParams({ quality: event.target.value as TaskParams['quality'] })}>{['auto', 'low', 'medium', 'high'].map((value) => <option key={value} value={value}>{value}</option>)}</select></label><label>数量<input aria-label="节点数量" type="number" min="1" max="10" value={node.params?.n ?? 1} onChange={(event) => updateParams({ n: Math.max(1, Math.min(10, Number(event.target.value) || 1)) })} /></label></div>
+          <div className="canvas-params"><label>尺寸<select aria-label="节点尺寸" value={node.params?.size || '1254x1254'} onChange={(event) => updateParams({ size: event.target.value })}>{['auto', '1254x1254', '1024x1536', '1536x1024', '940x1672', '1672x940'].map((size) => <option key={size} value={size}>{size === 'auto' ? '自动' : size.replace('x', ' × ')}</option>)}</select></label><label>质量<select aria-label="节点质量" value={node.params?.quality || 'auto'} onChange={(event) => updateParams({ quality: event.target.value as TaskParams['quality'] })}>{([['auto', '自动'], ['low', '低'], ['medium', '中'], ['high', '高']] as const).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>数量<input aria-label="节点数量" type="number" min="1" max="10" value={node.params?.n ?? 1} onChange={(event) => updateParams({ n: Math.max(1, Math.min(10, Number(event.target.value) || 1)) })} /></label></div>
           <div className="canvas-input-count"><CanvasIcon name="link" />{props.hasConnectedText ? promptMode === 'own' ? '文字连线未参与生成' : promptMode === 'combine' ? '连线与本节点提示词一起提交' : '只使用连线提示词' : node.sourceNodeIds?.length ? `${node.sourceNodeIds.length} 个输入 · 图片` : '拖动素材右侧圆点，连接到左侧圆点'}</div>
           <button className="canvas-run" disabled={running} onClick={() => props.onRun(node.id)}><CanvasIcon name="play" />{running ? '正在生成…' : '执行生成'}</button>
           {task?.error && <p className="canvas-node-error" title={task.error}>{task.error}</p>}{task?.status === 'done' && <p className="canvas-node-success">已完成 · {task.outputImages.length} 张图片</p>}

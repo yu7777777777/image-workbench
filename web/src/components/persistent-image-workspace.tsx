@@ -4,7 +4,6 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { getValidatedAuthSession } from "@/lib/auth-session";
 import type { StoredAuthSession } from "@/store/auth";
-import { cn } from "@/lib/utils";
 
 function PersistentImageWorkspaceInner() {
   const pathname = usePathname();
@@ -16,7 +15,7 @@ function PersistentImageWorkspaceInner() {
   const currentMode = rawMode === "agent" ? "agent" : rawMode === "canvas" ? "canvas" : "gallery";
 
   const [session, setSession] = useState<StoredAuthSession | null>(null);
-  const [hasVisitedImage, setHasVisitedImage] = useState(false);
+  const [hasVisitedImage, setHasVisitedImage] = useState(isImageRoute);
   const frame = useRef<HTMLIFrameElement>(null);
   const [ready, setReady] = useState(false);
   const [slow, setSlow] = useState(false);
@@ -48,34 +47,21 @@ function PersistentImageWorkspaceInner() {
     };
   }, [normalizedPath]);
 
-  // Mark as visited when user enters /image with a valid session
-  useEffect(() => {
-    if (isImageRoute && session) {
-      setHasVisitedImage(true);
-    }
-  }, [isImageRoute, session]);
-
-  // Lock outer page scrolling when in image workspace
   useEffect(() => {
     if (isImageRoute) {
-      document.documentElement.classList.add("image-route-lock");
-      document.body.classList.add("image-route-lock");
-      return () => {
-        document.documentElement.classList.remove("image-route-lock");
-        document.body.classList.remove("image-route-lock");
-      };
+      setHasVisitedImage(true);
     }
   }, [isImageRoute]);
 
   // Sync mode to iframe whenever ready and mode changes
   useEffect(() => {
-    if (ready && frame.current?.contentWindow) {
+    if (ready && isImageRoute && frame.current?.contentWindow) {
       frame.current.contentWindow.postMessage(
         { type: "set-app-mode", mode: currentMode },
         window.location.origin
       );
     }
-  }, [ready, currentMode]);
+  }, [ready, isImageRoute, currentMode]);
 
   // Sync theme (dark/light) to iframe
   useEffect(() => {
@@ -128,6 +114,7 @@ function PersistentImageWorkspaceInner() {
       }
       if (event.data?.type === "account-pool-mounted") {
         setReady(true);
+        setSlow(false);
         const isDark = document.documentElement.classList.contains("dark");
         frame.current?.contentWindow?.postMessage(
           { type: "theme-sync", theme: isDark ? "dark" : "light" },
@@ -138,65 +125,50 @@ function PersistentImageWorkspaceInner() {
           window.location.origin
         );
       }
-      if (event.data?.type === "app-mode-sync" && isImageRoute) {
+      if (event.data?.type === "app-mode-sync" && isImageRoute && ready) {
         const incoming = event.data.mode === "agent" ? "agent" : event.data.mode === "canvas" ? "canvas" : "gallery";
         if (incoming !== currentMode) {
-          router.replace(`/image?mode=${incoming}`);
+          router.replace(`/image/?mode=${incoming}`);
         }
       }
-      if (event.data?.type === "open-settings") {
-        router.push("/settings");
+      if (event.data?.type === "open-settings" && isImageRoute) {
+        router.push("/settings/");
       }
     };
 
     window.addEventListener("message", receive);
-    const timer = window.setTimeout(() => setSlow(true), 20000);
-    return () => {
-      window.removeEventListener("message", receive);
-      window.clearTimeout(timer);
-    };
-  }, [session, attempt, hasVisitedImage, currentMode, isImageRoute, router]);
+    return () => window.removeEventListener("message", receive);
+  }, [session, hasVisitedImage, currentMode, isImageRoute, ready, router]);
 
-  const handleFrameLoad = () => {
-    setReady(true);
-    setSlow(false);
-    const target = frame.current?.contentWindow;
-    if (!target || !session) {
-      return;
-    }
-    const origin = window.location.origin;
-    target.postMessage({ type: "account-pool-session", key: session.key }, origin);
-    target.postMessage(
-      {
-        type: "theme-sync",
-        theme: document.documentElement.classList.contains("dark") ? "dark" : "light",
-      },
-      origin
+  const sessionKey = session?.key;
+  useEffect(() => {
+    if (!sessionKey || !hasVisitedImage) return;
+    frame.current?.contentWindow?.postMessage(
+      { type: "account-pool-session", key: sessionKey },
+      window.location.origin
     );
-    target.postMessage({ type: "set-app-mode", mode: currentMode }, origin);
-  };
+  }, [sessionKey, hasVisitedImage, attempt]);
 
-  // If user hasn't visited /image yet, or is not logged in, don't mount the iframe
-  if (!hasVisitedImage || !session) {
+  useEffect(() => {
+    if (ready || !sessionKey || !hasVisitedImage) return;
+    const timer = window.setTimeout(() => setSlow(true), 20000);
+    return () => window.clearTimeout(timer);
+  }, [ready, sessionKey, hasVisitedImage, attempt]);
+
+  if (!isImageRoute && (!hasVisitedImage || !session)) {
     return null;
   }
 
   return (
     <section
-      className={cn(
-        "w-full min-h-0 flex-1 flex-col",
-        isImageRoute ? "flex" : "hidden"
-      )}
+      className={isImageRoute ? "image-workspace-active flex min-h-0 w-full flex-1 flex-col" : "hidden"}
     >
       <div
-        className={cn(
-          "relative w-full overflow-hidden",
-          isImageRoute ? "min-h-0 flex-1" : "min-h-[520px] flex-none"
-        )}
+        className="relative min-h-0 w-full flex-1 overflow-hidden"
       >
         {!ready && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-transparent text-sm text-stone-500">
-            <p>
+            <p role="status">
               {slow
                 ? "加载时间较长，请点击重试。"
                 : "正在加载工作台…"}
@@ -216,15 +188,14 @@ function PersistentImageWorkspaceInner() {
             )}
           </div>
         )}
-        <iframe
+        {hasVisitedImage && session && <iframe
           key={attempt}
           ref={frame}
-          src={`/playground/?v=${encodeURIComponent(process.env.NEXT_PUBLIC_APP_VERSION || "0")}&retry=${attempt}#${currentMode}`}
+          src={`/playground/?v=${encodeURIComponent(process.env.NEXT_PUBLIC_APP_VERSION || "0")}&retry=${attempt}`}
           title="生图工作台"
-          onLoad={handleFrameLoad}
           className="absolute inset-0 h-full min-h-0 w-full border-0 bg-transparent"
           allow="clipboard-write; fullscreen"
-        />
+        />}
       </div>
     </section>
   );

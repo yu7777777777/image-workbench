@@ -214,7 +214,6 @@ export default function ChatPage() {
 
   const notices = (
     <>
-      {isLoadingModels && <div className="chat-notice">正在加载模型目录…</div>}
       {!isLoadingModels && !modelError && !canSend && <div className="chat-notice">
         {models.length ? "当前模型设置不可用，请选择可用的模型和思考程度。" : "当前账号池暂无可用的对话模型。"}
       </div>}
@@ -258,6 +257,7 @@ export default function ChatPage() {
       >
         <SelectTrigger
           aria-label="选择对话模型"
+          aria-busy={isLoadingModels}
           className="chat-model-control"
         >
           <SelectValue placeholder="选择模型" />
@@ -304,7 +304,7 @@ export default function ChatPage() {
           {!thread.messages.length ? (
             <div className="chat-welcome">
               <h1 className="studio-empty-title">开始新对话</h1>
-              <p className="chat-empty-description">描述想法，或引用图片继续修改。</p>
+              <p className="chat-empty-description">提出问题，或聊聊你的想法。</p>
               <div className="chat-suggestions studio-empty-actions">
                 {["帮我梳理一个想法", "润色一段文案", "一起分析一张图片"].map(
                   (text) => (
@@ -591,10 +591,11 @@ function Composer({
     };
   }, []);
   useEffect(() => {
-    if (input.current) {
-      input.current.style.height = "auto";
-      input.current.style.height = `${Math.min(input.current.scrollHeight, 180)}px`;
-    }
+    const textarea = input.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    const borderHeight = textarea.offsetHeight - textarea.clientHeight;
+    textarea.style.height = `${Math.min(textarea.scrollHeight + borderHeight, 180)}px`;
   }, [text]);
   const addImages = async (incoming: File[]) => {
     if (disabled || readingRef.current || !incoming.length) return;

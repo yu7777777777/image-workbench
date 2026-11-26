@@ -28,7 +28,7 @@ import DragUploadOverlay from './input/dragUploadOverlay'
 import InputBatchBars from './input/inputBatchBars'
 import InputParamsPanel from './input/inputParamsPanel'
 import { fetchQuotaData, type QuotaData } from '../lib/quota'
-import { fetchAvailableImageModels, filterHiddenImageModels } from '../lib/modelsCatalog'
+import { fetchAvailableImageModelsResult, filterHiddenImageModels, getCachedAvailableImageModels } from '../lib/modelsCatalog'
 
 /** API 支持的最大参考图数量（超限图片保留并置灰，提交时拦截） */
 const API_MAX_IMAGES = getInputImageLimit()
@@ -494,11 +494,20 @@ export default function InputBar() {
   ), [activeProfile.id, settingsActiveProfile.id, settings])
 
   const [quotaData, setQuotaData] = useState<QuotaData | null>(null)
-  const [availableModels, setAvailableModels] = useState<string[]>(() => (
-    isPoolBuild ? [] : filterHiddenImageModels(['gpt-image-2'])
-  ))
+  // 账号池目录独立于当前所选配置。切换模型时沿用已确认的目录。
+  const catalogApiKey = isPoolBuild ? undefined : activeProfile.apiKey
+  const catalogBaseUrl = isPoolBuild ? undefined : activeProfile.baseUrl
+  const catalogProxy = isPoolBuild ? undefined : activeProfile.apiProxy
+  const [imageCatalog, setImageCatalog] = useState(() => {
+    const cached = getCachedAvailableImageModels(catalogApiKey, catalogBaseUrl, catalogProxy)
+    return {
+      models: filterHiddenImageModels(cached ?? (isPoolBuild ? [] : ['gpt-image-2'])),
+      status: isPoolBuild && !cached?.length ? 'loading' : 'ready',
+    }
+  })
+  const availableModels = imageCatalog.models
   const poolProfileAvailable = settings.profiles.some((profile) => profile.id === POOL_PROFILE_ID)
-  const showImageModelControl = poolProfileAvailable || agentImageProfiles.length > 0 || availableModels.length > 0
+  const showImageModelControl = isPoolBuild || agentImageProfiles.length > 0 || availableModels.length > 0
 
   const isPoolProfile = isPoolProfileId(activeProfile.id)
   const isSharedProfile = activeProfile.id.startsWith('shared-')
@@ -542,8 +551,13 @@ export default function InputBar() {
       if (pending) return
       pending = true
       try {
-        const models = await fetchAvailableImageModels(activeProfile.apiKey, activeProfile.baseUrl, activeProfile.apiProxy)
-        if (active) setAvailableModels(filterHiddenImageModels(models))
+        const result = await fetchAvailableImageModelsResult(catalogApiKey, catalogBaseUrl, catalogProxy)
+        if (!active) return
+        const cached = getCachedAvailableImageModels(catalogApiKey, catalogBaseUrl, catalogProxy)
+        setImageCatalog({
+          models: filterHiddenImageModels(result.ok ? result.models : cached ?? result.models),
+          status: result.ok || cached?.length || !isPoolBuild ? 'ready' : 'error',
+        })
       } finally {
         pending = false
       }
@@ -557,7 +571,7 @@ export default function InputBar() {
       window.removeEventListener('focus', refreshModels)
       window.clearInterval(timer)
     }
-  }, [activeProfile.apiKey, activeProfile.apiProxy, activeProfile.baseUrl, activeProfile.id])
+  }, [catalogApiKey, catalogBaseUrl, catalogProxy])
 
   const runningTaskCount = useMemo(() => tasks.filter((t) => t.status === 'running').length, [tasks])
   const prevRunningCountRef = useRef(runningTaskCount)
@@ -635,19 +649,20 @@ export default function InputBar() {
     : isFalProvider
     ? `fal.ai 最大请求数量为 ${outputImageLimit}`
     : `OpenAI 最大请求数量为 ${outputImageLimit}`
-  const displaySize = isFalTextToImage && params.size === 'auto'
+  const rawDisplaySize = isFalTextToImage && params.size === 'auto'
     ? DEFAULT_FAL_IMAGE_SIZE
     : (activeProfile.codexCli ? normalizeCodexCliImageSize(params.size) : normalizeImageSize(params.size)) || DEFAULT_PARAMS.size
+  const displaySize = rawDisplaySize === 'auto' ? '自动' : rawDisplaySize
 
   const qualityOptions = [
-    ...(!isFalProvider ? [{ label: 'auto', value: 'auto' }] : []),
-    { label: 'low', value: 'low' },
-    { label: 'medium', value: 'medium' },
-    { label: 'high', value: 'high' },
+    ...(!isFalProvider ? [{ label: '自动', value: 'auto' }] : []),
+    { label: '低', value: 'low' },
+    { label: '中', value: 'medium' },
+    { label: '高', value: 'high' },
     ...(isGptImage25Model(getImageGenerationModel(activeProfile))
       ? [
-          { label: 'xhigh', value: 'xhigh' },
-          { label: 'max', value: 'max' },
+          { label: '极高', value: 'xhigh' },
+          { label: '最高', value: 'max' },
         ]
       : []),
   ]
@@ -791,7 +806,7 @@ export default function InputBar() {
   }, [params.output_compression])
 
   useEffect(() => {
-    setNInput(agentAutoImageCount ? 'auto' : String(params.n))
+    setNInput(agentAutoImageCount ? '自动' : String(params.n))
   }, [agentAutoImageCount, params.n])
 
   useEffect(() => {
@@ -849,7 +864,7 @@ export default function InputBar() {
   const commitN = useCallback(() => {
     nLimitHint.hide()
     if (agentAutoImageCount) {
-      setNInput('auto')
+      setNInput('自动')
       return
     }
     const nextValue = Number(nInput)
@@ -883,7 +898,7 @@ export default function InputBar() {
 
   const handleNInputChange = useCallback((value: string) => {
     if (agentAutoImageCount) {
-      setNInput('auto')
+      setNInput('自动')
       return
     }
     setNInput(value)
@@ -1731,6 +1746,8 @@ export default function InputBar() {
       onOpenSizePicker={() => setShowSizePicker(true)}
       currentModel={activeProfile.model}
       availableModels={availableModels}
+      isLoadingImageModels={imageCatalog.status === 'loading'}
+      imageModelError={imageCatalog.status === 'error'}
       onModelChange={handleModelChange}
       isAgentMode={appMode === 'agent'}
       agentTextProfiles={agentTextProfiles}
@@ -1992,10 +2009,10 @@ export default function InputBar() {
               {renderParams(
                 appMode === 'agent'
                   ? (showImageModelControl
-                      ? 'grid-cols-[minmax(120px,1.2fr)_minmax(120px,1.2fr)_repeat(5,minmax(56px,0.9fr))_minmax(40px,0.55fr)]'
-                      : 'grid-cols-[minmax(120px,1.2fr)_repeat(5,minmax(56px,0.9fr))_minmax(40px,0.55fr)]')
+                      ? 'grid-cols-[minmax(145px,1.8fr)_minmax(160px,2fr)_minmax(68px,0.85fr)_repeat(4,minmax(54px,0.7fr))_minmax(44px,0.55fr)]'
+                      : 'grid-cols-[minmax(165px,2fr)_minmax(72px,0.9fr)_repeat(4,minmax(56px,0.75fr))_minmax(44px,0.55fr)]')
                   : (showImageModelControl
-                      ? 'grid-cols-[minmax(140px,1.4fr)_repeat(5,minmax(64px,1fr))_minmax(44px,0.6fr)]'
+                      ? 'grid-cols-[minmax(185px,2.4fr)_minmax(72px,0.95fr)_repeat(4,minmax(60px,0.75fr))_minmax(44px,0.55fr)]'
                       : 'grid-cols-[repeat(5,minmax(64px,1fr))_minmax(44px,0.6fr)]')
               )}
 

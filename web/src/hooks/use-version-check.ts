@@ -36,7 +36,7 @@ export interface UpgradeRunResult {
   elapsed_secs?: number;
 }
 
-export function useVersionCheck() {
+export function useVersionCheck(canUpgrade: boolean) {
   const currentVersion = webConfig.appVersion;
   const localReleases = useMemo(readLocalReleases, []);
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
@@ -64,21 +64,23 @@ export function useVersionCheck() {
           setLatestVersion(tag);
         }
       }
-      // 同步一次服务器端升级状态（管理员）：上次升级结果/待处理请求
-      try {
-        const status = await fetchUpgradeStatus();
-        if (status.last_result) {
-          setUpgradeResult({
-            status: status.last_result.status === "success" ? "success" : "failed",
-            version: status.last_result.version,
-            error: status.last_result.error,
-            elapsed_secs: status.last_result.elapsed_secs,
-          });
+      if (canUpgrade) {
+        // 同步一次服务器端升级状态（管理员）：上次升级结果/待处理请求
+        try {
+          const status = await fetchUpgradeStatus();
+          if (status.last_result) {
+            setUpgradeResult({
+              status: status.last_result.status === "success" ? "success" : "failed",
+              version: status.last_result.version,
+              error: status.last_result.error,
+              elapsed_secs: status.last_result.elapsed_secs,
+            });
+          }
+          if (status.request_pending) setUpgrading(true);
+          else if (status.last_result?.status === "success") setUpgrading(false);
+        } catch {
+          // 暂时无法读取升级状态时仍保留版本信息。
         }
-        if (status.request_pending) setUpgrading(true);
-        else if (status.last_result?.status === "success") setUpgrading(false);
-      } catch {
-        // 非管理员访问 /api/system/upgrade/status 会 403，忽略即可
       }
       if (showMessage) {
         toast.success(
@@ -90,10 +92,11 @@ export function useVersionCheck() {
     } finally {
       setChecking(false);
     }
-  }, [currentVersion]);
+  }, [canUpgrade, currentVersion]);
 
   const startUpgrade = useCallback(
     async (version: string) => {
+      if (!canUpgrade) return false;
       setUpgrading(true);
       try {
         await triggerUpgrade(version);
@@ -129,7 +132,7 @@ export function useVersionCheck() {
         return false;
       }
     },
-    [],
+    [canUpgrade],
   );
 
   const openReleaseModal = () => {

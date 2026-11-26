@@ -14,8 +14,9 @@ import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTi
 import webConfig from "@/constants/common-env";
 import { fetchThirdPartyApps, updateSelfProfile, type ThirdPartyAppsSettings } from "@/lib/api";
 import { getValidatedAuthSession } from "@/lib/auth-session";
+import { maskSecretKey } from "@/lib/mask-secret";
 import { clearStoredAuthSession, setStoredAuthSession, type StoredAuthSession } from "@/store/auth";
-import { BookOpen, Bug, Check, Copy, Database, GalleryHorizontal, Images, KeyRound, LayoutGrid, List, LoaderCircle, LogOut, MessageCircle, Settings, ShieldCheck, Sparkles, User } from "lucide-react";
+import { BookOpen, Bug, Check, Copy, Database, Eye, EyeOff, GalleryHorizontal, Images, KeyRound, LayoutGrid, List, LoaderCircle, LogOut, MessageCircle, Settings, ShieldCheck, Sparkles, User } from "lucide-react";
 import { toast } from "sonner";
 
 const workspaceItems = [
@@ -64,6 +65,7 @@ function TopNavInner() {
   const [confirmKey, setConfirmKey] = useState("");
   const [isSubmittingKey, setIsSubmittingKey] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [showDialogApiKey, setShowDialogApiKey] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -285,7 +287,7 @@ function TopNavInner() {
           ))}
         </nav>
         <div className="workspace-rail-utility">
-          <HeaderActions compact />
+          <HeaderActions compact canUpgrade={session.role === "admin"} />
           <span className="workspace-rail-divider" aria-hidden="true" />
           <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
             <PopoverTrigger asChild>
@@ -293,7 +295,7 @@ function TopNavInner() {
                 <User className="size-4" />
               </button>
             </PopoverTrigger>
-            <PopoverContent align="end" side="right" sideOffset={10} className="w-56 rounded-2xl p-2 shadow-xl">
+            <PopoverContent align="end" side="right" sideOffset={10} collisionPadding={8} className="w-56 rounded-2xl p-2 shadow-xl">
               <div className="border-b border-stone-100 px-2.5 py-2 dark:border-white/10">
                 <p className="text-xs font-semibold text-stone-900 dark:text-stone-100 truncate">{displayName}</p>
                 <p className="mt-0.5 text-[11px] text-stone-400">{roleLabel} 账户</p>
@@ -375,7 +377,7 @@ function TopNavInner() {
                 取消
               </Button>
             </DialogClose>
-            <Button type="button" className="rounded-xl bg-stone-950 text-white hover:bg-stone-800" onClick={confirmCanvasOpen}>
+            <Button type="button" className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90" onClick={confirmCanvasOpen}>
               继续跳转
             </Button>
           </DialogFooter>
@@ -448,7 +450,7 @@ function TopNavInner() {
               </Button>
               <Button
                 type="submit"
-                className="rounded-xl bg-stone-950 text-white hover:bg-stone-800"
+                className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
                 disabled={isSubmittingKey}
               >
                 {isSubmittingKey ? <LoaderCircle className="mr-1.5 size-4 animate-spin" /> : null}
@@ -460,7 +462,13 @@ function TopNavInner() {
       </Dialog>
 
       {/* 接口接入说明弹窗 */}
-      <Dialog open={isApiDocsDialogOpen} onOpenChange={setIsApiDocsDialogOpen}>
+      <Dialog
+        open={isApiDocsDialogOpen}
+        onOpenChange={(open) => {
+          setIsApiDocsDialogOpen(open);
+          if (!open) setShowDialogApiKey(false);
+        }}
+      >
         <DialogContent showCloseButton={false} className="rounded-2xl p-6 sm:max-w-lg">
           <DialogHeader className="gap-2">
             <DialogTitle className="flex items-center gap-2">
@@ -490,19 +498,31 @@ function TopNavInner() {
             </div>
 
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs font-medium text-stone-600 dark:text-stone-400">
+              <div className="flex items-center justify-between gap-2 text-xs font-medium text-stone-600 dark:text-stone-400">
                 <span>您的专属 API 密钥 (API Key)</span>
-                <button
-                  type="button"
-                  onClick={() => void copyToClipboard(session?.key || "", "api-key")}
-                  className="flex items-center gap-1 text-[11px] text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
-                >
-                  {copiedField === "api-key" ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
-                  复制密钥
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowDialogApiKey((visible) => !visible)}
+                    aria-label={showDialogApiKey ? "隐藏密钥" : "显示密钥"}
+                    aria-pressed={showDialogApiKey}
+                    className="flex items-center gap-1 text-[11px] text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
+                  >
+                    {showDialogApiKey ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
+                    {showDialogApiKey ? "隐藏密钥" : "显示密钥"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void copyToClipboard(session?.key || "", "api-key")}
+                    className="flex items-center gap-1 text-[11px] text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
+                  >
+                    {copiedField === "api-key" ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
+                    复制密钥
+                  </button>
+                </div>
               </div>
               <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 font-mono text-xs text-stone-800 dark:border-white/10 dark:bg-stone-900/50 dark:text-stone-200 truncate">
-                {session?.key}
+                {showDialogApiKey ? session?.key : maskSecretKey(session?.key || "")}
               </div>
             </div>
 
@@ -523,7 +543,7 @@ function TopNavInner() {
           <DialogFooter className="pt-3">
             <Button
               type="button"
-              className="rounded-xl bg-stone-950 text-white hover:bg-stone-800"
+              className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
               onClick={() => setIsApiDocsDialogOpen(false)}
             >
               我知道了

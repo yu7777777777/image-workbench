@@ -1,8 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-html.image-route-lock,
-body.image-route-lock {
+html:has(.image-workspace-active),
+body:has(.image-workspace-active) {
   overflow: hidden !important;
   height: 100dvh !important;
   overscroll-behavior: none !important;
@@ -12,7 +12,7 @@ body.image-route-lock {
  * 图片工作台：把整页锁成 100dvh 的竖向 flex 布局，
  * 让工作区精确占满导航栏以下的高度，底部不再露出页面背景条。
  */
-html.image-route-lock .app-shell {
+.app-shell:has(.image-workspace-active) {
   display: flex;
   flex-direction: column;
   height: 100dvh;
@@ -20,13 +20,13 @@ html.image-route-lock .app-shell {
   overflow: hidden;
 }
 
-html.image-route-lock .app-shell-inner {
+.app-shell-inner:has(> .image-workspace-active) {
   flex: 1 1 auto;
   height: auto;
   min-height: 0;
 }
 
-html.image-route-lock .app-content {
+.image-workspace-active + .app-content {
   display: none;
 }
 
@@ -332,6 +332,60 @@ html.image-route-lock .app-content {
 
 .workspace-nav-sheet {
   background: var(--card);
+}
+
+@media (max-width: 639px) {
+  .app-shell-inner:has(> .workspace-nav-rail) {
+    padding-inline-start: 0;
+    padding-top: calc(48px + env(safe-area-inset-top));
+  }
+
+  .workspace-nav-rail {
+    inset: 0 0 auto 0;
+    width: 100%;
+    height: calc(48px + env(safe-area-inset-top));
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    border-inline-end: 0;
+    border-bottom: 1px solid var(--border);
+    padding: env(safe-area-inset-top) 8px 0;
+  }
+
+  .workspace-rail-links {
+    width: auto;
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-direction: row;
+    justify-content: center;
+    gap: 2px;
+    padding-block: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .workspace-rail-divider {
+    width: 1px;
+    height: 18px;
+    margin: 0 2px;
+  }
+
+  .workspace-rail-utility {
+    margin-top: 0;
+    width: auto;
+    flex-direction: row;
+    gap: 2px;
+    padding: 0;
+  }
+
+  .workspace-version-trigger {
+    display: none;
+  }
+
+  .workspace-nav-trigger {
+    padding: 0 4px;
+  }
 }
 
 @media (min-width: 768px) {

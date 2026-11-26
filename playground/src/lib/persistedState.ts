@@ -174,7 +174,8 @@ export function normalizePersistedState(
       ? normalizeAgentInputDrafts(persistedState.agentInputDrafts, agentConversations)
       : normalizeAgentInputDraftsByKey(persistedState.agentInputDrafts)
   const cleanedAgentInputDrafts = cleanStaleAgentInputDrafts(normalizedAgentInputDrafts, activeAgentConversationId, now)
-  const agentInputDrafts = appMode === 'agent' && activeAgentConversationId && !cleanedAgentInputDrafts[activeAgentConversationId] && settings.persistInputOnRestart && typeof persistedState.prompt === 'string'
+  const hasExplicitDraftSchema = persistedState.galleryInputDraft !== undefined || persistedState.agentInputDrafts !== undefined
+  const agentInputDrafts = appMode === 'agent' && activeAgentConversationId && !cleanedAgentInputDrafts[activeAgentConversationId] && settings.persistInputOnRestart && !hasExplicitDraftSchema && typeof persistedState.prompt === 'string'
     ? {
         ...cleanedAgentInputDrafts,
         [activeAgentConversationId]: normalizeAgentInputDraft({
@@ -188,6 +189,11 @@ export function normalizePersistedState(
   const restoredAgentDraft = settings.persistInputOnRestart && appMode === 'agent' && activeAgentConversationId
     ? agentInputDrafts[activeAgentConversationId] ?? null
     : null
+  const activeInputDraft = appMode === 'agent'
+    ? restoredAgentDraft
+    : appMode === 'gallery'
+      ? galleryInputDraft
+      : null
   const favoriteCollections = Array.isArray(persistedState.favoriteCollections)
     ? ensureDefaultFavoriteCollection(normalizeFavoriteCollections(persistedState.favoriteCollections, now), now)
     : fallback.favoriteCollections
@@ -216,10 +222,10 @@ export function normalizePersistedState(
       supportPromptDismissed: Boolean(persistedState.supportPromptDismissed),
       supportPromptOpen: Boolean(persistedState.supportPromptOpen),
       supportPromptSkippedForImportedData: Boolean(persistedState.supportPromptSkippedForImportedData),
-      prompt: restoredAgentDraft ? restoredAgentDraft.prompt : galleryInputDraft?.prompt ?? '',
-      inputImages: restoredAgentDraft ? restoredAgentDraft.inputImages : galleryInputDraft?.inputImages ?? [],
-      maskDraft: restoredAgentDraft ? restoredAgentDraft.maskDraft : galleryInputDraft?.maskDraft ?? null,
-      maskEditorImageId: restoredAgentDraft ? restoredAgentDraft.maskEditorImageId : galleryInputDraft?.maskEditorImageId ?? null,
+      prompt: activeInputDraft?.prompt ?? '',
+      inputImages: activeInputDraft?.inputImages ?? [],
+      maskDraft: activeInputDraft?.maskDraft ?? null,
+      maskEditorImageId: activeInputDraft?.maskEditorImageId ?? null,
     },
     hasLegacyAgentConversations,
     shouldMigrateAgentConversations: hasLegacyAgentConversations && agentConversations.length > 0,

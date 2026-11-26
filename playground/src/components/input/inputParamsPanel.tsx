@@ -54,6 +54,8 @@ export default function InputParamsPanel({
   onOpenSizePicker,
   currentModel,
   availableModels,
+  isLoadingImageModels,
+  imageModelError,
   onModelChange,
   isAgentMode,
   agentTextProfiles,
@@ -105,6 +107,8 @@ export default function InputParamsPanel({
   onOpenSizePicker: () => void
   currentModel?: string
   availableModels?: string[]
+  isLoadingImageModels?: boolean
+  imageModelError?: boolean
   onModelChange?: (model: string, profileId?: string) => void
   isAgentMode?: boolean
   agentTextProfiles?: ApiProfile[]
@@ -118,7 +122,7 @@ export default function InputParamsPanel({
   const profileEntries = (agentImageProfiles ?? []).filter((profile) =>
     !poolProfileAvailable || (profile.id !== POOL_PROFILE_ID && Boolean(profile.apiKey)),
   )
-  const combinedImageOptions = (poolProfileAvailable || (agentImageProfiles && agentImageProfiles.length > 0))
+  const combinedImageOptions = (poolProfileAvailable || isLoadingImageModels || imageModelError || profileEntries.length > 0)
     ? [
         ...(availableModels ?? []).map((m) => {
           let label = m
@@ -141,6 +145,11 @@ export default function InputParamsPanel({
         : `pool::${currentModel ?? (availableModels?.[0] ?? '')}`)
     : undefined
 
+  const imageModelPlaceholder = combinedImageOptions?.length || isLoadingImageModels
+    ? '选择生图模型'
+    : imageModelError ? '模型加载失败' : '暂无可用模型'
+  const compressionDisabledHint = isFalProvider ? 'fal.ai 不支持压缩率参数' : '仅 JPEG 和 WebP 支持压缩率'
+
   const handleCombinedImageChange = (val: string) => {
     if (val.startsWith('pool::')) {
       const model = val.slice('pool::'.length)
@@ -156,7 +165,7 @@ export default function InputParamsPanel({
   return (
     <div className={`studio-composer-params grid ${cols} gap-2 text-xs min-w-0 flex-1`}>
       {isAgentMode && agentTextProfiles && agentTextProfiles.length > 0 && (
-        <label className="relative flex flex-col gap-0.5 min-w-0">
+        <label className="relative flex flex-col gap-0.5 min-w-0 col-span-2 sm:col-span-1">
           <span className="text-gray-400 dark:text-gray-500 ml-1 truncate">对话模型</span>
           <Select
             value={currentAgentTextProfileId || agentTextProfiles[0]?.id}
@@ -165,23 +174,23 @@ export default function InputParamsPanel({
               label: p.name,
               value: p.id,
             }))}
-            showValueTooltips={false}
+            showValueTooltips={true}
             className={selectClass}
           />
         </label>
       )}
       {/* Image model / profile selector */}
       {(availableModels && availableModels.length > 0 || combinedImageOptions) && (
-        <label className="relative flex flex-col gap-0.5 min-w-0">
+        <label className="relative flex flex-col gap-0.5 min-w-0 col-span-2 sm:col-span-1" aria-busy={isLoadingImageModels}>
           <span className="text-gray-400 dark:text-gray-500 ml-1 truncate">{isAgentMode ? '生图模型' : '模型'}</span>
           {combinedImageOptions ? (
             <Select
               value={combinedImageOptions.find((option) => option.value === combinedImageValue)?.value
-                ?? (combinedImageOptions.length ? '选择生图模型' : '暂无可用模型')}
+                ?? imageModelPlaceholder}
               disabled={combinedImageOptions.length === 0}
               onChange={handleCombinedImageChange}
               options={combinedImageOptions}
-              showValueTooltips={false}
+              showValueTooltips={true}
               className={selectClass}
             />
           ) : (
@@ -197,7 +206,7 @@ export default function InputParamsPanel({
                 else if (m.startsWith('gpt-image-2.5')) label = `${m} (Codex)`
                 return { label, value: m }
               })}
-              showValueTooltips={false}
+              showValueTooltips={true}
               className={selectClass}
             />
           )}
@@ -295,8 +304,8 @@ export default function InputParamsPanel({
               })
             }}
             options={[
-              { label: 'false', value: 'off' },
-              { label: 'true', value: 'on' },
+              { label: '关闭', value: 'off' },
+              { label: '开启', value: 'on' },
             ]}
             showValueTooltips={false}
             className={selectClass}
@@ -320,23 +329,26 @@ export default function InputParamsPanel({
         >
           <span className="text-gray-400 dark:text-gray-500 ml-1">压缩率</span>
           <input
-            value={outputCompressionInput}
+            value={isAgentMode && compressionDisabled ? '不适用' : outputCompressionInput}
             onChange={(e) => setOutputCompressionInput(e.target.value)}
             onBlur={commitOutputCompression}
             disabled={compressionDisabled}
-            type="number"
+            aria-label="压缩率"
+            aria-description={compressionDisabled ? compressionDisabledHint : undefined}
+            title={compressionDisabled ? compressionDisabledHint : undefined}
+            type={isAgentMode && compressionDisabled ? 'text' : 'number'}
             min={0}
             max={100}
             placeholder="0-100"
             className={`px-2 sm:px-2.5 py-1.5 rounded-xl border border-gray-200/60 dark:border-white/[0.08] focus:outline-none text-xs transition-all duration-200 shadow-sm ${
               compressionDisabled
-                ? 'bg-gray-100/50 dark:bg-white/[0.05] opacity-50 cursor-not-allowed'
+                ? 'bg-gray-100/50 text-gray-500 dark:bg-white/[0.05] dark:text-gray-400 cursor-not-allowed'
                 : 'bg-white/50 dark:bg-white/[0.03]'
               }`}
           />
           <ButtonTooltip
             visible={compressionHint.visible}
-            text={isFalProvider ? 'fal.ai 不支持压缩率参数' : '仅 JPEG 和 WebP 支持压缩率'}
+            text={compressionDisabledHint}
           />
         </label>
       )}
@@ -356,8 +368,8 @@ export default function InputParamsPanel({
             if (!moderationDisabled) setParams({ moderation: val as TaskParams['moderation'] })
           }}
           options={[
-            { label: 'auto', value: 'auto' },
-            { label: 'low', value: 'low' },
+            { label: '自动', value: 'auto' },
+            { label: '宽松', value: 'low' },
           ]}
           disabled={moderationDisabled}
           showValueTooltips={false}
@@ -385,7 +397,7 @@ export default function InputParamsPanel({
       >
         <span className="text-gray-400 dark:text-gray-500 ml-1">数量</span>
         <input
-          value={nInput}
+          value={agentAutoImageCount ? '自动' : nInput}
           onChange={(e) => handleNInputChange(e.target.value)}
           onFocus={() => setNInputFocused(true)}
           onBlur={() => {
@@ -403,12 +415,15 @@ export default function InputParamsPanel({
             }
           }}
           disabled={agentAutoImageCount}
+          aria-label="数量"
+          aria-description={agentAutoImageCount ? nLimitHintText : undefined}
+          title={agentAutoImageCount ? nLimitHintText : undefined}
           type={agentAutoImageCount ? 'text' : 'number'}
           min={agentAutoImageCount ? undefined : 1}
           max={agentAutoImageCount ? undefined : outputImageLimit}
-          className={`px-1.5 py-1.5 text-center font-mono rounded-xl border border-gray-200/60 dark:border-white/[0.08] focus:outline-none text-xs transition-all duration-200 shadow-sm ${
+          className={`min-w-0 px-2 sm:px-2.5 py-1.5 text-left rounded-xl border border-gray-200/60 dark:border-white/[0.08] focus:outline-none text-xs transition-all duration-200 shadow-sm ${
             agentAutoImageCount
-              ? 'bg-gray-100/50 dark:bg-white/[0.05] opacity-50 cursor-not-allowed'
+              ? 'bg-gray-100/50 text-gray-500 dark:bg-white/[0.05] dark:text-gray-400 cursor-not-allowed'
               : 'bg-white/50 dark:bg-white/[0.03]'
           }`}
         />
