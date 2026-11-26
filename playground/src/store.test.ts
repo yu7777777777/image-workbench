@@ -4454,6 +4454,7 @@ describe('task deletion', () => {
     expect(useStore.getState().streamPreviewSlots[runningTask.id]?.['1']).toContain('partial')
 
     await removeTask(runningTask)
+    expect(vi.mocked(callImageApi).mock.calls[0][0].signal?.aborted).toBe(true)
     expect(useStore.getState().streamPreviews[runningTask.id]).toBeUndefined()
     expect(useStore.getState().streamPreviewSlots[runningTask.id]).toBeUndefined()
     emitPartialImage()
@@ -4846,10 +4847,14 @@ describe('agent built-in image tool failure', () => {
 
     await submitAgentMessage()
     await vi.waitFor(() => expect(useStore.getState().tasks.filter((item) => item.agentBatchCallId === 'hybrid-batch-call')).toHaveLength(2))
+    await vi.waitFor(() => expect(callImageApi).toHaveBeenCalledTimes(2))
     const deletedTask = useStore.getState().tasks.find((item) => item.prompt === 'deleted prompt')
     expect(deletedTask).toBeDefined()
     expect(deletedTask).toMatchObject({ agentBatchCallId: 'hybrid-batch-call' })
     await removeTask(deletedTask!)
+    const [deletedCall, liveCall] = vi.mocked(callImageApi).mock.calls
+    expect(deletedCall[0].signal?.aborted).toBe(true)
+    expect(liveCall[0].signal?.aborted).toBe(false)
     expect(JSON.stringify(useStore.getState().agentConversations[0].rounds[0].responseOutput)).not.toContain('deleted-item')
     deletedRequest.resolve({ images: ['data:image/png;base64,deleted-batch'], actualParams: {}, actualParamsList: [{}], revisedPrompts: ['deleted prompt'] })
     liveRequest.resolve({ images: ['data:image/png;base64,live-batch'], actualParams: {}, actualParamsList: [{}], revisedPrompts: ['live prompt'] })

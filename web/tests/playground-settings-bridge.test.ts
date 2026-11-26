@@ -38,7 +38,7 @@ describe("playground settings bridge", () => {
     store = installMockLocalStorage();
   });
 
-  test("first owner claims legacy playground settings once and isolates subsequent owners", () => {
+  test("only the owner recorded by workbench can read legacy settings", () => {
     store.set(
       "gpt-image-playground",
       JSON.stringify({
@@ -53,6 +53,8 @@ describe("playground settings bridge", () => {
       }),
     );
 
+    expect(readPlaygroundSettingsSnapshot("user:alice").settings).toEqual(DEFAULT_GALLERY_SETTINGS);
+    store.set("gpt-image-playground-legacy-owner-v1", "user:alice");
     const firstSnap = readPlaygroundSettingsSnapshot("user:alice");
     expect(firstSnap.settings.enterSubmit).toBe(true);
     expect(firstSnap.chatProfileNames).toEqual(["自定义对话"]);
@@ -89,10 +91,13 @@ describe("playground settings bridge", () => {
     expect(saved.version).toBe(2);
     expect(saved.state.appMode).toBe("canvas");
     expect(saved.state.params).toEqual({ size: "1254x1254" });
-    expect(saved.state.settings.enterSubmit).toBe(true);
+    expect(saved.state.settings.enterSubmit).toBe(false);
     expect(saved.state.settings.agentWebSearch).toBe(true);
-    expect(saved.state.settings.agentMaxToolRounds).toBe(15);
     expect(saved.state.settings.profiles).toHaveLength(1);
+    const pending = readPlaygroundSettingsSnapshot("user:alice").settings;
+    expect(pending.enterSubmit).toBe(true);
+    expect(pending.agentMaxToolRounds).toBe(15);
+    expect(readPlaygroundSettingsSnapshot("user:bob").settings).toEqual(DEFAULT_GALLERY_SETTINGS);
     expect(store.has("gpt-image-playground:user:bob")).toBe(false);
   });
 });

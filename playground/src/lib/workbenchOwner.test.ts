@@ -11,6 +11,7 @@ import {
 import { loadCanvasAssetMetadata, saveCanvasAssetMetadata } from './canvasAssetMetadata'
 import { loadCanvasPromptLibrary, saveCanvasPromptLibrary } from './canvasPromptLibrary'
 import { loadGalleryDensity, saveGalleryDensity } from './galleryDensity'
+import { applyQueuedWorkbenchSettings, createWorkbenchStateStorage } from './workbenchSettings'
 import { callImageApi } from './api'
 import { createDefaultOpenAIProfile, DEFAULT_SETTINGS } from './apiProfiles'
 import { DEFAULT_PARAMS } from '../types'
@@ -65,6 +66,28 @@ describe('workbenchOwner isolation and legacy claim', () => {
     expect(loadGalleryDensity()).toBe('compact')
     expect(loadCanvasAssetMetadata()).toEqual({ k1: { category: '角色', tags: ['a'] } })
     expect(loadCanvasPromptLibrary()).toHaveLength(1)
+  })
+
+  it('keeps disjoint field edits from two tabs and consumes a queued owner patch', () => {
+    setWorkbenchOwner('user:alice')
+    const name = 'gpt-image-playground'
+    const key = getOwnerScopedKey(name)
+    const a = createWorkbenchStateStorage()
+    const b = createWorkbenchStateStorage()
+    const snapshot = (enterSubmit: boolean, agentWebSearch: boolean) =>
+      JSON.stringify({ version: 2, state: { settings: { enterSubmit, agentWebSearch } } })
+    localStorage.setItem(key, snapshot(false, false))
+    a.getItem(name)
+    b.getItem(name)
+    a.setItem(name, snapshot(true, false))
+    b.setItem(name, snapshot(false, true))
+    expect(localStorage.getItem(key)).toBe(snapshot(true, true))
+
+    localStorage.setItem(key + ':settings-patch:agentMaxToolRounds', '{"value":12}')
+    const apply = vi.fn()
+    applyQueuedWorkbenchSettings(apply)
+    expect(apply).toHaveBeenCalledWith({ agentMaxToolRounds: 12 })
+    expect(localStorage.getItem(key + ':settings-patch:agentMaxToolRounds')).toBeNull()
   })
 
   it('aborts underlying image fetch immediately when external AbortSignal aborts', async () => {

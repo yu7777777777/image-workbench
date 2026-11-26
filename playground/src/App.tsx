@@ -1,7 +1,8 @@
+import { applyQueuedWorkbenchSettings } from './lib/workbenchSettings'
 import { useEffect, Suspense, lazy } from 'react'
-import { initStore, restoreExplicitPresetConfig, useStore } from './store'
+import { initStore, restoreExplicitPresetConfig, syncWorkbenchDeletions, useStore } from './store'
 import { buildSettingsFromUrlParams, clearUrlSettingParams, getExplicitUrlSettingsIds, hasUrlSettingParams } from './lib/urlSettings'
-import { createDefaultOpenAIProfile, hasDefaultPresetConfig, isAgentTextApiProfile, normalizeSettings } from './lib/apiProfiles'
+import { createDefaultOpenAIProfile, hasDefaultPresetConfig, isAgentTextApiProfile } from './lib/apiProfiles'
 import { getCustomProviderConfigUrl, hasEmbeddedDefaultConfig, loadCustomProviderSettingsFromUrl, loadEmbeddedDefaultConfig } from './lib/customProviderConfigUrl'
 import { getDefaultPresetProfileId, getPresetProfileIds, isPresetConfigOnlyEnabled, setPresetConfig } from './lib/presetConfig'
 import { useDockerApiUrlMigrationNotice } from './hooks/useDockerApiUrlMigrationNotice'
@@ -23,7 +24,7 @@ import SupportPromptModal from './components/SupportPromptModal'
 import { FavoriteCollectionPickerModal, FavoriteCollectionsView, ManageCollectionsModal } from './components/FavoriteCollections'
 import { useGlobalClickSuppression } from './lib/clickSuppression'
 import { ensureSharedProfilesLoaded, isPoolBuild, poolSettings } from './lib/accountPool'
-import { getWorkbenchOwner } from './lib/workbenchOwner'
+import { getOwnerScopedKey, getWorkbenchOwner, WORKBENCH_PERSIST_BASE_KEY } from './lib/workbenchOwner'
 import { useHashRouter } from './hooks/useHashRouter'
 import ErrorBoundary from './components/ErrorBoundary'
 import { ToastProvider } from './components/ui/Toast'
@@ -50,15 +51,10 @@ export default function App() {
       ? Promise.resolve().then(() => loadEmbeddedDefaultConfig())
       : loadCustomProviderSettingsFromUrl(customProviderConfigUrl)
 
-    const applyUrlSettings = async (baseSettings: Partial<AppSettings>) => {
-      const ids = getExplicitUrlSettingsIds(searchParams)
-      const restored = await restoreExplicitPresetConfig(ids)
-      const restoredSettings = useStore.getState().settings
-      const sourceSettings = restored
-        ? { ...restoredSettings, ...baseSettings, customProviders: restoredSettings.customProviders, profiles: restoredSettings.profiles }
-        : baseSettings
-      const nextSettings = buildSettingsFromUrlParams(sourceSettings, searchParams)
-      return Object.keys(nextSettings).length ? nextSettings : sourceSettings
+    const applyUrlSettings = async (selection: Partial<AppSettings> = {}) => {
+      await restoreExplicitPresetConfig(getExplicitUrlSettingsIds(searchParams))
+      const source = { ...useStore.getState().settings, ...selection }
+      return { ...selection, ...buildSettingsFromUrlParams(source, searchParams) }
     }
 
     const clearAppliedUrlSettings = () => {
@@ -103,21 +99,18 @@ export default function App() {
         const current = useStore.getState()
         const presetIds = getPresetProfileIds()
         const defaultPresetId = getDefaultPresetProfileId()
-        const settings = isPresetConfigOnlyEnabled()
-          ? normalizeSettings({
-              ...current.settings,
-              activeProfileId: presetIds.has(current.settings.activeProfileId)
-                ? current.settings.activeProfileId
-                : defaultPresetId ?? [...presetIds][0],
-              agentTextProfileId: current.settings.agentTextProfileId && presetIds.has(current.settings.agentTextProfileId)
-                ? current.settings.agentTextProfileId
-                : current.settings.profiles.find((profile) => presetIds.has(profile.id) && isAgentTextApiProfile(profile))?.id ?? null,
-              agentImageProfileId: current.settings.agentImageProfileId && presetIds.has(current.settings.agentImageProfileId)
-                ? current.settings.agentImageProfileId
-                : defaultPresetId ?? [...presetIds][0],
-            })
-          : current.settings
-        current.setSettings(await applyUrlSettings(settings))
+        const selection = isPresetConfigOnlyEnabled() ? {
+          activeProfileId: presetIds.has(current.settings.activeProfileId)
+            ? current.settings.activeProfileId
+            : defaultPresetId ?? [...presetIds][0],
+          agentTextProfileId: current.settings.agentTextProfileId && presetIds.has(current.settings.agentTextProfileId)
+            ? current.settings.agentTextProfileId
+            : current.settings.profiles.find((profile) => presetIds.has(profile.id) && isAgentTextApiProfile(profile))?.id ?? null,
+          agentImageProfileId: current.settings.agentImageProfileId && presetIds.has(current.settings.agentImageProfileId)
+            ? current.settings.agentImageProfileId
+            : defaultPresetId ?? [...presetIds][0],
+        } : {}
+        current.setSettings(await applyUrlSettings(selection))
         if (!isPoolBuild) {
           // 先尝试取回本站共享模型（禁止首帧以「无共享模型」的状态渲染后一直停留）；
           // 拿不到时由 ensureSharedProfilesLoaded 在后台退避重试，不阻塞首屏。
@@ -133,7 +126,7 @@ export default function App() {
         setPresetConfig(null)
         const state = useStore.getState()
         try {
-          state.setSettings(await applyUrlSettings(state.settings))
+          state.setSettings(await applyUrlSettings())
           clearAppliedUrlSettings()
           if (!isPoolBuild) void ensureSharedProfilesLoaded()
         } catch (error) {
@@ -148,6 +141,8 @@ export default function App() {
         void ensureSharedProfilesLoaded()
       })
   }, [])
+
+  useEffect(syncWorkbenchDeletions, [])
 
   useEffect(() => {
     const preventPageImageDrag = (e: DragEvent) => {
@@ -175,22 +170,22 @@ export default function App() {
       if (e.data?.type === 'sync-shared-profiles') {
         void ensureSharedProfilesLoaded()
       }
-      // 设置页通过单写通道下发工作台字段补丁，由工作台 store 统一合并并持久化。
-      if (e.data?.type === 'patch-playground-settings' && e.data?.patch && typeof e.data.patch === 'object') {
-        const expectedOwner = typeof e.data.owner === 'string' ? e.data.owner.trim() : ''
-        const activeOwner = getWorkbenchOwner()
-        if (expectedOwner && activeOwner && expectedOwner !== activeOwner) return
-        useStore.getState().setSettings(e.data.patch as Partial<AppSettings>)
-        const source = e.source as Window | null
-        source?.postMessage(
-          { type: 'patch-playground-settings-ack', requestId: e.data.requestId, owner: activeOwner },
-          window.location.origin,
-        )
+      if (e.source === window.parent && e.data?.type === 'apply-playground-settings' && e.data.owner === getWorkbenchOwner()) {
+        applyQueuedWorkbenchSettings(useStore.getState().setSettings)
       }
     }
 
+    const syncQueuedSettings = (event: StorageEvent) => {
+      if (event.key?.startsWith(getOwnerScopedKey(WORKBENCH_PERSIST_BASE_KEY) + ':settings-patch:')) {
+        applyQueuedWorkbenchSettings(useStore.getState().setSettings)
+      }
+    }
     window.addEventListener('message', handleMessage)
-    return () => window.removeEventListener('message', handleMessage)
+    window.addEventListener('storage', syncQueuedSettings)
+    return () => {
+      window.removeEventListener('message', handleMessage)
+      window.removeEventListener('storage', syncQueuedSettings)
+    }
   }, [])
 
   return (

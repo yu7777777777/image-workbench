@@ -1,3 +1,9 @@
+# 1.16.42
+
+- 将共享图片、编辑、文本、Agent 和 fal 队列统一到服务端适配，工作台只读取共享渠道的公开信息。
+- 工作台按账号迁移旧数据，设置按字段保存，跨标签页删除与迟到流式写入使用同一事务保护。
+- 补齐图片任务的流式取消、超时、结果持久化和共享素材清理。
+
 # 1.16.41
 
 - 独立对话补齐富组件与图片组解析兼容：`chat_rich_content.py` 兼容 `AsyncImageGroup queries=` 属性与 `content_references` 图片提取，`chat-widget.ts` 支持 `{@body}` 共享状态同级块合并、`{#if}/{:else if}/{:else}/{/if}`、模板字符串、`.filter(Boolean).length`、`GenUI.openUrl("sandbox:...")` 站内附件下载（复用 `bearerAuthHeader` 密钥校验）、`<LearningViz>` 转 KaTeX 公式、关键词兜底图片匹配、去重商品卡片并清洗空评分残片，缺图保留带图标的「图片未返回」胶囊占位。

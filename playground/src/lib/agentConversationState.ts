@@ -1,3 +1,4 @@
+import { isAnotherWorkbenchTabActive } from './workbenchOwner'
 import type { AgentConversation, AgentMessage, AgentRound, TaskRecord } from '../types'
 import { normalizeResponsesOutputItems } from './responsesOutputState'
 
@@ -20,7 +21,7 @@ function normalizeAgentRound(value: unknown, fallbackIndex: number): AgentRound 
   if (typeof round.userMessageId !== 'string' || !round.userMessageId) return null
 
   const status = round.status === 'running'
-    ? 'error'
+    ? isAnotherWorkbenchTabActive(round.workbenchTabId) ? 'running' : 'error'
     : round.status === 'error' || round.status === 'done'
     ? round.status
     : 'done'
@@ -28,6 +29,7 @@ function normalizeAgentRound(value: unknown, fallbackIndex: number): AgentRound 
 
   return {
     id: round.id,
+    ...(typeof round.workbenchTabId === 'string' ? { workbenchTabId: round.workbenchTabId } : {}),
     index: typeof round.index === 'number' ? round.index : fallbackIndex + 1,
     parentRoundId: typeof round.parentRoundId === 'string' ? round.parentRoundId : null,
     userMessageId: round.userMessageId,
