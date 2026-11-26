@@ -114,6 +114,28 @@ def test_image_components_preserve_only_their_own_query_results() -> None:
     ]
 
 
+def test_image_components_support_queries_attr_and_content_references_images() -> None:
+    markup = '<AsyncImageGroup queries={["地图", "装备"]} layout="bento"/>'
+    answer = _message("answer", "assistant", {"content_type": "text", "parts": [markup]},
+        content_references=[{
+            "type": "async_image_group",
+            "component_resolution_id": "ref-group",
+            "start_index": 0,
+            "end_index": len(markup),
+            "images": [{"thumbnail_url": "https://example.org/m1.png"}, {"thumbnail_url": "https://example.org/m2.png"}],
+        }])
+    backend = Mock()
+    backend._get_editable_conversation_detail.return_value = {}
+    rich = ChatRichContent("owner-a")
+    rich.observe(backend, _event(answer, markup))
+    rich.finish(backend)
+    associated = [block for block in rich.blocks if block.get("queries")]
+    assert [(block["ref"], block["queries"], block["imageUrl"]) for block in associated] == [
+        ("ref-group", ["地图", "装备"], "https://example.org/m1.png"),
+        ("ref-group", ["地图", "装备"], "https://example.org/m2.png"),
+    ]
+
+
 def test_attachment_resolution_rejects_non_visible_paths_and_other_turns(monkeypatch: pytest.MonkeyPatch) -> None:
     text = "[wrong](sandbox:/mnt/data/%2e%2e/file.txt) [missing](sandbox:/mnt/data/test.txt)"
     current = _message("current", "assistant", {"content_type": "text", "parts": [text]})

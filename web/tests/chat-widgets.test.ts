@@ -1,6 +1,9 @@
 import { expect, test } from "bun:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { splitChatReply } from "../src/lib/chat-rich-reply";
 import { chatWidgetInlineImages, readChatWidget, widgetValue, type WidgetNode } from "../src/lib/chat-widget";
+import { ChatWidgetView, resolveIcon } from "../src/app/chat/chat-widget-view";
 import examples from "./fixtures/chat-widget-expansion.json";
 
 test("renders a radio group with an unmatched initial option and requires a visible choice", async () => {
@@ -134,7 +137,7 @@ test("compiles the component playground without falling back to whole sections o
 });
 
 test("renders screenshot examples through the normal rich-reply parser", async () => {
-  const fixture = await Bun.file(new URL("./fixtures/chat-widget-compatibility.txt", import.meta.url)).text();
+  const fixture = (await Bun.file(new URL("./fixtures/chat-widget-compatibility.txt", import.meta.url)).text()).replaceAll("\r\n", "\n");
   const widgets = splitChatReply(fixture).flatMap((block) => block.kind === "widget" ? [block.widget] : []);
   expect(widgets).toHaveLength(5);
   const [buttons, selection, input, overlays, media] = widgets;
@@ -244,4 +247,191 @@ test("keeps disallowed record fields and array mutations inert within supported 
   expect(text).toBe("可读字段 {item.constructor}");
   expect(root.children[2]).toMatchObject({ kind: "unsupported", tag: "button" });
   expect(root.children.at(-1)).toMatchObject({ kind: "layout", children: [{ parts: ["下文"] }] });
+});
+
+test("supports top-level {#if}/{:else if} blocks sharing {@body} state, box progress width/color, filter(Boolean).length, queries attr and GenUI.openUrl", () => {
+  const showcase = [
+    '{@body const [tab, setTab] = DIL.useState("layout")}',
+    '{@body const [progress, setProgress] = DIL.useState(65)}',
+    '{@body const [checks, setChecks] = DIL.useState([true, false, true])}',
+    '<card><button onClick={() => setTab("forms")}>表单</button></card>',
+    '{#if tab === "layout"}',
+    '  <box background="surface-tertiary" radius="full">',
+    '    <box width={`${progress}%`} background="#16A34A" radius="full"><text>进度</text></box>',
+    '  </box>',
+    '  <text>已选择 {checks.filter(Boolean).length} 项</text>',
+    '  <AsyncImageGroup queries={["地图", "装备"]} layout="bento"/>',
+    '{:else if tab === "forms"}',
+    '  <button block onClick={() => GenUI.openUrl("sandbox:/mnt/data/demo.csv")}>下载 CSV</button>',
+    '{:else}',
+    '  <text>其他</text>',
+    '{/if}',
+  ].join("\n");
+  const blocks = splitChatReply(showcase);
+  expect(blocks).toHaveLength(1);
+  expect(blocks[0].kind).toBe("widget");
+  if (blocks[0].kind !== "widget" || blocks[0].widget.root.kind !== "layout") throw new Error("缺少组合组件");
+  const [, condition] = blocks[0].widget.root.children;
+  if (condition.kind !== "condition") throw new Error("缺少条件分支");
+  expect(widgetValue(condition.test, blocks[0].widget.initial)).toBe(true);
+  expect(condition.children[0]).toMatchObject({
+    kind: "layout",
+    children: [{ options: { background: "#16A34A" } }],
+  });
+  const widthExpr = (condition.children[0] as Extract<WidgetNode, { kind: "layout" }>).children[0];
+  if (widthExpr.kind !== "layout" || widthExpr.options?.width === undefined) throw new Error("缺少 width");
+  expect(widgetValue(widthExpr.options.width, blocks[0].widget.initial)).toBe("65%");
+  const countNode = condition.children[1];
+  if (countNode.kind !== "layout" || countNode.children[0]?.kind !== "markdown") throw new Error("缺少统计文本");
+  const countText = countNode.children[0].parts.map((part) => typeof part === "string" ? part : widgetValue(part.value, blocks[0].widget.initial)).join("");
+  expect(countText).toBe("已选择 2 项");
+  expect(condition.children[2]).toMatchObject({ kind: "image", group: true, queries: ["地图", "装备"] });
+  expect(condition.fallback[0]).toMatchObject({
+    kind: "condition",
+    children: [{ kind: "button", action: { openUrl: "sandbox:/mnt/data/demo.csv" } }],
+  });
+
+  const cleanCard = readChatWidget('<box><text>RTX 5080 · {turn0prod0.rating}/5（{turn0prod0.reviews} 条评价）</text></box>')?.widget;
+  if (!cleanCard || cleanCard.root.kind !== "layout" || cleanCard.root.children[0]?.kind !== "layout" || cleanCard.root.children[0].children[0]?.kind !== "markdown") throw new Error("缺少清洗文本");
+  expect(cleanCard.root.children[0].children[0].parts).toEqual(["RTX 5080"]);
+});
+
+test("normalizes lucide icon prefixes, aliases, and extended UI icon names", () => {
+  expect(resolveIcon("lucide:CalendarDays")).toBeDefined();
+  expect(resolveIcon("lucide-react:more-horizontal")).toBe(resolveIcon("ellipsis"));
+  expect(resolveIcon("icon:plus-circle")).toBe(resolveIcon("circle-plus"));
+  expect(resolveIcon("more-vertical")).toBe(resolveIcon("ellipsis-vertical"));
+  expect(resolveIcon("lucide:list-todo")).toBeDefined();
+  expect(resolveIcon("lucide:graduation-cap")).toBeDefined();
+  expect(resolveIcon("bell")).toBeDefined();
+  expect(resolveIcon("settings")).toBeDefined();
+  expect(resolveIcon("home")).toBeDefined();
+  expect(resolveIcon("user")).toBeDefined();
+  expect(resolveIcon("folder")).toBeDefined();
+});
+
+test("parses layout fidelity options, typography props, divider props, and merged borderless stacks", () => {
+  const widget = readChatWidget([
+    '<box direction="row" border={{ size: 1 }} radius="3xl" padding={{ x: 2, y: 1 }} background="surface-elevated">',
+    '  <title size="h2" weight="bold" align="center" value="周计划" />',
+    '  <text size="sm" weight="medium" align="end" color="emphasis" value="共 7 天" />',
+    '  <caption size="xs" align="start" value="底部备注" />',
+    '  <badge color="discovery" variant="outline" label="Beta" />',
+    '  <badge color="info">默认柔和</badge>',
+    '  <row wrap="nowrap">',
+    '    <box flex={1} border="subtle" padding="sm"><text value="周一" /></box>',
+    '    <box flex={1} border="none" radius="none" background="transparent"><text value="周二" /></box>',
+    '  </row>',
+    '  <grid columns={7}>',
+    '    <box radius="sm" background="alpha-05"><text value="1" /></box>',
+    '  </grid>',
+    '  <divider spacing="sm" flush orientation="horizontal" />',
+    '  <icon name="lucide:CalendarDays" size={20} color="primary" />',
+    '</box>',
+  ].join("\n"))?.widget;
+  if (!widget || widget.root.kind !== "layout") throw new Error("缺少布局组件");
+  expect(widget.root.options).toMatchObject({
+    direction: "row",
+    border: true,
+    radius: "3xl",
+    padding: { left: 8, right: 8, top: 4, bottom: 4 },
+    background: "surface-elevated",
+  });
+  const [title, textNode, caption, badgeOutline, badgeDefault, row, grid, divider, icon] = widget.root.children;
+  expect(title).toMatchObject({
+    variant: "title",
+    options: { size: "h2", weight: "bold", align: "center" },
+    children: [{ kind: "markdown", parts: ["周计划"] }],
+  });
+  expect(textNode).toMatchObject({
+    variant: "text",
+    options: { size: "sm", weight: "medium", align: "end", color: "emphasis" },
+    children: [{ kind: "markdown", parts: ["共 7 天"] }],
+  });
+  expect(caption).toMatchObject({
+    variant: "caption",
+    options: { size: "xs", align: "start" },
+    children: [{ kind: "markdown", parts: ["底部备注"] }],
+  });
+  expect(badgeOutline).toMatchObject({
+    variant: "badge",
+    options: { color: "discovery", variant: "outline" },
+    children: [{ kind: "markdown", parts: ["Beta"] }],
+  });
+  expect(badgeDefault).toMatchObject({
+    variant: "badge",
+    options: { color: "info", variant: "soft" },
+  });
+  expect(row).toMatchObject({
+    variant: "row",
+    options: { wrap: "nowrap" },
+    children: [
+      { variant: "box", options: { flex: 1, border: true, padding: 8 } },
+      { variant: "box", options: { flex: 1, border: false, radius: "none", background: "transparent" } },
+    ],
+  });
+  expect(grid).toMatchObject({ variant: "grid", options: { columns: 7 } });
+  expect(divider).toMatchObject({ kind: "divider", spacing: "sm", flush: true, orientation: "horizontal" });
+  expect(icon).toMatchObject({ kind: "icon", name: "lucide:CalendarDays", size: "20", color: "primary" });
+
+  const html = renderToStaticMarkup(createElement(ChatWidgetView, {
+    widget,
+    streaming: false,
+    canSend: true,
+    onSend: () => {},
+    resolveImages: () => [],
+  }));
+  expect(html).toContain('data-direction="row"');
+  expect(html).toContain('data-background="true"');
+  expect(html).toContain('data-surface="true"');
+  expect(html).toContain('data-weight="bold"');
+  expect(html).toContain('text-align:center');
+  expect(html).toContain('data-color="discovery"');
+  expect(html).toContain('data-variant="outline"');
+  expect(html).toContain('data-wrap="nowrap"');
+  expect(html).toContain('data-has-flex="true"');
+  expect(html).toContain('flex:1 1 0px');
+  expect(html).not.toContain('12rem');
+  expect(html).toContain('data-border="false"');
+  expect(html).toContain('class="chat-widget-divider"');
+  expect(html).toContain('data-spacing="sm"');
+  expect(html).toContain('data-flush="true"');
+
+  const mergedWidget = readChatWidget([
+    '{@body const [tab, setTab] = DIL.useState("a")}',
+    '<card><text value="顶部卡片" /></card>',
+    '{#if tab === "a"}<card><text value="分支 A" /></card>{/if}',
+  ].join("\n"))?.widget;
+  expect(mergedWidget?.root).toMatchObject({ kind: "layout", variant: "col", options: { gap: 12 } });
+});
+
+test("classifies lightweight text follow-up pressables as link variant while keeping cards as block pressables", () => {
+  const widget = readChatWidget([
+    '<box>',
+    '  <pressable prompt="继续拆解第一步"><text value="继续拆解第一步" /></pressable>',
+    '  <list>',
+    '    <list-item><pressable prompt="查看细节"><row><text value="查看细节" /><icon name="arrow-right" /></row></pressable></list-item>',
+    '  </list>',
+    '  <pressable border padding={2} prompt="打开卡片"><text value="带边框卡片" /></pressable>',
+    '</box>',
+  ].join("\n"))?.widget;
+  if (!widget || widget.root.kind !== "layout") throw new Error("缺少 pressable 布局");
+  const [linkPressable, list, cardPressable] = widget.root.children;
+  expect(linkPressable).toMatchObject({ kind: "pressable", variant: "link", action: { submit: "继续拆解第一步" } });
+  expect(list).toMatchObject({
+    kind: "list",
+    children: [{ kind: "list-item", children: [{ kind: "pressable", variant: "link", action: { submit: "查看细节" } }] }],
+  });
+  expect(cardPressable).toMatchObject({ kind: "pressable", action: { submit: "打开卡片" } });
+  if (cardPressable.kind === "pressable") expect(cardPressable.variant).toBeUndefined();
+
+  const html = renderToStaticMarkup(createElement(ChatWidgetView, {
+    widget,
+    streaming: false,
+    canSend: true,
+    onSend: () => {},
+    resolveImages: () => [],
+  }));
+  expect(html).toContain('<button type="button" class="chat-widget-pressable" data-variant="link"');
+  expect(html).toContain('<div class="chat-widget-pressable" data-border="true"');
 });

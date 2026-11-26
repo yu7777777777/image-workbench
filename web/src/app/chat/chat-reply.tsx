@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react";
-import { Copy, Pencil } from "lucide-react";
+import { Copy, FileText, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { readReplyResources, splitChatReply } from "@/lib/chat-rich-reply";
-import type { ChatResource } from "@/lib/chat-resources";
+import { attachmentPath, chatExternalUrl, type ChatResource } from "@/lib/chat-resources";
 import { copyReplyText, ReplyMarkdown, type ReplyMarkdownResources } from "./chat-markdown";
-import { ChatResourceLink, ReplyResourcePanel } from "./chat-resource-view";
+import { ChatResourceLink, downloadChatAttachment, ReplyResourcePanel } from "./chat-resource-view";
 import { ChatWidgetView } from "./chat-widget-view";
 import { chatWidgetInlineImages, type WidgetImage } from "@/lib/chat-widget";
 
@@ -20,27 +20,32 @@ function WritingBlock({ text, streaming, onSave, markdownResources }: {
   const [saving, setSaving] = useState(false);
   return (
     <section className="chat-writing-block" aria-label="写作块">
-      {edit === undefined ? <ReplyMarkdown text={text} streaming={streaming} {...markdownResources} /> : (
-        <Textarea aria-label="编辑写作块" rows={Math.min(14, Math.max(4, edit.split("\n").length + 1))} value={edit} onChange={(event) => setEdit(event.target.value)} disabled={saving} autoFocus />
-      )}
-      <div className="chat-writing-actions">
-        {edit === undefined ? <>
-          <Button type="button" variant="ghost" size="sm" disabled={streaming} onClick={() => setEdit(text)}><Pencil size={14} />编辑</Button>
-          <Button type="button" variant="ghost" size="sm" disabled={streaming || !text} onClick={async () => {
-            if (await copyReplyText(text)) toast.success("已复制正文");
-          }}><Copy size={14} />复制正文</Button>
-        </> : <>
-          <Button type="button" variant="ghost" size="sm" disabled={saving} onClick={() => setEdit(undefined)}>取消</Button>
-          <Button type="button" size="sm" disabled={saving} onClick={async () => {
-            setSaving(true);
-            try {
-              await onSave(edit);
-              setEdit(undefined);
-            } finally {
-              setSaving(false);
-            }
-          }}>{saving ? "保存中…" : "保存"}</Button>
-        </>}
+      <div className="chat-writing-header">
+        <span className="chat-writing-title"><FileText size={14} aria-hidden="true" />文档草稿</span>
+        <div className="chat-writing-actions">
+          {edit === undefined ? <>
+            <Button type="button" variant="ghost" size="sm" disabled={streaming} onClick={() => setEdit(text)}><Pencil size={13} />编辑</Button>
+            <Button type="button" variant="ghost" size="sm" disabled={streaming || !text} onClick={async () => {
+              if (await copyReplyText(text)) toast.success("已复制正文");
+            }}><Copy size={13} />复制正文</Button>
+          </> : <>
+            <Button type="button" variant="ghost" size="sm" disabled={saving} onClick={() => setEdit(undefined)}>取消</Button>
+            <Button type="button" size="sm" disabled={saving} onClick={async () => {
+              setSaving(true);
+              try {
+                await onSave(edit);
+                setEdit(undefined);
+              } finally {
+                setSaving(false);
+              }
+            }}>{saving ? "保存中…" : "保存"}</Button>
+          </>}
+        </div>
+      </div>
+      <div className="chat-writing-body">
+        {edit === undefined ? <ReplyMarkdown text={text} streaming={streaming} {...markdownResources} /> : (
+          <Textarea aria-label="编辑写作块" rows={Math.min(14, Math.max(4, edit.split("\n").length + 1))} value={edit} onChange={(event) => setEdit(event.target.value)} disabled={saving} autoFocus />
+        )}
       </div>
     </section>
   );
@@ -72,6 +77,11 @@ export function ChatReply({ text, writingDrafts, resources = emptyResources, own
     return { images, products };
   }, [resources]);
 
+  const exactRefs = new Set<string>();
+  for (const image of inlineAssets.images) {
+    if (image.ref) exactRefs.add(image.ref);
+  }
+
   function resolveImages(node: WidgetImage): ChatResource[] {
     const { images, products } = inlineAssets;
     let matches = node.ref ? images.filter((image) => image.ref === node.ref) : [];
@@ -81,6 +91,13 @@ export function ChatReply({ text, writingDrafts, resources = emptyResources, own
         && image.queries.every((query, index) => query === queries[index]));
       if (!matches.length && node.group) {
         matches = queries.flatMap((query) => images.find((image) => image.queries?.length === 1 && image.queries[0] === query) ?? []);
+      }
+      if (!matches.length) {
+        const tokens = queries.flatMap((q) => q.toLowerCase().split(/[\s,，、/|]+/).filter((t) => t.length >= 2));
+        if (tokens.length) {
+          matches = images.filter((image) => !image.queries?.length && (!image.ref || !exactRefs.has(image.ref)) && Boolean(image.title)
+            && tokens.some((token) => image.title!.toLowerCase().includes(token)));
+        }
       }
     }
     if (!matches.length && node.ref && !node.group) {
@@ -94,6 +111,23 @@ export function ChatReply({ text, writingDrafts, resources = emptyResources, own
       urls.add(imageUrl);
       return true;
     });
+  }
+
+  function handleOpenUrl(rawUrl: string) {
+    if (rawUrl.startsWith("sandbox:")) {
+      const path = attachmentPath(rawUrl);
+      const attachment = path ? attachments.get(path) : undefined;
+      if (!attachment || !owner) {
+        toast.error("附件未随回复返回");
+        return;
+      }
+      void downloadChatAttachment(attachment, owner).catch((error) => {
+        toast.error(error instanceof Error ? error.message : "文件下载失败，请重试");
+      });
+      return;
+    }
+    const safeUrl = chatExternalUrl(rawUrl);
+    if (safeUrl) window.open(safeUrl, "_blank", "noopener,noreferrer");
   }
 
   const renderedInline = new Set<string>();
@@ -127,7 +161,7 @@ export function ChatReply({ text, writingDrafts, resources = emptyResources, own
           case "writing":
             return block.text && <WritingBlock key={block.offset} text={writingDrafts?.[block.offset] ?? block.text} streaming={streaming} markdownResources={markdownResources} onSave={(value) => onSaveWriting(block.offset, value)} />;
           case "widget":
-            return <ChatWidgetView key={block.offset} widget={block.widget} canSend={canSend} streaming={streaming} onSend={onSend} renderResource={renderResource} resolveImages={resolveImages} />;
+            return <ChatWidgetView key={block.offset} widget={block.widget} canSend={canSend} streaming={streaming} onSend={onSend} onOpenUrl={handleOpenUrl} renderResource={renderResource} resolveImages={resolveImages} />;
           case "unsupported":
             return (
               <details key={block.offset} className="chat-reply-source">

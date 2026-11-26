@@ -6,7 +6,7 @@ export type WidgetStateValue = Scalar | readonly Scalar[];
 type WidgetData = Scalar | readonly WidgetData[] | ReadonlyMap<string, WidgetData>;
 type Comparison = "===" | "!==" | ">" | "<" | ">=" | "<=";
 type Value = Scalar | { variable: string } | { add: [Value, Value] } | { compare: [Comparison, Value, Value] } | { choose: [Value, Value, Value] } | { fallback: [Value, Value] } | { join: Value[]; separator: string }
-  | { not: Value } | { length: Value } | { trim: Value } | { includes: [Value, Value] } | { joinState: Value; separator: string }
+  | { not: Value } | { length: Value } | { countTruthy: Value } | { trim: Value } | { includes: [Value, Value] } | { joinState: Value; separator: string }
   | { array: readonly Value[] } | { record: ReadonlyMap<string, Value> } | { index: [Value, Value] } | { field: [Value, string] };
 type Attribute = string | true | { expression: string };
 type Element = { tag: string; attributes: Map<string, Attribute>; children: (Element | string)[]; inner: string; start: number; contentStart: number; end: number; source: string };
@@ -33,14 +33,14 @@ type WidgetArrayAction = { name: string } & (
   { kind: "replace"; index: number; value: Value } |
   { kind: "select"; list: Value; field: string }
 );
-type Action = { submit: Value } | { submitForm: true } | { reset: string[] } | { adjust: { name: string; change: number; bound: number } }
+type Action = { submit: Value } | { openUrl: Value } | { submitForm: true } | { reset: string[] } | { adjust: { name: string; change: number; bound: number } }
   | { set: StateUpdate } | { updates: StateUpdate[] } | { array: WidgetArrayAction };
 type FieldBinding = { name: string; updates?: StateUpdate[] };
 type AstNode = Expression | { type: "PrivateIdentifier"; name: string } | { type: "SpreadElement"; argument: Expression } | { type: "Super" };
 type Layout = "box" | "row" | "col" | "grid" | "card" | "title" | "text" | "badge" | "caption" | "grid-item" | "flow-item" | "carousel-item"
   | "label" | "blockquote" | "callout";
 type LayoutOptions = { gap?: number; columns?: number; flex?: number; align?: "start" | "center" | "end" | "stretch"; justify?: "start" | "center" | "end" | "between"; border?: boolean; surface?: boolean; background?: Value;
-  padding?: number | Partial<Record<"top" | "right" | "bottom" | "left", number>>; radius?: "md" | "lg" | "xl" | "2xl" | "full"; square?: number; height?: string; aspectRatio?: string; color?: Value; size?: string; wrap?: boolean; numeric?: boolean };
+  padding?: number | Partial<Record<"top" | "right" | "bottom" | "left", number>>; radius?: "none" | "sm" | "md" | "lg" | "xl" | "2xl" | "3xl" | "full"; square?: number; width?: Value; height?: string; aspectRatio?: string; color?: Value; size?: string; wrap?: "wrap" | "nowrap"; direction?: "row" | "col"; weight?: "normal" | "medium" | "semibold" | "bold"; variant?: "soft" | "solid" | "outline"; numeric?: boolean };
 type ChartRow = { name: Value; values: Value[]; x?: Value; filter?: Scalar };
 export type WidgetMarker = { lat: number; lon: number; label: string } | { address: string; label: string };
 type SvgShape = { tag: "rect" | "circle" | "ellipse" | "path" | "line" | "polygon" | "polyline"; attrs: Record<string, string> };
@@ -63,10 +63,10 @@ export type WidgetNode =
   | { kind: "form"; label?: string; action?: Action; submit?: Value; children: WidgetNode[] }
   | { kind: "popover"; label: string; icon?: string; children: WidgetNode[] }
   | { kind: "carousel"; label: string; binding?: string; showArrows: boolean; children: WidgetNode[] }
-  | { kind: "pressable"; action: Action; label: string; options: LayoutOptions; children: WidgetNode[]; pressed?: Value; expanded?: Value }
+  | { kind: "pressable"; action: Action; label: string; options: LayoutOptions; children: WidgetNode[]; pressed?: Value; expanded?: Value; variant?: "link" }
   | { kind: "markdown"; parts: (string | { value: Value })[] }
   | { kind: "icon"; name: Value; size?: string; color?: Value }
-  | { kind: "divider" }
+  | { kind: "divider"; spacing?: "none" | "sm" | "md" | "lg" | number; flush?: boolean; orientation?: "horizontal" | "vertical" }
   | { kind: "spacer" }
   | { kind: "unsupported"; tag: string; text: string; source?: string }
   | { kind: "svg"; viewBox: string; shapes: SvgShape[] }
@@ -143,6 +143,10 @@ function evaluateData(value: Value, state: ReadonlyMap<string, WidgetStateValue>
     if ("length" in value) {
       const sequence = evaluate(value.length, depth + 1);
       return typeof sequence === "string" || Array.isArray(sequence) ? sequence.length : 0;
+    }
+    if ("countTruthy" in value) {
+      const sequence = evaluate(value.countTruthy, depth + 1);
+      return isDataArray(sequence) ? sequence.filter(Boolean).length : 0;
     }
     if ("includes" in value) {
       const collection = evaluate(value.includes[0], depth + 1);
@@ -262,7 +266,7 @@ function readElement(source: string, from: number, depth = 0): Element | undefin
       } else {
         const keyword = /^(?:[A-Za-z_$][\w$-]*|\d+)(?=[\s/>])/.exec(source.slice(cursor));
         const repeatAttribute = ["each", "chat-repeat"].includes(tag) && ["alias", "as", "index", "values", "items", "of", "in"].includes(name);
-        if (!keyword || (!repeatAttribute && !["align", "justify", "flex", "marker", "connector", "layout"].includes(name))) return undefined;
+        if (!keyword || (!repeatAttribute && !["align", "justify", "flex", "marker", "connector", "layout", "wrap", "direction", "weight", "variant", "spacing", "orientation"].includes(name))) return undefined;
         attributes.set(name, keyword[0]);
         cursor += keyword[0].length;
       }
@@ -331,6 +335,17 @@ function valueExpression(node: AstNode | null | undefined, states: Map<string, S
     if (node.value === null) return "";
     return typeof node.value === "string" || typeof node.value === "boolean" || (typeof node.value === "number" && Number.isFinite(node.value)) ? node.value : undefined;
   }
+  if (node.type === "TemplateLiteral") {
+    let result: Value = node.quasis[0]?.value.cooked ?? "";
+    for (let index = 0; index < node.expressions.length; index++) {
+      const part = valueExpression(node.expressions[index], states, depth + 1);
+      if (part === undefined) return undefined;
+      result = { add: [result, part] };
+      const tail = node.quasis[index + 1]?.value.cooked ?? "";
+      if (tail) result = { add: [result, tail] };
+    }
+    return result;
+  }
   if (node.type === "Identifier" && states.has(node.name)) return states.get(node.name)?.derived ?? { variable: node.name };
   if (node.type === "ArrayExpression") {
     if (node.elements.length > 40) return undefined;
@@ -360,6 +375,11 @@ function valueExpression(node: AstNode | null | undefined, states: Map<string, S
   }
   if (node.type === "MemberExpression" && !node.computed && !node.optional && node.property.type === "Identifier") {
     const key = node.property.name;
+    if (key === "length" && memberCall(node.object, "filter") && node.object.arguments.length === 1
+      && node.object.arguments[0].type === "Identifier" && node.object.arguments[0].name === "Boolean") {
+      const collection = valueExpression(node.object.callee.object, states, depth + 1);
+      return collection === undefined ? undefined : { countTruthy: collection };
+    }
     const target = valueExpression(node.object, states, depth + 1);
     if (target === undefined || !isSafeField(key)) return undefined;
     if (typeof target === "object" && "record" in target) return target.record.get(key);
@@ -682,11 +702,18 @@ function parseAction(source: string | undefined, states: Map<string, State>): Ac
       const initial = new Map([...states].map(([name, entry]) => [name, entry.initial]));
       return value !== undefined && typeof widgetValue(value, initial) === typeof state[1].initial ? { set: { name: state[0], value } } : undefined;
     }
-    if (target.type !== "MemberExpression" || target.optional || target.computed || target.object.type !== "Identifier" || target.object.name !== "GenUI" || target.property.type !== "Identifier" || target.property.name !== "issueNewTurn") {
+    if (target.type !== "MemberExpression" || target.optional || target.computed || target.object.type !== "Identifier" || target.object.name !== "GenUI" || target.property.type !== "Identifier") {
       return undefined;
     }
-    const submit = valueExpression(body.arguments[0], states);
-    return submit === undefined ? undefined : { submit };
+    if (target.property.name === "issueNewTurn") {
+      const submit = valueExpression(body.arguments[0], states);
+      return submit === undefined ? undefined : { submit };
+    }
+    if (target.property.name === "openUrl") {
+      const openUrl = valueExpression(body.arguments[0], states);
+      return openUrl === undefined ? undefined : { openUrl };
+    }
+    return undefined;
   }
   if (body.type !== "BlockStatement" || !body.body.length) return undefined;
   const updates = parseStateUpdates(body.body, states);
@@ -796,7 +823,12 @@ function compileChart(element: Element, states: Map<string, State>): WidgetNode 
 }
 
 function compileText(source: string, states: Map<string, State>): WidgetNode {
-  const text = source.trim().replace(/^[ \t]+/gm, "").replace(/\{(?:turn\d+|sample)[\w-]*(?:\.\w+)+\}/g, "");
+  const text = source
+    .trim()
+    .replace(/^[ \t]+/gm, "")
+    .replace(/\{(?:turn\d+|sample)[\w-]*(?:\.\w+)+\}/g, "")
+    .replace(/(?:·\s*)?\/5（\s*条评价）/g, "")
+    .trim();
   const parts: (string | { value: Value })[] = [];
   let cursor = 0;
   for (const [start, end] of bracedRanges(text)) {
@@ -809,7 +841,7 @@ function compileText(source: string, states: Map<string, State>): WidgetNode {
   return { kind: "markdown", parts };
 }
 
-function compileChildren(element: Element, states: WidgetScope): WidgetNode[] | undefined {
+function compileChildren(element: Element, states: WidgetScope, inListItem = false): WidgetNode[] | undefined {
   const segments: Element["children"] = [];
   for (const part of element.children) {
     const child = typeof part !== "string" && part.tag === "Entity"
@@ -845,13 +877,13 @@ function compileChildren(element: Element, states: WidgetScope): WidgetNode[] | 
         }
       }
       if (isRepeat(child)) {
-        const repeated = compileRepeat(child, states);
+        const repeated = compileRepeat(child, states, inListItem);
         if (repeated) children.push(...repeated);
         else children.push({ kind: "unsupported", tag: "each", text: child.inner, source: child.source });
         label = "";
         continue;
       }
-      const node = compileNode(child, states, label);
+      const node = compileNode(child, states, label, inListItem);
       const previous = children.at(-1);
       if (node?.kind === "condition" && previous?.kind === "pressable" && previous.expanded === undefined
         && togglesCondition(previous.action, node.test)) {
@@ -865,13 +897,13 @@ function compileChildren(element: Element, states: WidgetScope): WidgetNode[] | 
   return children;
 }
 
-function compileRepeat(element: Element, states: WidgetScope): WidgetNode[] | undefined {
+function compileRepeat(element: Element, states: WidgetScope, inListItem = false): WidgetNode[] | undefined {
   const bindings = repeatBindings(element, states);
   if (!bindings) return undefined;
   const children: WidgetNode[] = [];
   for (const binding of bindings) {
     if (states.context.remaining <= 0) return undefined;
-    const repeated = compileChildren(element, binding);
+    const repeated = compileChildren(element, binding, inListItem);
     if (!repeated) return undefined;
     children.push(...repeated);
   }
@@ -900,42 +932,116 @@ function compileInput(element: Element, states: Map<string, State>, label: strin
   };
 }
 
+const paddingTokens: Record<string, number> = { none: 0, xs: 4, sm: 8, md: 12, lg: 16, xl: 20 };
+const titleSizes = new Set(["xs", "sm", "md", "lg", "xl", "2xl", "3xl", "h1", "h2", "h3", "h4"]);
+const textSizes = new Set(["xs", "sm", "md", "lg", "xl"]);
+const captionSizes = new Set(["xs", "sm", "md"]);
+
+function parseBorder(element: Element, states: Map<string, State>): boolean | undefined {
+  if (!element.attributes.has("border")) return undefined;
+  const bool = attrBoolean(element, "border");
+  if (bool !== undefined) return bool;
+  const num = attrNumber(element, "border");
+  if (num !== undefined) return num > 0;
+  const str = attrString(element, "border")?.trim().toLowerCase();
+  if (str !== undefined) {
+    if (str === "none" || str === "0" || str === "0px" || str === "false") return false;
+    if (str === "subtle" || str === "default" || str === "1px" || str === "solid" || str === "true") return true;
+    return undefined;
+  }
+  const expr = parseExpression(attrExpression(element, "border"));
+  if (expr?.type === "ObjectExpression") {
+    const sizeVal = valueExpression(property(expr, "size"), states);
+    if (typeof sizeVal === "number") return sizeVal > 0;
+    if (typeof sizeVal === "string") return sizeVal !== "none" && sizeVal !== "0" && sizeVal !== "0px";
+    return true;
+  }
+  return undefined;
+}
+
 function layoutOptions(element: Element, states = new Map<string, State>()): LayoutOptions {
-  const align = attrString(element, "align");
+  const alignRaw = attrString(element, "align");
+  const align = alignRaw === "left" ? "start" : alignRaw === "right" ? "end" : alignRaw;
   const justify = attrString(element, "justify");
   const gap = attrNumber(element, "gap");
   const columns = attrNumber(element, "columns");
   const flex = attrNumber(element, "flex");
-  const padding = attrNumber(element, "padding");
+  const clampPadding = (value: number) => Math.min(32, Math.max(0, value * 4));
+  const paddingNum = attrNumber(element, "padding");
+  const paddingStr = attrString(element, "padding")?.trim().toLowerCase();
   const paddingRecord = parseExpression(attrExpression(element, "padding"));
   const sides: Exclude<LayoutOptions["padding"], number | undefined> = {};
   if (paddingRecord?.type === "ObjectExpression") {
+    const readSide = (key: string): number | undefined => {
+      const value = valueExpression(property(paddingRecord, key), states);
+      if (typeof value === "number") return clampPadding(value);
+      if (typeof value === "string" && value.trim().toLowerCase() in paddingTokens) return paddingTokens[value.trim().toLowerCase()];
+      return undefined;
+    };
+    const x = readSide("x") ?? readSide("horizontal");
+    const y = readSide("y") ?? readSide("vertical");
+    if (x !== undefined) {
+      sides.left = x;
+      sides.right = x;
+    }
+    if (y !== undefined) {
+      sides.top = y;
+      sides.bottom = y;
+    }
     for (const side of ["top", "right", "bottom", "left"] as const) {
-      const value = valueExpression(property(paddingRecord, side), states);
-      if (typeof value === "number") sides[side] = Math.min(24, Math.max(0, value * 4));
+      const value = readSide(side);
+      if (value !== undefined) sides[side] = value;
     }
   }
+  const resolvedPadding = paddingNum !== undefined
+    ? clampPadding(paddingNum)
+    : paddingStr !== undefined && paddingStr in paddingTokens
+      ? paddingTokens[paddingStr]
+      : Object.keys(sides).length > 0
+        ? sides
+        : undefined;
   const radius = attrString(element, "radius");
   const size = attrString(element, "size");
   const square = size && /^([1-9]\d{0,2})px$/.exec(size);
   const height = attrString(element, "height") ?? attrString(element, "minHeight");
   const ratio = ratioAttribute(element);
+  const wrapStr = attrString(element, "wrap")?.trim().toLowerCase();
+  const wrapBool = attrBoolean(element, "wrap");
+  const wrap: "wrap" | "nowrap" | undefined = wrapStr === "nowrap" || wrapBool === false
+    ? "nowrap"
+    : wrapStr === "wrap" || wrapBool === true
+      ? "wrap"
+      : undefined;
+  const directionRaw = attrString(element, "direction")?.trim().toLowerCase();
+  const direction: "row" | "col" | undefined = directionRaw === "row"
+    ? "row"
+    : directionRaw === "col" || directionRaw === "column"
+      ? "col"
+      : undefined;
+  const weightRaw = attrString(element, "weight")?.trim().toLowerCase();
+  const weight: LayoutOptions["weight"] =
+    weightRaw === "normal" || weightRaw === "medium" || weightRaw === "semibold" || weightRaw === "bold" ? weightRaw : undefined;
+  const surfaceAttr = attrBoolean(element, "surface");
+  const bgLiteral = attrString(element, "background");
   return {
     gap: gap === undefined ? undefined : Math.min(24, Math.max(0, gap * 4)),
-    columns: columns === undefined ? undefined : Math.max(1, Math.min(4, Math.floor(columns))),
+    columns: columns === undefined ? undefined : Math.min(12, Math.max(1, Math.floor(columns))),
     flex: flex === undefined || flex <= 0 ? undefined : Math.min(8, flex),
     align: align === "start" || align === "center" || align === "end" || align === "stretch" ? align : undefined,
     justify: justify === "start" || justify === "center" || justify === "end" || justify === "between" ? justify : undefined,
-    border: attrBoolean(element, "border"),
-    surface: attrString(element, "background") === "surface-secondary" || undefined,
+    border: parseBorder(element, states),
+    surface: surfaceAttr ?? (bgLiteral === "surface-secondary" ? true : undefined),
     background: attrValue(element, "background", states),
-    padding: padding === undefined ? (Object.keys(sides).length > 0 ? sides : undefined) : Math.min(24, Math.max(0, padding * 4)),
-    radius: radius === "md" || radius === "lg" || radius === "xl" || radius === "2xl" || radius === "full" ? radius : undefined,
+    padding: resolvedPadding,
+    radius: radius === "none" || radius === "sm" || radius === "md" || radius === "lg" || radius === "xl" || radius === "2xl" || radius === "3xl" || radius === "full" ? radius : undefined,
     square: square ? Math.min(160, Number(square[1])) : undefined,
+    width: attrValue(element, "width", states),
     height: height === "100%" || (height && /^[1-9]\d{0,2}px$/.test(height) && parseInt(height, 10) <= 480) ? height : undefined,
     aspectRatio: ratio,
     size,
-    wrap: attrString(element, "wrap") === "wrap" || undefined,
+    wrap,
+    direction,
+    weight,
     numeric: attrBoolean(element, "tabularNums"),
   };
 }
@@ -959,12 +1065,17 @@ function safeMediaUrl(value: string | undefined): URL | undefined {
   return undefined;
 }
 
-function compileImage(element: Element): WidgetImage {
+function compileImage(element: Element, states = new Map<string, State>()): WidgetImage {
   const group = element.tag === "AsyncImageGroup";
-  const expression = parseExpression(attrExpression(element, "query"));
-  const queries = expression?.type === "ArrayExpression" && group
-    ? expression.elements.map((item) => valueExpression(item, new Map()))
-    : [attrString(element, "query")];
+  const exprSource = attrExpression(element, "query") ?? attrExpression(element, "queries");
+  const expression = parseExpression(exprSource);
+  let queries: unknown[];
+  if (expression?.type === "ArrayExpression" && group) {
+    queries = expression.elements.map((item) => valueExpression(item, states));
+  } else {
+    const str = attrString(element, "query", states) ?? attrString(element, "queries", states);
+    queries = [str];
+  }
   const width = /^([1-9]\d{0,3})(?:px)?$/.exec(attrString(element, "maxWidth") ?? String(attrNumber(element, "maxWidth") ?? ""));
   return {
     kind: "image", group, bento: group && attrString(element, "layout") === "bento",
@@ -1094,13 +1205,33 @@ function pressableLabel(nodes: WidgetNode[], values: ReadonlyMap<string, WidgetS
   return "";
 }
 
-function compileNode(element: Element, states: WidgetScope, label = ""): WidgetNode | undefined {
+function isSimplePressableContent(nodes: WidgetNode[]): boolean {
+  return nodes.length > 0 && nodes.every((node) => {
+    if (node.kind === "markdown" || node.kind === "icon") return true;
+    if (node.kind === "layout" && (node.variant === "text" || node.variant === "title" || node.variant === "caption")) {
+      return isSimplePressableContent(node.children);
+    }
+    return false;
+  });
+}
+
+function fallbackTextChildren(element: Element, attrName: string, states: Map<string, State>): WidgetNode[] | undefined {
+  const rawText = attrText(element, attrName);
+  if (rawText !== undefined && rawText.trim()) return [compileText(rawText, states)];
+  const val = attrValue(element, attrName, states);
+  if (val !== undefined && val !== "") {
+    return [{ kind: "markdown", parts: [typeof val === "string" ? val : { value: val }] }];
+  }
+  return undefined;
+}
+
+function compileNode(element: Element, states: WidgetScope, label = "", inListItem = false): WidgetNode | undefined {
   if (states.repeatDepth && states.context.remaining-- <= 0) return undefined;
   const tag = element.tag;
   switch (tag) {
     case "each":
     case "chat-repeat": {
-      const children = compileRepeat(element, states);
+      const children = compileRepeat(element, states, inListItem);
       return children ? { kind: "layout", variant: "col", children } : undefined;
     }
     case "radio-group":
@@ -1206,12 +1337,27 @@ function compileNode(element: Element, states: WidgetScope, label = ""): WidgetN
       const test = parseExpression(attrExpression(element, "test"));
       const value = valueExpression(test, states);
       const fallbackIndex = element.children.findIndex((child) => typeof child !== "string" && child.tag === "chat-otherwise");
-      const children = compileChildren({ ...element, children: fallbackIndex < 0 ? element.children : element.children.slice(0, fallbackIndex) }, states);
-      const fallback = fallbackIndex < 0 ? [] : compileChildren({ ...element, children: element.children.slice(fallbackIndex + 1) }, states);
+      const children = compileChildren({ ...element, children: fallbackIndex < 0 ? element.children : element.children.slice(0, fallbackIndex) }, states, inListItem);
+      const fallback = fallbackIndex < 0 ? [] : compileChildren({ ...element, children: element.children.slice(fallbackIndex + 1) }, states, inListItem);
       return value !== undefined && children && fallback ? { kind: "condition", test: value, children, fallback } : undefined;
     }
-    case "divider":
-      return { kind: "divider" };
+    case "divider": {
+      const spacingStr = attrString(element, "spacing")?.trim().toLowerCase();
+      const spacingNum = attrNumber(element, "spacing");
+      const spacing =
+        spacingStr === "none" || spacingStr === "sm" || spacingStr === "md" || spacingStr === "lg" ? spacingStr
+        : spacingNum !== undefined ? Math.min(32, Math.max(0, spacingNum * 4))
+        : undefined;
+      const flush = attrBoolean(element, "flush");
+      const orientationRaw = attrString(element, "orientation")?.trim().toLowerCase();
+      const orientation = orientationRaw === "horizontal" || orientationRaw === "vertical" ? orientationRaw : undefined;
+      return {
+        kind: "divider",
+        ...(spacing !== undefined ? { spacing } : {}),
+        ...(flush !== undefined ? { flush } : {}),
+        ...(orientation !== undefined ? { orientation } : {}),
+      };
+    }
     case "spacer":
       return { kind: "spacer" };
     case "svg":
@@ -1222,18 +1368,22 @@ function compileNode(element: Element, states: WidgetScope, label = ""): WidgetN
       return { kind: "list", ordered: attrString(element, "marker") === "number", connected: attrString(element, "connector") === "solid", gap: layoutOptions(element).gap, children };
     }
     case "list-item": {
-      const children = compileChildren(element, states);
+      const children = compileChildren(element, states, true);
       return children ? { kind: "list-item", children } : undefined;
     }
-    case "icon":
-      return { kind: "icon", name: attrValue(element, "name", states) ?? "", size: attrString(element, "size"), color: attrValue(element, "color", states) };
+    case "icon": {
+      const sizeNum = attrNumber(element, "size");
+      const sizeStr = attrString(element, "size");
+      const size = sizeNum !== undefined ? String(Math.round(sizeNum)) : sizeStr;
+      return { kind: "icon", name: attrValue(element, "name", states) ?? "", size, color: attrValue(element, "color", states) };
+    }
     case "favicon":
       return { kind: "icon", name: "globe" };
     case "Entity":
       return { kind: "resource", resourceType: "product", ref: attrString(element, "ref"), label: attrString(element, "value") ?? "商品信息未返回" };
     case "AsyncImage":
     case "AsyncImageGroup":
-      return compileImage(element);
+      return compileImage(element, states);
     case "Link": {
       const label = attrText(element, "title") ?? "来源";
       const url = attrString(element, "url") ?? attrString(element, "href");
@@ -1281,7 +1431,12 @@ function compileNode(element: Element, states: WidgetScope, label = ""): WidgetN
       return children?.length ? { kind: "carousel", label: attrString(element, "label") ?? attrString(element, "title") ?? "内容轮播", binding, showArrows: attrBoolean(element, "showArrows") ?? true, children } : undefined;
     }
     case "pressable": {
-      const action = element.attributes.has("onClick") ? parseAction(attrExpression(element, "onClick"), states) : { updates: [] };
+      const prompt = attrValue(element, "prompt", states);
+      const action = element.attributes.has("onClick")
+        ? parseAction(attrExpression(element, "onClick"), states)
+        : prompt !== undefined
+          ? { submit: prompt }
+          : { updates: [] };
       const children = compileChildren(element, states);
       if (!action || !children?.length || children.some((child) => widgetHas(child, (node) =>
         !["layout", "markdown", "icon", "spacer", "divider", "svg", "condition"].includes(node.kind)))) return undefined;
@@ -1289,8 +1444,18 @@ function compileNode(element: Element, states: WidgetScope, label = ""): WidgetN
       const options = layoutOptions(element, states);
       const background = options.background;
       const pressed: Value | undefined = typeof background === "object" && "choose" in background ? background.choose[0] : undefined;
-      return { kind: "pressable", action, children, label: label || "切换卡片状态", options,
-        pressed: attrValue(element, "aria-pressed", states) ?? pressed, expanded: attrValue(element, "aria-expanded", states) ?? attrValue(element, "ariaExpanded", states) };
+      const isUnstyled = !options.border && options.background === undefined && !options.surface && options.padding === undefined;
+      const variant = isUnstyled && (inListItem || isSimplePressableContent(children)) ? ("link" as const) : undefined;
+      return {
+        kind: "pressable",
+        action,
+        children,
+        label: label || "切换卡片状态",
+        options,
+        ...(variant ? { variant } : {}),
+        pressed: attrValue(element, "aria-pressed", states) ?? pressed,
+        expanded: attrValue(element, "aria-expanded", states) ?? attrValue(element, "ariaExpanded", states),
+      };
     }
     case "AsyncVideo":
     case "video": {
@@ -1355,9 +1520,29 @@ function compileNode(element: Element, states: WidgetScope, label = ""): WidgetN
     case "blockquote":
     case "callout":
     case "badge": {
-      const children = compileChildren(element, states);
+      let children = compileChildren(element, states);
+      if (children && !children.length) {
+        if (tag === "title" || tag === "text" || tag === "caption") {
+          children = fallbackTextChildren(element, "value", states) ?? children;
+        } else if (tag === "badge") {
+          children = fallbackTextChildren(element, "label", states) ?? fallbackTextChildren(element, "value", states) ?? children;
+        }
+      }
       const options = layoutOptions(element, states);
       options.color = attrText(element, "color") ?? valueExpression(parseExpression(attrExpression(element, "color")), states);
+      if (tag === "title") {
+        const normalizedSize = options.size?.trim().toLowerCase();
+        options.size = normalizedSize && titleSizes.has(normalizedSize) ? normalizedSize : undefined;
+      } else if (tag === "text") {
+        const normalizedSize = options.size?.trim().toLowerCase();
+        options.size = normalizedSize && textSizes.has(normalizedSize) ? normalizedSize : undefined;
+      } else if (tag === "caption") {
+        const normalizedSize = options.size?.trim().toLowerCase();
+        options.size = normalizedSize && captionSizes.has(normalizedSize) ? normalizedSize : undefined;
+      } else if (tag === "badge") {
+        const variantRaw = attrString(element, "variant")?.trim().toLowerCase();
+        options.variant = variantRaw === "solid" || variantRaw === "outline" || variantRaw === "soft" ? variantRaw : "soft";
+      }
       return children ? { kind: "layout", variant: tag === "column" ? "col" : tag === "flow" ? "grid" : tag, options, children } : undefined;
     }
     default:
@@ -1385,8 +1570,8 @@ function widgetDirectives(root: Element): WidgetDirective[] {
     for (const child of element.children) {
       if (typeof child === "string") {
         for (const [start, end] of bracedRanges(child)) {
-          const match = /^(#each|#if|\/each|\/if|:else)(?=\s|$)([\s\S]*)$/.exec(child.slice(start + 1, end - 1));
-          if (match) directives.push({ name: match[1], args: match[2].trim(), start: cursor + start, end: cursor + end });
+          const match = /^(#each|#if|\/each|\/if|:else(?:\s+if)?)(?=\s|$)([\s\S]*)$/.exec(child.slice(start + 1, end - 1));
+          if (match) directives.push({ name: match[1].replace(/\s+/, " "), args: match[2].trim(), start: cursor + start, end: cursor + end });
         }
         cursor += child.length;
       } else {
@@ -1433,6 +1618,7 @@ function expandElementDirectives(source: string, root: Element): string {
   }
 
   const parts: string[] = [];
+  const ifStack: number[] = [];
   let cursor = 0;
   for (const { name, args, start, end } of directives) {
     let markup: string | undefined;
@@ -1442,9 +1628,15 @@ function expandElementDirectives(source: string, root: Element): string {
         ? `<chat-repeat values={${binding[1]}} alias="${binding[2]}"${binding[3] ? ` index="${binding[3]}"` : ""}>`
         : "<chat-repeat>";
     } else if (name === "#if" && args) {
+      ifStack.push(0);
       markup = `<chat-condition test={${args}}>`;
+    } else if (name === ":else if" && args && ifStack.length) {
+      ifStack[ifStack.length - 1]++;
+      markup = `<chat-otherwise/><chat-condition test={${args}}>`;
     } else if (!args) {
-      markup = name === "/each" ? "</chat-repeat>" : name === "/if" ? "</chat-condition>" : "<chat-otherwise/>";
+      if (name === "/each") markup = "</chat-repeat>";
+      else if (name === "/if") markup = "</chat-condition>".repeat(1 + (ifStack.pop() ?? 0));
+      else markup = "<chat-otherwise/>";
     }
     if (markup === undefined) continue;
     parts.push(expanded.slice(cursor, start), markup);
@@ -1501,20 +1693,80 @@ function readDeclarations(source: string, states: Map<string, State>, inline = f
   return { end: cursor, valid, text: text + source.slice(cursor) };
 }
 
+function readDirectiveBlock(source: string, from: number): number | undefined {
+  const opening = source.slice(from);
+  const isIf = /^\{#if(?=\s)/.test(opening);
+  const isEach = /^\{#each(?=\s)/.test(opening);
+  if (!isIf && !isEach) return undefined;
+  const openKind = isIf ? "#if" : "#each";
+  const closeKind = isIf ? "/if" : "/each";
+  let depth = 0;
+  let cursor = from;
+  while (cursor < source.length) {
+    if (source[cursor] === "{") {
+      const end = readBraces(source, cursor);
+      if (end === undefined) return undefined;
+      const inner = source.slice(cursor + 1, end - 1).trim();
+      if (inner.startsWith(openKind) && (inner.length === openKind.length || /\s/.test(inner[openKind.length]))) depth++;
+      else if (inner === closeKind && --depth === 0) return end;
+      cursor = end;
+    } else if (source[cursor] === "<") {
+      const elem = readElement(source, cursor);
+      cursor = elem ? elem.end : cursor + 1;
+    } else {
+      cursor++;
+    }
+  }
+  return undefined;
+}
+
+const widgetTagSet = new Set(chatWidgetStartTags);
+
 export function readChatWidget(source: string): { end: number; widget?: ChatWidget } | undefined {
   const prelude = new Map<string, State>();
   const { end: cursor, valid } = readDeclarations(source, prelude);
-  const element = readElement(source, cursor);
+  const firstElement = readElement(source, cursor);
+  const firstDirectiveEnd = !firstElement && prelude.size ? readDirectiveBlock(source, cursor) : undefined;
+  if (!firstElement && firstDirectiveEnd === undefined) return undefined;
+  let groupEnd = firstElement ? firstElement.end : firstDirectiveEnd!;
+  let merged = Boolean(firstDirectiveEnd);
+  if (prelude.size) {
+    while (groupEnd < source.length) {
+      const space = /^[ \t\r\n]*/.exec(source.slice(groupEnd))?.[0].length ?? 0;
+      const nextPos = groupEnd + space;
+      const rest = source.slice(nextPos);
+      if (!rest || rest.startsWith("{@body")) break;
+      if (/^\{#(?:if|each)(?=\s)/.test(rest)) {
+        const nextEnd = readDirectiveBlock(source, nextPos);
+        if (nextEnd === undefined) break;
+        groupEnd = nextEnd;
+        merged = true;
+        continue;
+      }
+      if (merged) {
+        const tag = /^<([A-Za-z][\w-]*)(?=[\s/>])/.exec(rest)?.[1];
+        if (tag && widgetTagSet.has(tag)) {
+          const nextElem = readElement(source, nextPos);
+          if (nextElem) {
+            groupEnd = nextElem.end;
+            continue;
+          }
+        }
+      }
+      break;
+    }
+  }
+  const original = merged ? `<col gap={3}>${source.slice(cursor, groupEnd)}</col>` : source.slice(cursor, groupEnd);
+  const element = merged ? readElement(original, 0) : firstElement;
   if (!element) return undefined;
-  const original = source.slice(cursor, element.end);
-  const expanded = original.includes("{#each") || original.includes("{#if") ? expandElementDirectives(source, element) : original;
+  const expanded = original.includes("{#each") || original.includes("{#if") ? expandElementDirectives(merged ? original : source, element) : original;
   const display = expanded === original ? element : readElement(expanded, 0);
-  if (!valid || !display) return { end: element.end };
+  if (!valid || !display) return { end: groupEnd };
   const states = new WidgetScope(prelude, { remaining: 800, dynamic: false });
   let root = compileNode(display, states);
   const initial = new Map([...states].map(([name, state]) => [name, state.initial]));
-  if (!root) return { end: element.end };
-  let end = element.end;
+  if (!root) return { end: groupEnd };
+  let end = groupEnd;
   let captionNode: WidgetNode | undefined;
   if (root.kind === "carousel" && root.binding) {
     const following = /^[\t ]*\r?\n[\r\n\t ]*/.exec(source.slice(end));
@@ -1544,7 +1796,7 @@ export function readChatWidget(source: string): { end: number; widget?: ChatWidg
 export function chatWidgetInlineImages(widget: ChatWidget): WidgetImage[] {
   function collect(node: WidgetNode): WidgetImage[] {
     if (node.kind === "image" && !node.href) return [node];
-    if (node.kind === "condition" || node.kind === "popover" || node.kind === "carousel") return [];
+    if (node.kind === "condition" || node.kind === "popover") return [];
     return "children" in node ? node.children.flatMap(collect) : [];
   }
   return collect(widget.root);

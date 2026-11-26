@@ -1,10 +1,11 @@
-import { isValidElement, memo, useEffect, useRef, useState, type ReactNode } from "react";
+import { isValidElement, memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import { Check, Copy, Download } from "lucide-react";
 import { toast } from "sonner";
+import { tokenizeCode } from "@/lib/chat-code-highlight";
 import { prepareReplyMarkdown } from "@/lib/chat-rich-reply";
 import { attachmentPath, type ChatResource } from "@/lib/chat-resources";
 import { ReplyChart } from "./chat-chart";
@@ -49,28 +50,46 @@ export async function copyReplyText(text: string): Promise<boolean> {
 }
 
 let mermaidId = 0;
-let mermaidLoader: Promise<typeof import("mermaid")["default"]> | undefined;
+let mermaidThemeLoaded: "dark" | "neutral" | undefined;
+let mermaidModule: typeof import("mermaid")["default"] | undefined;
 
-function loadMermaid() {
-  mermaidLoader ??= import("mermaid").then(({ default: mermaid }) => {
-    mermaid.initialize({
+async function loadMermaid(dark: boolean) {
+  const theme = dark ? "dark" : "neutral";
+  if (!mermaidModule) {
+    mermaidModule = (await import("mermaid")).default;
+  }
+  if (mermaidThemeLoaded !== theme) {
+    mermaidModule.initialize({
       startOnLoad: false,
       securityLevel: "strict",
       htmlLabels: false,
       maxTextSize: 15000,
       maxEdges: 100,
       suppressErrorRendering: true,
-      theme: "neutral",
+      theme,
     });
-    return mermaid;
-  }).catch((error: unknown) => {
-    mermaidLoader = undefined;
-    throw error;
-  });
-  return mermaidLoader;
+    mermaidThemeLoaded = theme;
+  }
+  return mermaidModule;
+}
+
+function useDarkTheme(): boolean {
+  const [dark, setDark] = useState(() =>
+    typeof document !== "undefined" && document.documentElement.classList.contains("dark"),
+  );
+  useEffect(() => {
+    const root = document.documentElement;
+    const sync = () => setDark(root.classList.contains("dark"));
+    sync();
+    const observer = new MutationObserver(sync);
+    observer.observe(root, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
+  return dark;
 }
 
 function MermaidPreview({ source }: { source: string }) {
+  const dark = useDarkTheme();
   const [preview, setPreview] = useState<{ url: string; width?: number }>();
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -81,7 +100,7 @@ function MermaidPreview({ source }: { source: string }) {
     }
     let active = true;
     let url = "";
-    void loadMermaid()
+    void loadMermaid(dark)
       .then((mermaid) => mermaid.render(`chat-mermaid-${++mermaidId}`, source))
       .then(({ svg }) => {
         if (!active) return;
@@ -95,7 +114,7 @@ function MermaidPreview({ source }: { source: string }) {
       active = false;
       if (url) URL.revokeObjectURL(url);
     };
-  }, [source]);
+  }, [source, dark]);
   if (failed) return <p className="chat-code-status">暂时无法预览此 Mermaid 图，可查看源码。</p>;
   return preview
     ? <figure className="chat-diagram"><img src={preview.url} width={preview.width} alt="Mermaid 图表" /></figure>
@@ -124,6 +143,13 @@ export function CodeBlock({ children, streaming, filenames }: { children?: React
   const vega = !streaming && /^(json|vega-lite|vegalite)$/.test(language ?? "") ? readVegaChart(source) : undefined;
   const canPreview = Boolean(source) && !streaming && (staticPreview || vega);
   const format = language === "csv" ? "csv" : /^(?:text|txt|plaintext)$/.test(language ?? "") ? "txt" : undefined;
+  const highlighted = useMemo(
+    () => (source && !diagram && language !== "text" && language !== "txt" && language !== "plaintext" ? tokenizeCode(source, language) : null),
+    [source, diagram, language],
+  );
+  const renderedCode = highlighted
+    ? <code className={code?.className}>{highlighted.map((tok, i) => tok.kind === "plain" ? tok.text : <span key={i} data-tok={tok.kind}>{tok.text}</span>)}</code>
+    : children;
   return (
     <div className="chat-code">
       <div className="chat-code-tools">
@@ -149,8 +175,8 @@ export function CodeBlock({ children, streaming, filenames }: { children?: React
       {canPreview && showPreview ? (
         vega ? <div className="chat-code-chart"><ReplyChart {...vega} /></div> : <StaticCodePreview source={source} language={language!} />
       ) : diagram ? (
-        <details className="chat-code-source"><summary>查看源码</summary><pre ref={ref}>{children}</pre></details>
-      ) : <pre ref={ref}>{children}</pre>}
+        <details className="chat-code-source"><summary>查看源码</summary><pre ref={ref}>{renderedCode}</pre></details>
+      ) : <pre ref={ref}>{renderedCode}</pre>}
     </div>
   );
 }
@@ -175,6 +201,7 @@ export const ReplyMarkdown = memo(function ReplyMarkdown({
       ) ? url : defaultUrlTransform(url)}
       components={{
         pre: ({ children }) => <CodeBlock streaming={streaming} filenames={filenames}>{children}</CodeBlock>,
+        table: ({ node: _node, children, ...props }) => <div className="chat-table-wrap"><table {...props}>{children}</table></div>,
         a: ({ node: _node, children, href, ...props }) => {
           if (href?.startsWith("sandbox:")) {
             const path = attachmentPath(href);
@@ -184,8 +211,22 @@ export const ReplyMarkdown = memo(function ReplyMarkdown({
               : <span className="chat-unavailable-link" title="附件未随回复返回">{children}（附件未返回）</span>;
           }
           if (href?.startsWith("workbench-cite:")) {
-            const source = inlineSources?.get(href.slice("workbench-cite:".length));
-            return source ? <ChatResourceLink resource={source} label={children} /> : <span>{children}</span>;
+            const refs = href.slice("workbench-cite:".length).split(",").map((part) => {
+              try { return decodeURIComponent(part); } catch { return part; }
+            }).filter(Boolean);
+            const seenUrls = new Set<string>();
+            const resolved: ChatResource[] = [];
+            for (const ref of refs) {
+              const source = inlineSources?.get(ref);
+              if (source?.url && !seenUrls.has(source.url)) {
+                seenUrls.add(source.url);
+                resolved.push(source);
+              }
+            }
+            const [primary, ...extraResources] = resolved;
+            return primary
+              ? <ChatResourceLink resource={primary} extraResources={extraResources} label={children} />
+              : <span>{children}</span>;
           }
           return href ? <a {...props} href={href} target="_blank" rel="noopener noreferrer">{children}</a> : <span>{children}</span>;
         },
