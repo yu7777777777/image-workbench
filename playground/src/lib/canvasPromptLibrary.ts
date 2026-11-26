@@ -1,3 +1,5 @@
+import { getOwnerScopedKey } from './workbenchOwner'
+
 export interface CanvasPromptEntry {
   id: string
   title: string
@@ -23,18 +25,18 @@ export function normalizeCanvasPromptLibrary(value: unknown): CanvasPromptEntry[
 export function loadCanvasPromptLibrary(): CanvasPromptEntry[] {
   if (typeof localStorage === 'undefined') return []
   try {
-    const parsed: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
+    const parsed: unknown = JSON.parse(localStorage.getItem(getOwnerScopedKey(STORAGE_KEY)) || '[]')
     return normalizeCanvasPromptLibrary(parsed)
   } catch { return [] }
 }
 
 export function saveCanvasPromptLibrary(entries: CanvasPromptEntry[]): void {
   if (typeof localStorage === 'undefined') return
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizeCanvasPromptLibrary(entries))) } catch { /* 忽略不可用的本地存储 */ }
+  try { localStorage.setItem(getOwnerScopedKey(STORAGE_KEY), JSON.stringify(normalizeCanvasPromptLibrary(entries))) } catch { /* 忽略不可用的本地存储 */ }
 }
 
 export function clearCanvasPromptLibrary(): void {
   if (typeof localStorage === 'undefined') return
-  try { localStorage.removeItem(STORAGE_KEY) } catch { /* 忽略不可用的本地存储 */ }
+  try { localStorage.removeItem(getOwnerScopedKey(STORAGE_KEY)) } catch { /* 忽略不可用的本地存储 */ }
 }
 

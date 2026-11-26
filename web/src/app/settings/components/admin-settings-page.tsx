@@ -100,7 +100,7 @@ export default function AdminSettingsPageContent({ owner }: { owner: string }) {
           <ConfigCard />
         </TabsContent>
         <TabsContent value="workspace">
-          <GallerySettingsCard />
+          <GallerySettingsCard owner={owner} />
         </TabsContent>
         <TabsContent value="chat">
           <StandaloneChatSettingsCard owner={owner} />

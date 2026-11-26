@@ -3,6 +3,7 @@ import { createDefaultFalProfile, createDefaultOpenAIProfile, normalizeSettings 
 
 // 账号池 profile ID 定义在 poolProfileIds.ts（叶子模块），避免 apiProfiles.ts ↔ accountPool.ts 循环依赖。
 import { isPoolProfileId, LEGACY_LOCAL_POOL_PROFILE_ID, POOL_AGENT_PROFILE_ID, POOL_PROFILE_ID } from './poolProfileIds'
+import { claimLegacyWorkbenchLocalStorage, normalizeWorkbenchOwner, setWorkbenchOwner } from './workbenchOwner'
 
 export { isPoolProfileId, POOL_AGENT_PROFILE_ID, POOL_PROFILE_ID } from './poolProfileIds'
 
@@ -271,6 +272,11 @@ export function connectAccountPool(): Promise<void> {
         return
       }
       if (event.data?.type !== 'account-pool-session' || typeof event.data.key !== 'string' || !event.data.key) return
+      const nextOwner = normalizeWorkbenchOwner(event.data.owner)
+      if (nextOwner) {
+        setWorkbenchOwner(nextOwner)
+        claimLegacyWorkbenchLocalStorage(nextOwner)
+      }
       if (event.data.key === key) return
       const hadSession = Boolean(key)
       key = event.data.key

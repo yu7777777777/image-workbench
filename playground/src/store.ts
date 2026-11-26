@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware'
 import type {
   AgentConversation,
   AgentInputDraft,
@@ -35,6 +35,7 @@ import {
   deleteTask as dbDeleteTask,
   commitTaskDeletion,
   clearTasks as dbClearTasks,
+  migrateLegacyDbToOwner,
   getAllAgentConversations,
   putAgentConversation as dbPutAgentConversation,
   replaceAgentConversations,
@@ -90,6 +91,7 @@ import { createCanvasSlice, type CanvasSlice } from './store/canvasSlice'
 import { createSettingsSlice, type SettingsSlice } from './store/settingsSlice'
 import { clearCanvasAssetMetadata, loadCanvasAssetMetadata, saveCanvasAssetMetadata } from './lib/canvasAssetMetadata'
 import { clearCanvasPromptLibrary, loadCanvasPromptLibrary, normalizeCanvasPromptLibrary, saveCanvasPromptLibrary } from './lib/canvasPromptLibrary'
+import { getOwnerScopedKey, WORKBENCH_PERSIST_BASE_KEY } from './lib/workbenchOwner'
 
 const FAL_RECOVERY_POLL_MS = 10_000
 const CUSTOM_RECOVERY_POLL_MS = 10_000
@@ -98,6 +100,7 @@ const falRecoveryTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const customRecoveryTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const openAIWatchdogTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const agentRoundControllers = new Map<string, AbortController>()
+const taskAbortControllers = new Map<string, AbortController>()
 const agentRecoveryContinuations = new Set<string>()
 const deletedActiveAgentTasks = new Map<string, { task: TaskRecord; controller: AbortController }>()
 let agentConversationPersistenceReady = false
@@ -479,6 +482,21 @@ async function deleteStoredImageIfUnreferenced(imageId: string) {
       thumbnailVersion: thumbnail.thumbnailVersion,
     })
   }
+}
+
+const ownerScopedStorage: StateStorage = {
+  getItem: (name) => {
+    if (typeof localStorage === 'undefined') return null
+    return localStorage.getItem(getOwnerScopedKey(name))
+  },
+  setItem: (name, value) => {
+    if (typeof localStorage === 'undefined') return
+    localStorage.setItem(getOwnerScopedKey(name), value)
+  },
+  removeItem: (name) => {
+    if (typeof localStorage === 'undefined') return
+    localStorage.removeItem(getOwnerScopedKey(name))
+  },
 }
 
 export const useStore = create<AppState>()(
@@ -985,14 +1003,19 @@ export const useStore = create<AppState>()(
 
     }),
     {
-      name: 'gpt-image-playground',
+      name: WORKBENCH_PERSIST_BASE_KEY,
       version: 2,
+      storage: createJSONStorage(() => ownerScopedStorage),
       migrate: migratePersistedState,
       partialize: getPersistedState,
       merge: mergePersistedState,
     },
   ),
 )
+
+export async function rehydrateWorkbenchStoreForOwner() {
+  await useStore.persist.rehydrate()
+}
 
 let lastObservedAgentConversations = useStore.getState().agentConversations
 let agentConversationPersistQueued = false
@@ -1434,6 +1457,7 @@ async function recoverFalTask(taskId: string) {
 
 /** 初始化：从 IndexedDB 加载任务，按需恢复输入图片，并清理孤立图片 */
 export async function initStore() {
+  await migrateLegacyDbToOwner()
   const legacyAgentConversations = normalizeAgentConversations(useStore.getState().agentConversations)
   const storedTasks = await getAllTasks()
   const storedAgentConversations = normalizeAgentConversations(await getAllAgentConversations())
@@ -2958,6 +2982,7 @@ async function executeAgentRound(
         params: opts.taskParams,
         inputImageDataUrls: opts.referenceImageDataUrls,
         skipCodexCliSizePrompt: true,
+        signal: opts.signal,
         onPartialImage: opts.onPartialImage
           ? (partial) => {
               void opts.onPartialImage?.({ image: partial.image, partialImageIndex: partial.partialImageIndex ?? partial.requestIndex })
@@ -3674,6 +3699,9 @@ async function executeTask(taskId: string) {
     scheduleOpenAIWatchdog(taskId, activeProfile.timeout, activeProfile)
   }
 
+  const taskController = new AbortController()
+  taskAbortControllers.set(taskId, taskController)
+
   try {
     // 获取输入图片 data URLs
     const inputDataUrls: string[] = []
@@ -3712,6 +3740,7 @@ async function executeTask(taskId: string) {
       markupStrokes: task.markupStrokes,
       markupOverlays,
       skipCodexCliSizePrompt: task.sourceMode === 'agent',
+      signal: taskController.signal,
       onFalRequestEnqueued: (request) => {
         falRequestInfo = request
         updateTaskInStore(taskId, {
@@ -3855,6 +3884,9 @@ async function executeTask(taskId: string) {
       useStore.getState().setDetailTaskId(taskId)
     }
   } finally {
+    if (taskAbortControllers.get(taskId) === taskController) {
+      taskAbortControllers.delete(taskId)
+    }
     // 释放输入图片的内存缓存（已持久化到 IndexedDB，后续按需从 DB 加载）
     for (const imgId of task.inputImageIds) {
       deleteCachedImage(imgId)
@@ -4260,6 +4292,11 @@ async function removeTasks(taskIds: string[], updateState?: TaskDeletionStateUpd
   const deletedImageIds = new Set<string>()
   for (const task of deletedTasks) {
     addTaskReferencedImageIds(deletedImageIds, task)
+    const activeTaskController = taskAbortControllers.get(task.id)
+    if (activeTaskController) {
+      activeTaskController.abort()
+      taskAbortControllers.delete(task.id)
+    }
     const controller = task.agentConversationId && task.agentRoundId
       ? agentRoundControllers.get(getAgentRoundControllerKey(task.agentConversationId, task.agentRoundId))
       : undefined
