@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Globe, ImageOff, Terminal } from "lucide-react";
 import { toast } from "sonner";
 import webConfig from "@/constants/common-env";
+import { bearerAuthHeader } from "@/lib/auth-key";
 import { getStoredAuthSession } from "@/store/auth";
 import type { ChatResource } from "@/lib/chat-resources";
 import type { WidgetImage } from "@/lib/chat-widget";
@@ -17,7 +18,7 @@ export async function downloadChatAttachment(resource: ChatResource, owner: stri
     throw new Error("登录状态已变化，请重新打开对话");
   }
   const response = await fetch(`${webConfig.apiUrl}/v1/chat/attachments/${encodeURIComponent(resource.id)}`, {
-    headers: { Authorization: `Bearer ${session.key}` },
+    headers: { Authorization: bearerAuthHeader(session.key) },
     redirect: "error",
     signal,
   });

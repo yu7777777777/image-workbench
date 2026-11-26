@@ -208,6 +208,92 @@ async function waitAnswer(page) {
   await page.getByRole("button", { name: "重新生成", exact: true }).waitFor();
 }
 
+async function checkLegacyKeyRotation(page, base) {
+  const legacyKey = "浏览器旧密钥-123";
+  const newKey = "mock-rotated-key-123!";
+  const attachmentId = "fixture-file";
+  let legacyLogins = 0;
+  let rotations = 0;
+  let completions = 0;
+  let downloads = 0;
+  await page.route("**/auth/login", async (route) => {
+    const key = route.request().postDataJSON()?.key;
+    if (key === undefined) return route.fallback();
+    assert.equal(key, legacyKey);
+    assert.equal(route.request().headers().authorization, undefined);
+    legacyLogins++;
+    return route.fulfill({ json: { ok: true, role: "user", subject_id: "user-a", name: "测试用户", version: "1.16.40" } });
+  });
+  await page.route("**/api/auth/self/profile", async (route) => {
+    rotations++;
+    assert.equal(route.request().headers().authorization, undefined);
+    assert.deepEqual(route.request().postDataJSON(), { old_key: legacyKey, new_key: newKey });
+    return route.fulfill({ json: { success: true, new_key: newKey } });
+  });
+  await page.route("**/v1/chat/completions", (route) => {
+    completions++;
+    assert.equal(route.request().headers().authorization, "Bearer " + (completions === 1 ? "mock-user-a" : newKey));
+    const events = [
+      { choices: [{ delta: { content: "测试附件" } }] },
+      { choices: [{ delta: {}, finish_reason: "stop" }], workbench: { blocks: [
+        { id: attachmentId, type: "attachment", title: "test.txt", path: "sandbox:/mnt/data/test.txt" },
+      ] } },
+    ];
+    return route.fulfill({ contentType: "text/event-stream", body: events.map((event) => "data: " + JSON.stringify(event) + "\n\n").join("") + "data: [DONE]\n\n" });
+  });
+  await page.route("**/v1/chat/attachments/" + attachmentId, (route) => {
+    downloads++;
+    assert.equal(route.request().headers().authorization, "Bearer " + newKey);
+    return route.fulfill({ contentType: "text/plain", body: "authenticated attachment" });
+  });
+
+  await send(page, "保留这条含附件的历史");
+  await waitAnswer(page);
+  const attachment = page.getByRole("button", { name: "下载 test.txt", exact: true });
+  await attachment.waitFor();
+
+  await seed(page, legacyKey);
+  await page.reload();
+  await waitReady(page);
+  await page.getByRole("alert").filter({ hasText: "请在账号设置中更换密钥" }).waitFor();
+  assert.ok(legacyLogins > 0);
+  await page.getByRole("textbox", { name: "输入消息", exact: true }).fill("不应发送");
+  assert.equal(await page.getByRole("button", { name: "发送消息", exact: true }).isDisabled(), true);
+  await attachment.click();
+  await page.getByText(/当前密钥.*请在账号设置中更换密钥。/).last().waitFor();
+  assert.equal(completions, 1);
+  assert.equal(downloads, 0);
+
+  await page.getByRole("link", { name: "打开账号设置", exact: true }).click();
+  await page.getByPlaceholder("请输入当前使用的密钥").fill(legacyKey);
+  const next = page.getByPlaceholder("至少 6 位新密钥");
+  const confirm = page.getByPlaceholder("请再次输入新密钥");
+  const saveKey = page.getByRole("button", { name: "确认修改", exact: true });
+  await next.fill("仍含中文的密钥");
+  await confirm.fill("仍含中文的密钥");
+  await saveKey.click();
+  await page.getByText(/新密钥只能使用可打印的 ASCII 字符/).waitFor();
+  assert.equal(rotations, 0);
+
+  await next.fill(newKey);
+  await confirm.fill(newKey);
+  await saveKey.click();
+  await page.getByText("密钥修改成功，已自动生效", { exact: true }).waitFor();
+  assert.equal(rotations, 1);
+
+  await page.goto(base + "/chat/");
+  await waitReady(page);
+  await page.getByText("保留这条含附件的历史", { exact: true }).waitFor();
+  const pendingDownload = page.waitForEvent("download");
+  await attachment.click();
+  const file = await pendingDownload;
+  assert.equal(await readFile(await file.path(), "utf8"), "authenticated attachment");
+  assert.equal(downloads, 1);
+  await send(page, "更换后请求恢复");
+  await waitAnswer(page);
+  assert.equal(completions, 2);
+}
+
 async function checkRichReplies(page, context) {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await send(page, "展示写作模板");
@@ -906,6 +992,12 @@ async function checkImageWidgets(page) {
     await page.goto(base + "/chat/");
     await waitReady(page);
     await page.emulateMedia({ reducedMotion: "reduce" });
+    if (process.argv.includes("--legacy-key-rotation")) {
+      await checkLegacyKeyRotation(page, base);
+      assert.deepEqual(errors, []);
+      console.log(JSON.stringify({ ok: true, cases: ["legacy-json-login", "message-disabled", "attachment-guard", "reject-new-unicode", "rotate", "recover-history-and-authenticated-requests"] }));
+      return;
+    }
     if (process.argv.includes("--widget-radio-default")) {
       await checkRadioDefaultMismatch(page);
       assert.deepEqual(errors, []);

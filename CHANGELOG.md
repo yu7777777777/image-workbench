@@ -1,8 +1,12 @@
-# 1.16.39
+# 1.16.41
 
-- 独立对话补齐富组件与图片组解析兼容：`chat_rich_content.py` 兼容 `AsyncImageGroup queries=` 属性与 `content_references` 图片提取，`chat-widget.ts` 支持 `{@body}` 共享状态同级块合并、`{#if}/{:else if}/{:else}/{/if}`、模板字符串、`.filter(Boolean).length`、`GenUI.openUrl("sandbox:...")` 站内附件下载、`<LearningViz>` 转 KaTeX 公式、关键词兜底图片匹配、去重商品卡片并清洗空评分残片，缺图保留带图标的「图片未返回」胶囊占位。
+- 独立对话补齐富组件与图片组解析兼容：`chat_rich_content.py` 兼容 `AsyncImageGroup queries=` 属性与 `content_references` 图片提取，`chat-widget.ts` 支持 `{@body}` 共享状态同级块合并、`{#if}/{:else if}/{:else}/{/if}`、模板字符串、`.filter(Boolean).length`、`GenUI.openUrl("sandbox:...")` 站内附件下载（复用 `bearerAuthHeader` 密钥校验）、`<LearningViz>` 转 KaTeX 公式、关键词兜底图片匹配、去重商品卡片并清洗空评分残片，缺图保留带图标的「图片未返回」胶囊占位。
 - 全面升级独立对话排版与交互视觉：正文与组件阅读列宽收敛至 `50rem`（内文 `768px`），回到底部按钮避开移动端工具栏；消除嵌套 `<box>` 默认套框与 `flex-basis: 12rem` 引发的 7 天日历条/底栏 5+2 错行，支持 `wrap="nowrap"` 与 12 列网格；Markdown 表格外包 `.chat-table-wrap` 铺满列宽并改为极简无竖线细横线样式，`<blockquote>` 改为中性左竖线，补齐 `<hr>` 与 `<divider>` 样式。
 - 丰富独立对话组件表现力：新增零依赖代码语法高亮（`chat-code-highlight.ts`）、Mermaid 暗色主题自适应、HTML 静态预览安全保留 `<style>`；升级柱图参考网格、折线面积渐变与环形饼图（Donut）；单层问卷卡配备自定义圆形单选/对勾复选框与全宽胶囊 CTA，`WritingBlock` 新增顶部「文档草稿」操作栏；补齐 `h1`–`h4` 标题层级、`discovery` 柔和紫与 `soft`/`solid`/`outline` 徽章、`lucide:` 图标前缀剥离与 40+ 常用图标、`<pressable>` 下划线追问链接，以及行内多来源自动聚合的 Favicon `域名 +N` 引用胶囊与来源弹层。
+
+# 1.16.40
+
+- 新增和修改本站密钥时校验可打印 ASCII 字符。已保存的旧密钥可登录更换，独立对话在发送和下载前会提示更新密钥。
 
 # 1.16.38
 

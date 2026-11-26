@@ -14,12 +14,13 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from services.auth_service import auth_service
+from services.auth_service import auth_service, validate_new_auth_key
 
 from api.support import (
     extract_bearer_token,
     require_admin,
     require_identity,
+    require_legacy_key_identity,
     sanitize_cpa_pool,
     sanitize_cpa_pools,
     sanitize_sub2api_server,
@@ -223,21 +224,30 @@ def create_router() -> APIRouter:
             body: ChangeSelfProfileRequest,
             authorization: str | None = Header(default=None),
     ):
-        identity = require_identity(authorization)
+        old_key = (body.old_key or "").strip()
+        new_key = (body.new_key or "").strip()
+        name = (body.name or "").strip()
+        if authorization is None and old_key and new_key and not name:
+            identity = require_legacy_key_identity(old_key)
+            current_key = old_key
+        else:
+            identity = require_identity(authorization)
+            current_key = extract_bearer_token(authorization)
         user_id = str(identity.get("id") or "")
-        bearer_token = extract_bearer_token(authorization)
 
         updates: dict[str, object] = {}
-        if body.name is not None and body.name.strip():
-            updates["name"] = body.name.strip()
+        if name:
+            updates["name"] = name
 
-        new_key = str(body.new_key or "").strip()
-        if new_key:
+        if body.new_key is not None:
             if len(new_key) < 6:
                 raise HTTPException(status_code=400, detail={"error": "新密钥长度至少 6 位"})
-            old_key = str(body.old_key or "").strip()
-            if not old_key or old_key != bearer_token:
+            if not old_key or old_key != current_key:
                 raise HTTPException(status_code=400, detail={"error": "当前旧密钥不匹配，请重新确认当前密钥"})
+            try:
+                validate_new_auth_key(new_key)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
             updates["key"] = new_key
 
         if not updates:

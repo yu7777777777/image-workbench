@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import localforage from "localforage";
 import webConfig from "@/constants/common-env";
+import { bearerAuthHeader } from "@/lib/auth-key";
 import { getStoredAuthSession } from "@/store/auth";
 import { mergeChatResources, readChatResources, type ChatResource } from "@/lib/chat-resources";
 import {
@@ -301,7 +302,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session.key}`,
+          Authorization: bearerAuthHeader(session.key),
         },
         body: JSON.stringify({
           model: thread.model,
