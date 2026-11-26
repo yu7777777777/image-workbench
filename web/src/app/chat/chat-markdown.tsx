@@ -6,6 +6,8 @@ import remarkMath from "remark-math";
 import { Check, Copy, Download } from "lucide-react";
 import { toast } from "sonner";
 import { prepareReplyMarkdown } from "@/lib/chat-rich-reply";
+import { ReplyChart } from "./chat-chart";
+import { StaticCodePreview, readVegaChart } from "./chat-code-preview";
 import "katex/dist/katex.min.css";
 
 export async function copyReplyText(text: string): Promise<boolean> {
@@ -72,29 +74,36 @@ function MermaidPreview({ source }: { source: string }) {
     : <p className="chat-code-status" role="status">正在渲染图表…</p>;
 }
 
-function downloadCsv(source: string): void {
-  const url = URL.createObjectURL(new Blob(["\uFEFF", source], { type: "text/csv;charset=utf-8" }));
+function downloadText(source: string, format: "csv" | "txt", filename: string): void {
+  const mime = format === "csv" ? "text/csv" : "text/plain";
+  const url = URL.createObjectURL(new Blob([format === "csv" ? "\uFEFF" : "", source], { type: `${mime};charset=utf-8` }));
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = "reply.csv";
+  anchor.download = filename;
   anchor.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function CodeBlock({ children, streaming }: { children?: ReactNode; streaming: boolean }) {
+function CodeBlock({ children, streaming, filenames }: { children?: ReactNode; streaming: boolean; filenames?: ReadonlyMap<string, string> }) {
   const ref = useRef<HTMLPreElement>(null);
   const [copied, setCopied] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const code = isValidElement<{ className?: string; children?: ReactNode }>(children) ? children.props : undefined;
   const language = code?.className?.match(/\blanguage-([\w.+-]+)/)?.[1]?.toLowerCase();
   const source = typeof code?.children === "string" ? code.children : "";
   const diagram = language === "mermaid" && Boolean(source) && !streaming;
+  const staticPreview = /^(html|jsx|tsx|svg)$/.test(language ?? "") && source.length <= 30000;
+  const vega = !streaming && /^(json|vega-lite|vegalite)$/.test(language ?? "") ? readVegaChart(source) : undefined;
+  const canPreview = Boolean(source) && !streaming && (staticPreview || vega);
+  const format = language === "csv" ? "csv" : /^(?:text|txt|plaintext)$/.test(language ?? "") ? "txt" : undefined;
   return (
     <div className="chat-code">
       <div className="chat-code-tools">
         {language && <span>{language}</span>}
         <div>
-          {language === "csv" && source && !streaming && (
-            <button type="button" onClick={() => downloadCsv(source)}><Download size={13} />下载 CSV 正文</button>
+          {canPreview && <button type="button" aria-pressed={showPreview} onClick={() => setShowPreview((value) => !value)}>{showPreview ? "查看代码" : "预览"}</button>}
+          {format && source && !streaming && (
+            <button type="button" onClick={() => downloadText(source, format, filenames?.get(format) ?? `reply.${format}`)}><Download size={13} />下载 {format.toUpperCase()} 正文</button>
           )}
           <button
             type="button"
@@ -109,27 +118,29 @@ function CodeBlock({ children, streaming }: { children?: ReactNode; streaming: b
         </div>
       </div>
       {diagram && <MermaidPreview key={source} source={source} />}
-      {diagram ? (
+      {canPreview && showPreview ? (
+        vega ? <div className="chat-code-chart"><ReplyChart {...vega} /></div> : <StaticCodePreview source={source} language={language!} />
+      ) : diagram ? (
         <details className="chat-code-source"><summary>查看源码</summary><pre ref={ref}>{children}</pre></details>
       ) : <pre ref={ref}>{children}</pre>}
     </div>
   );
 }
 
-export const ReplyMarkdown = memo(function ReplyMarkdown({ text, streaming = false }: { text: string; streaming?: boolean }) {
+export const ReplyMarkdown = memo(function ReplyMarkdown({ text, streaming = false, filenames, citations }: { text: string; streaming?: boolean; filenames?: ReadonlyMap<string, string>; citations?: ReadonlyMap<string, string> }) {
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: true }]]}
       rehypePlugins={[[rehypeKatex, { trust: false, strict: "ignore" }]]}
       urlTransform={(url, key, node) => (node.tagName === "a" && key === "href" && url.startsWith("sandbox:")) ? url : defaultUrlTransform(url)}
       components={{
-        pre: ({ children }) => <CodeBlock streaming={streaming}>{children}</CodeBlock>,
+        pre: ({ children }) => <CodeBlock streaming={streaming} filenames={filenames}>{children}</CodeBlock>,
         a: ({ node: _node, children, href, ...props }) => href?.startsWith("sandbox:") ? (
           <span className="chat-unavailable-link" title="附件未随回复返回">{children}（附件未返回）</span>
         ) : href ? <a {...props} href={href} target="_blank" rel="noopener noreferrer">{children}</a> : <span>{children}</span>,
       }}
     >
-      {prepareReplyMarkdown(text)}
+      {prepareReplyMarkdown(text, citations)}
     </ReactMarkdown>
   );
 });

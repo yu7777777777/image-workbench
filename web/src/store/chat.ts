@@ -22,6 +22,7 @@ export type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   text: string;
+  writingDrafts?: Record<number, string>;
   images?: ChatImage[];
   model?: string;
   status?: "streaming" | "done" | "stopped" | "error";
@@ -52,6 +53,7 @@ type ChatState = {
     patch: Partial<Pick<ChatThread, "title" | "model" | "effort" | "system">>,
   ) => void;
   remove: (id: string) => void;
+  saveWritingDraft: (threadId: string, messageId: string, offset: number, text: string) => Promise<void>;
   send: (text: string, images: ChatImage[], retry?: boolean) => Promise<void>;
   stop: () => void;
 };
@@ -73,7 +75,7 @@ const makeThread = (model: string, effort = model.endsWith("-thinking") ? "stand
   messages: [],
 });
 
-function persist(): void {
+async function persist(): Promise<void> {
   const { owner, ready, threads, activeId } =
     useChatStore.getState();
   if (!owner || !ready) return;
@@ -89,6 +91,7 @@ function persist(): void {
             "历史记录保存失败，可能是浏览器空间不足。请勿关闭页面。",
         });
     });
+  await writeQueue;
 }
 function saveSoon(): void {
   if (saveTimer) return;
@@ -177,6 +180,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
   select: (id) => {
     set({ activeId: id });
     persist();
+  },
+  saveWritingDraft: (threadId, messageId, offset, text) => {
+    set({
+      threads: get().threads.map((thread) => {
+        if (thread.id !== threadId) return thread;
+        return {
+          ...thread,
+          messages: thread.messages.map((message) => {
+            if (message.id !== messageId || message.role !== "assistant" || message.status === "streaming") return message;
+            return { ...message, writingDrafts: { ...message.writingDrafts, [offset]: text } };
+          }),
+        };
+      }),
+    });
+    return persist();
   },
   update: (id, patch) => {
     set({

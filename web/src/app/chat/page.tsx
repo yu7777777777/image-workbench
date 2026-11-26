@@ -352,9 +352,11 @@ export default function ChatPage() {
                   ) : (
                     <ChatReply
                       text={message.text}
+                      writingDrafts={message.writingDrafts}
                       streaming={message.status === "streaming"}
                       canSend={canSend && !chat.busyId}
                       onSend={(text) => { void chat.send(text, []); }}
+                      onSaveWriting={(offset, text) => chat.saveWritingDraft(thread.id, message.id, offset, text)}
                     />
                   )}
                   {message.status === "streaming" && (

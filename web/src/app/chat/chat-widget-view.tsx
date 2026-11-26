@@ -1,46 +1,19 @@
 import { useId, useState, type ReactNode } from "react";
-import { BookOpen, CheckCircle, RotateCcw } from "lucide-react";
+import { BookOpen, CheckCircle, Globe, Minus, Plus, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { escapeReplyMarkdown } from "@/lib/chat-rich-reply";
 import { widgetValue, type ChatWidget, type WidgetNode } from "@/lib/chat-widget";
 import { ReplyMarkdown } from "./chat-markdown";
+import { ReplyChart } from "./chat-chart";
 
 const icons = new Map([
   ["book-open", BookOpen],
   ["check-circle", CheckCircle],
   ["rotate-ccw", RotateCcw],
+  ["globe", Globe],
+  ["minus", Minus],
+  ["plus", Plus],
 ]);
-
-function WidgetChart({ node, values }: {
-  node: Extract<WidgetNode, { kind: "chart" }>;
-  values: ChatWidget["initial"];
-}) {
-  const bars = node.bars.map(({ name, value }) => {
-    const number = Number(widgetValue(value, values));
-    return { name, number: Number.isFinite(number) ? number : 0 };
-  });
-  const low = Math.min(0, node.min, ...bars.map(({ number }) => number));
-  const high = Math.max(low + 1, ...bars.map(({ number }) => number));
-  const range = high - low;
-  const base = -low / range * 100;
-
-  return (
-    <figure className="chat-widget-chart" aria-label={node.label}>
-      <div className="chat-chart-bars">
-        {bars.map(({ name, number }, index) => (
-          <div className="chat-chart-column" key={index}>
-            <div className="chat-chart-track" aria-hidden="true">
-              <span style={{ bottom: `${base}%` }} />
-              <i style={{ bottom: `${(Math.min(0, number) - low) / range * 100}%`, height: `${Math.abs(number) / range * 100}%` }} />
-            </div>
-            <div><strong>{number}</strong> <span>{name}</span></div>
-          </div>
-        ))}
-      </div>
-      {node.description && <figcaption>{node.description}</figcaption>}
-    </figure>
-  );
-}
 
 export function ChatWidgetView({ widget, streaming, canSend, onSend }: {
   widget: ChatWidget;
@@ -50,7 +23,7 @@ export function ChatWidgetView({ widget, streaming, canSend, onSend }: {
 }) {
   const id = useId();
   const [values, setValues] = useState(widget.initial);
-  const setValue = (name: string, value: string | number) => setValues((current) => new Map(current).set(name, value));
+  const setValue = (name: string, value: string | number | boolean) => setValues((current) => new Map(current).set(name, value));
 
   function renderNode(node: WidgetNode, key: string): ReactNode {
     switch (node.kind) {
@@ -94,15 +67,44 @@ export function ChatWidgetView({ widget, streaming, canSend, onSend }: {
           />
         );
       case "chart":
-        return <WidgetChart key={key} node={node} values={values} />;
+        return <ReplyChart key={key} {...node} rows={node.rows.map(({ name, values: rowValues }) => ({
+          name,
+          values: rowValues.map((value) => {
+            const number = Number(widgetValue(value, values));
+            return Number.isFinite(number) ? number : 0;
+          }),
+        }))} />;
+      case "condition":
+        return <div className="chat-widget-condition" key={key}>{(Number(widgetValue(node.value, values)) > node.threshold ? node.children : node.fallback).map((child, index) => renderNode(child, `${key}-${index}`))}</div>;
+      case "link":
+        return node.href ? <a key={key} href={node.href} target="_blank" rel="noopener noreferrer">{node.label}</a> : <span key={key} className="chat-unavailable-link">{node.label}（来源链接未返回）</span>;
+      case "checkbox":
+        return <label className="chat-widget-checkbox" key={key}>
+          <input type="checkbox" checked={values.get(node.name) === true} disabled={streaming} onChange={(event) => setValue(node.name, event.currentTarget.checked)} />
+          {node.label}
+        </label>;
+      case "select":
+        return <label className="chat-widget-select" key={key}>
+          {node.label}
+          <select value={String(values.get(node.name))} disabled={streaming} onChange={(event) => setValue(node.name, event.currentTarget.value)}>
+            {node.options.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </label>;
       case "button": {
         const { action } = node;
         const submit = "submit" in action;
         return (
-          <Button key={key} type="button" variant={submit ? "default" : "outline"} disabled={streaming || (submit && !canSend)}
+          <Button key={key} type="button" aria-label={node.label} variant={submit ? "default" : "outline"}
+            disabled={streaming || (submit && !canSend) || ("adjust" in action && Number(values.get(action.adjust.name)) === action.adjust.bound)}
             onClick={() => {
               if ("submit" in action) {
                 if (canSend && !streaming) onSend(String(widgetValue(action.submit, values)));
+              } else if ("adjust" in action) {
+                const {name, change, bound} = action.adjust;
+                setValues((current) => {
+                  const next = Number(current.get(name)) + change;
+                  return new Map(current).set(name, change > 0 ? Math.min(bound, next) : Math.max(bound, next));
+                });
               } else {
                 setValues((current) => {
                   const next = new Map(current);

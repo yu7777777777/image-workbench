@@ -1,7 +1,8 @@
 import { expect, test } from "bun:test";
-import { prepareReplyMarkdown, splitChatReply } from "../src/lib/chat-rich-reply";
+import { prepareReplyMarkdown, readReplyResources, splitChatReply } from "../src/lib/chat-rich-reply";
 import { widgetValue } from "../src/lib/chat-widget";
 import observed from "./fixtures/chat-observed-replies.json";
+import extended from "./fixtures/chat-extended-replies.json";
 
 const answer = (await Bun.file(new URL("fixtures/chat-rich-reply.txt", import.meta.url)).text()).replace(/\r\n/g, "\n");
 
@@ -59,9 +60,33 @@ test("accepts the observed nested form and chart with range controls and reset",
   if (chart?.widget.root.kind !== "layout") throw new Error("缺少图表布局");
   const children = chart.widget.root.children;
   expect(children.filter((child) => child.kind === "slider").map(({ name }) => name)).toEqual(["a", "b", "c"]);
-  const bars = children.find((child) => child.kind === "chart")?.bars;
-  expect(bars?.map(({ value }) => widgetValue(value, chart.widget.initial))).toEqual([1, 2, 3]);
+  const rows = children.find((child) => child.kind === "chart")?.rows;
+  expect(rows?.map(({ values }) => widgetValue(values[0], chart.widget.initial))).toEqual([1, 2, 3]);
   expect(children.find((child) => child.kind === "button")?.action).toEqual({ reset: ["a", "b", "c"] });
+});
+
+test("uses explicit adjacent source links, leaving ambiguous and fenced references unresolved", () => {
+  const resources = readReplyResources(extended.citations);
+  expect(resources.sources.size).toBe(2);
+  expect(resources.citations.get("samplesearch0")).toBe("https://www.iana.org/help/example-domains");
+  expect(prepareReplyMarkdown(extended.citations, resources.citations)).toContain("[来源](<https://www.iana.org/help/example-domains>)");
+  const invalid = '[a](https://a.example) <Cite refs={["x"]}/>\n[b](https://b.example) <Cite refs={["x"]}/>\n\n```\n[c](https://c.example) <Cite refs={["y"]}/>\n```';
+  expect(readReplyResources(invalid).citations.size).toBe(0);
+  expect(readReplyResources(invalid).sources.size).toBe(2);
+  expect([...readReplyResources(extended.attachments).filenames]).toEqual([["csv", "example.csv"], ["txt", "example.txt"]]);
+});
+
+test("compiles observed panels without executing their expressions", () => {
+  const controls = splitChatReply(extended.controls).find((block) => block.kind === "widget");
+  if (controls?.widget.root.kind !== "layout") throw new Error("缺少表单");
+  const action = controls.widget.root.children.find((child) => child.kind === "button")?.action;
+  if (!action || !("submit" in action)) throw new Error("缺少动作");
+  expect(widgetValue(action.submit, new Map<string, string | boolean>([["museum", true], ["park", false], ["season", "秋季"]]))).toContain("博物馆\n偏好的季节：秋季");
+  const charts = splitChatReply(extended.charts).filter((block) => block.kind === "widget");
+  expect(charts.map(({ widget: { root } }) => root.kind)).toEqual(["chart", "chart", "layout"]);
+  expect(charts[0].widget.root).toMatchObject({ chartType: "line", series: ["甲", "乙"] });
+  expect(charts[1].widget.root).toMatchObject({ chartType: "pie" });
+  expect(splitChatReply(extended.tools).some((block) => block.kind === "unsupported")).toBe(false);
 });
 
 test("normalizes observed formula delimiters and gives unavailable references a text fallback", () => {
