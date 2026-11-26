@@ -15,11 +15,13 @@ const answer =
   '这是一段测试回答。\n\n## 计划\n\n- 分析问题\n- 整理思路\n\n| 项目 | 状态 |\n| --- | --- |\n| 流式聊天 | 可用 |\n\n```js\nconsole.log("你好");\n```';
 const richReply = readFile(join(__dirname, "fixtures/chat-rich-reply.txt"), "utf8");
 const observedReplies = require("./fixtures/chat-observed-replies.json");
+const extendedReplies = require("./fixtures/chat-extended-replies.json");
 const observedPrompts = new Map([
   ["检查公式和流程图", observedReplies.markdown_math_code],
   ["检查嵌套表单", observedReplies.writing_and_native_form],
   ["检查交互图表", observedReplies.visual_and_search],
   ["检查文件正文", observedReplies.downloadable_file],
+  ...Object.entries(extendedReplies).map(([name, reply]) => [`检查 ${name}`, reply]),
 ]);
 const server = createServer(async (req, res) => {
   try {
@@ -206,7 +208,7 @@ async function checkObservedReplies(page) {
     await page.getByRole("button", { name: "新建对话", exact: true }).click();
     await send(page, prompt);
     await waitAnswer(page);
-    assert.equal(await page.locator(".chat-reply-source").count(), 0);
+    assert.equal(await page.locator(".chat-reply-source:not(.chat-sources)").count(), 0);
   }
 
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -257,8 +259,118 @@ async function checkObservedReplies(page) {
   const pending = page.waitForEvent("download");
   await page.getByRole("button", { name: "下载 CSV 正文" }).click();
   const download = await pending;
-  assert.equal(download.suggestedFilename(), "reply.csv");
+  assert.equal(download.suggestedFilename(), "format-check.csv");
   assert.match(await readFile(await download.path(), "utf8"), /^\uFEFFitem,count\napple,1\npear,2\n$/);
+}
+
+async function checkExtendedReplies(page) {
+  const message = () => page.locator(".chat-message.assistant").last();
+  async function ask(name) {
+    await page.getByRole("button", { name: "新建对话", exact: true }).click();
+    await send(page, `检查 ${name}`);
+    await waitAnswer(page);
+    assert.equal(await message().locator(".chat-reply-source:not(.chat-sources)").count(), 0);
+  }
+
+  await page.setViewportSize({ width: 1914, height: 940 });
+  await ask("citations");
+  const messages = await page.locator(".chat-messages").boundingBox();
+  const composer = await page.locator(".chat-composer").boundingBox();
+  const contents = await message().boundingBox();
+  assert(contents.width >= 1080 && messages.width >= 1100);
+  assert(Math.abs(contents.x - composer.x) < 12);
+  assert(Math.abs(contents.width - composer.width) < 12);
+  const citations = message().getByRole("link", { name: "来源", exact: true });
+  assert.deepEqual(await citations.evaluateAll((links) => links.map((link) => link.href)), ["https://www.iana.org/help/example-domains", "https://www.rfc-editor.org/info/rfc2606/"]);
+  await message().getByText("回复中的来源链接（2）", { exact: true }).click();
+  assert.equal(await message().locator(".chat-sources a").count(), 2);
+  await page.screenshot({ path: join(artifacts, "extended-wide-sources.png") });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  assert(Math.abs((await message().boundingBox()).x - (await page.locator(".chat-composer").boundingBox()).x) < 3);
+  assert(await page.evaluate(() => document.documentElement.scrollWidth === innerWidth));
+
+  await ask("attachments");
+  for (const [language, filename, content] of [["CSV", "example.csv", "\uFEFFname,value\napple,1\n"], ["TXT", "example.txt", "hello\n"]]) {
+    const pending = page.waitForEvent("download");
+    await message().getByRole("button", { name: `下载 ${language} 正文` }).click();
+    const download = await pending;
+    assert.equal(download.suggestedFilename(), filename);
+    assert.equal(await readFile(await download.path(), "utf8"), content);
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await ask("charts");
+  assert.equal(await message().getByRole("figure", { name: "甲与乙的数据变化" }).locator("polyline").count(), 2);
+  assert.equal(await message().getByRole("figure", { name: "水果数量分布" }).locator("li").count(), 3);
+  const pie = message().getByRole("figure", { name: "当前水果数量占比" });
+  await message().getByRole("slider", { name: "调整 APPLE", exact: true }).fill("7");
+  assert.match(await pie.locator("li").first().innerText(), /苹果\s*7/);
+  await message().getByRole("button", { name: "增加 apple", exact: true }).click();
+  assert.match(await pie.locator("li").first().innerText(), /苹果\s*8/);
+  await message().getByRole("button", { name: "恢复初始数据" }).click();
+  assert.match(await pie.locator("li").first().innerText(), /苹果\s*2/);
+  await pie.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: join(artifacts, "extended-mobile-chart.png") });
+  for (const name of ["APPLE", "PEAR", "BANANA"]) await message().getByRole("slider", { name: `调整 ${name}`, exact: true }).fill("0");
+  await message().getByText("所有数量均为 0，暂无饼图数据。", { exact: true }).waitFor();
+  assert(await page.evaluate(() => document.documentElement.scrollWidth === innerWidth));
+
+  await ask("controls");
+  await message().getByRole("checkbox", { name: /博物馆/ }).check();
+  await message().locator("select").selectOption("秋季");
+  const followUp = page.waitForRequest((request) => request.url().endsWith("/v1/chat/completions") && request.method() === "POST");
+  await message().getByRole("button", { name: "确认并发送" }).click();
+  assert.match((await followUp).postDataJSON().messages.at(-1).content, /感兴趣的地点：博物馆\n偏好的季节：秋季/);
+  await waitAnswer(page);
+
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await ask("writing_code");
+  const writing = message().getByRole("region", { name: "写作块" });
+  await writing.getByRole("button", { name: "编辑", exact: true }).click();
+  await writing.getByRole("textbox", { name: "编辑写作块" }).fill("保存后的现场样稿");
+  await writing.getByRole("button", { name: "保存", exact: true }).click();
+  await writing.getByText("保存后的现场样稿", { exact: true }).waitFor();
+  const savedDraft = await page.evaluate(async () => {
+    const db = await new Promise((resolve, reject) => {
+      const req = indexedDB.open("chatgpt2api");
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    try {
+      return await new Promise((resolve, reject) => {
+        const req = db.transaction("chat_conversations").objectStore("chat_conversations").get("user:user-a");
+        req.onerror = () => reject(req.error);
+        req.onsuccess = () => {
+          const snapshot = req.result;
+          const thread = snapshot?.threads.find((item) => item.id === snapshot.activeId);
+          resolve({ title: thread?.title, drafts: thread?.messages.at(-1)?.writingDrafts });
+        };
+      });
+    } finally {
+      db.close();
+    }
+  });
+  assert.deepEqual(Object.values(savedDraft.drafts ?? {}), ["保存后的现场样稿"], JSON.stringify(savedDraft));
+  await page.reload();
+  await waitReady(page);
+  await writing.getByText("保存后的现场样稿", { exact: true }).waitFor();
+  const blocks = message().locator(".chat-code");
+  for (const [index, lang, component] of [[0, "HTML", "div"], [1, "JSX", "div"], [2, "SVG", "circle"]]) {
+    await blocks.nth(index).getByRole("button", { name: "预览", exact: true }).click();
+    const frame = blocks.nth(index).locator(`iframe[title="${lang} 静态预览"]`);
+    assert.equal(await frame.getAttribute("sandbox"), "");
+    await frame.contentFrame().locator(component).waitFor();
+  }
+  await blocks.nth(3).getByRole("button", { name: "预览", exact: true }).click();
+  await blocks.nth(3).getByRole("figure", { name: "Vega-Lite 图表" }).waitFor();
+  await blocks.nth(3).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: join(artifacts, "extended-code-previews.png") });
+  assert.equal(await blocks.nth(4).getByRole("button", { name: "预览", exact: true }).count(), 0);
+
+  await ask("tools");
+  await message().getByText("商品信息未返回", { exact: true }).first().waitFor();
+  await message().getByText("图片未返回", { exact: true }).first().waitFor();
+  assert(!(await message().innerText()).includes("sampleproduct"));
 }
 
 (async () => {
@@ -289,6 +401,12 @@ async function checkObservedReplies(page) {
       await checkObservedReplies(page);
       assert.deepEqual(errors, []);
       console.log(JSON.stringify({ ok: true, cases: ["streamed-rich-reply", "reload-form", "radio-follow-up", "source-fallback", "observed-math-mermaid", "observed-nested-form", "observed-chart-references", "observed-csv"], requests: requests.length, artifacts }));
+      return;
+    }
+    if (process.argv.includes("--extended-replies")) {
+      await checkExtendedReplies(page);
+      assert.deepEqual(errors, []);
+      console.log(JSON.stringify({ ok: true, cases: ["wide-layout", "citations", "attachments", "multi-series-and-interactive-pie", "checkbox-select-submit", "writing-edit-reload", "isolated-previews", "tool-card-fallbacks"], requests: requests.length, artifacts }));
       return;
     }
     await page.screenshot({ path: join(artifacts, "desktop-empty.png") });

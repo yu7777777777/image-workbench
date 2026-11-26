@@ -47,9 +47,60 @@ export function escapeReplyMarkdown(text: string): string {
   return text.replace(/[\\`*_{}\[\]()<>#!|~$]/g, "\\$&");
 }
 
-export function prepareReplyMarkdown(text: string): string {
+export function readReplyResources(text: string) {
+  const links = new Map<string, string>();
+  const citations = new Map<string, string>();
+  const ambiguous = new Set<string>();
+  const names = new Map<string, Set<string>>();
+  let previous: { end: number; url: string } | undefined;
+  let hasReferences = false;
+  const tokens = /^ {0,3}(`{3,}|~{3,})[^\r\n]*|(`+)|<(?:Cite\s+refs|Link\s+ref)\b|(?<!!)\[([^\]\r\n]+)\]\((<?(?:https?:\/\/|sandbox:\/)[^\s)>]+>?)\)/gm;
+  for (let token = tokens.exec(text); token; token = tokens.exec(text)) {
+    if (token[1]) {
+      tokens.lastIndex = findFenceEnd(text, tokens.lastIndex, token[1]) ?? text.length;
+    } else if (token[2]) {
+      const end = new RegExp("(?<!`)" + token[2] + "(?!`)", "g");
+      end.lastIndex = tokens.lastIndex;
+      if (end.exec(text)) tokens.lastIndex = end.lastIndex;
+    } else if (!token[4]) {
+      hasReferences = true;
+      const ref = /^<Cite\s+refs=\{\s*\[\s*"([\w-]+)"\s*\]\s*\}\s*\/\s*>/.exec(text.slice(token.index))?.[1];
+      // Link an ID only when the reply places its single citation immediately after an explicit URL.
+      if (ref && previous && /^[ \t。.!?;：:]*$/.test(text.slice(previous.end, token.index))) {
+        if (citations.has(ref) && citations.get(ref) !== previous.url) ambiguous.add(ref);
+        citations.set(ref, previous.url);
+      }
+    } else {
+      const href = token[4].replace(/^<|>$/g, "");
+      if (href.startsWith("sandbox:")) {
+        const filename = href.match(/\/([a-z\d][a-z\d_.-]{0,95}\.(csv|txt))$/i);
+        if (filename) {
+          const extension = filename[2].toLowerCase();
+          const files = names.get(extension) ?? new Set<string>();
+          files.add(filename[1]);
+          names.set(extension, files);
+        }
+      } else {
+        try {
+          const url = new URL(href);
+          if (!url.username && !url.password) {
+            if (!links.has(url.href)) links.set(url.href, token[3]);
+            previous = { url: url.href, end: tokens.lastIndex };
+          }
+        } catch {
+          // A malformed source remains ordinary Markdown.
+        }
+      }
+    }
+  }
+  const filenames = new Map([...names].flatMap(([extension, files]) => files.size === 1 ? [[extension, [...files][0]] as const] : []));
+  for (const ref of ambiguous) citations.delete(ref);
+  return { sources: hasReferences ? links : new Map<string, string>(), filenames, citations };
+}
+
+export function prepareReplyMarkdown(text: string, citations?: ReadonlyMap<string, string>): string {
   const parts: string[] = [];
-  const tokens = /^ {0,3}(`{3,}|~{3,})[^\r\n]*|(`+)|(?<!\\)\\\(([^\r\n]+?)\\\)|(?<!\\)\\\[([\s\S]+?)\\\]|<Cite\s+refs=\{\s*\[\s*(?:"[^"<>]*"\s*,?\s*)+\]\s*\}\s*\/\s*>|<Link\s+ref="[^"<>]*"\s+title="([^"<>]+)"\s*\/\s*>/gm;
+  const tokens = /^ {0,3}(`{3,}|~{3,})[^\r\n]*|(`+)|(?<!\\)\\\(([^\r\n]+?)\\\)|(?<!\\)\\\[([\s\S]+?)\\\]|<Cite\s+refs=\{\s*\[(\s*(?:"[^"<>]*"\s*,?\s*)+)\]\s*\}\s*\/\s*>|<Link\s+ref="([\w-]+)"\s+title="([^"<>]+)"\s*\/\s*>|<icon\s+[^<>]*\/\s*>|<badge(?:\s[^<>]*)?>([^<>]*)<\/badge>/gm;
   let cursor = 0;
   for (let token = tokens.exec(text); token; token = tokens.exec(text)) {
     if (token[1]) {
@@ -65,8 +116,15 @@ export function prepareReplyMarkdown(text: string): string {
     parts.push(text.slice(cursor, token.index));
     if (token[3] !== undefined) parts.push(`$${token[3].trim()}$`);
     else if (token[4] !== undefined) parts.push(`\n\n$$\n${token[4].trim()}\n$$\n\n`);
-    else if (token[5]) parts.push(`${escapeReplyMarkdown(token[5])}（来源链接未返回）`);
-    else parts.push("〔来源链接未返回〕");
+    else if (token[8] !== undefined) parts.push(token[8]);
+    else if (token[7] || token[5]) {
+      const title = token[7] ? escapeReplyMarkdown(token[7]) : "来源";
+      const refs = token[6] ? [token[6]] : [...(token[5] ?? "").matchAll(/"([\w-]+)"/g)].map((item) => item[1]);
+      const urls = [...new Set(refs.map((ref) => citations?.get(ref)))];
+      const links = urls.filter((url): url is string => Boolean(url));
+      if (links.length) parts.push(links.map((url, index) => `[${title}${links.length > 1 ? ` ${index + 1}` : ""}](<${url}>)`).join(" · "));
+      if (!links.length || links.length < urls.length || !refs.length) parts.push(token[7] ? `${title}（来源链接未返回）` : "〔来源链接未返回〕");
+    }
     cursor = tokens.lastIndex;
   }
   parts.push(text.slice(cursor));
