@@ -97,7 +97,9 @@ export interface ApiProfile {
   provider: ApiProvider
   baseUrl: string
   apiKey: string
+  /** Responses 请求的顶层模型，或 Images、fal 和自定义渠道直接请求的模型。 */
   model: string
+  /** 第三方 Responses 内置 image_generation 工具的模型，账号池沿用各自的 model。 */
   imageGenerationModel?: string
   timeout: number
   apiMode: ApiMode
@@ -194,6 +196,7 @@ export interface AgentInputDraft {
 export type TaskStatus = 'running' | 'done' | 'error'
 
 export interface TaskRecord {
+  workbenchTabId?: string
   id: string
   prompt: string
   params: TaskParams
@@ -302,6 +305,7 @@ export interface AgentMessage {
 }
 
 export interface AgentRound {
+  workbenchTabId?: string
   id: string
   index: number
   parentRoundId?: string | null

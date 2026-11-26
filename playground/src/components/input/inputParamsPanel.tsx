@@ -1,3 +1,4 @@
+import { getImageCapabilities } from '../../lib/paramCompatibility'
 import type { ApiProfile, TaskParams } from '../../types'
 import { dismissAllTooltips } from '../../lib/tooltipDismiss'
 import Select from '../Select'
@@ -278,7 +279,7 @@ export default function InputParamsPanel({
             { label: 'PNG', value: 'png' },
             { label: 'JPEG', value: 'jpeg' },
             { label: 'WebP', value: 'webp' },
-          ]}
+          ].filter((option) => getImageCapabilities(activeProfile).outputFormats.includes(option.value))}
           showValueTooltips={false}
           className={selectClass}
         />

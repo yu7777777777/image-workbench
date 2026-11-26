@@ -1,3 +1,4 @@
+import { businessRequestUrl } from './businessRequests'
 import { DEFAULT_STREAM_PARTIAL_IMAGES, type ApiProfile, type CustomProviderDefinition, type CustomProviderPollMapping, type CustomProviderResultMapping, type CustomProviderSubmitMapping, type ImageApiResponse, type ImageResponseItem, type ResponsesApiResponse, type ResponsesOutputItem, type TaskParams } from '../types'
 import { dataUrlToBlob, imageDataUrlToPngBlob, maskDataUrlToPngBlob } from './canvasImage'
 import { type ImageAnchorComment, type ImageMarkupStroke } from './imageApiShared'
@@ -8,6 +9,7 @@ import {
   appendStreamingFormatHint,
   maybeAppendStreamingHint,
   type CallApiOptions,
+  createImageRequestTimeout,
   type CallApiResult,
   fetchImageUrlAsDataUrl,
   getApiErrorMessage,
@@ -16,7 +18,6 @@ import {
   getResponsesImageResultBase64,
   isDataUrl,
   isHttpUrl,
-  linkAbortSignal,
   mergeActualParams,
   maybeAppendTransparentBackgroundHint,
   MIME_MAP,
@@ -55,13 +56,6 @@ async function appendMarkupOverlayFields(formData: FormData, markupOverlays?: st
   for (let i = 0; i < markupOverlays.length; i++) {
     const blob = await dataUrlToBlob(markupOverlays[i], 'image/png')
     formData.append('markup', blob, `markup-${i}.png`)
-  }
-}
-
-function createOpenAICompatiblePaths() {
-  return {
-    generationPath: 'images/generations',
-    editPath: 'images/edits',
   }
 }
 
@@ -508,14 +502,10 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
     : sizePrompt
   const isEdit = inputImageDataUrls.length > 0
   const mime = MIME_MAP[params.output_format] || 'image/png'
-  const proxyConfig = readClientDevProxyConfig()
-  const useApiProxy = shouldUseApiProxyForCredential(profile.apiKey, profile.apiProxy, proxyConfig)
   const requestHeaders = createRequestHeaders(profile)
-  const paths = createOpenAICompatiblePaths()
 
-  const controller = new AbortController()
-  const unlinkAbort = linkAbortSignal(controller, opts.signal)
-  const timeoutId = setTimeout(() => controller.abort(), profile.timeout * 1000)
+  const request = createImageRequestTimeout(profile.timeout, opts.signal)
+  const { signal } = request
 
   try {
     let response: Response
@@ -581,12 +571,12 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
       appendMarkupStrokesField(formData, opts.markupStrokes)
       await appendMarkupOverlayFields(formData, opts.markupOverlays)
 
-      response = await fetch(buildApiUrl(profile.baseUrl, paths.editPath, proxyConfig, useApiProxy), {
+      response = await fetch(businessRequestUrl(profile, 'edit_image'), {
         method: 'POST',
         headers: requestHeaders,
         cache: 'no-store',
         body: formData,
-        signal: controller.signal,
+        signal,
       })
     } else {
       const body: Record<string, unknown> = {
@@ -619,7 +609,7 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
         body.partial_images = getStreamPartialImages(profile)
       }
 
-      response = await fetch(buildApiUrl(profile.baseUrl, paths.generationPath, proxyConfig, useApiProxy), {
+      response = await fetch(businessRequestUrl(profile, 'generate_image'), {
         method: 'POST',
         headers: {
           ...requestHeaders,
@@ -627,7 +617,7 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
         },
         cache: 'no-store',
         body: JSON.stringify(body),
-        signal: controller.signal,
+        signal,
       })
     }
 
@@ -637,13 +627,12 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
     }
 
     if (profile.streamImages && isEventStreamResponse(response)) {
-      return parseImagesApiStreamResponse(response, mime, opts.onPartialImage, controller.signal)
+      return await parseImagesApiStreamResponse(response, mime, opts.onPartialImage, signal)
     }
 
-    return parseImagesApiResponse(await response.json() as ImageApiResponse, mime, controller.signal)
+    return await parseImagesApiResponse(await response.json() as ImageApiResponse, mime, signal)
   } finally {
-    clearTimeout(timeoutId)
-    unlinkAbort()
+    request.clearTimeout()
   }
 }
 
@@ -653,11 +642,15 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
       reject(new DOMException('Aborted', 'AbortError'))
       return
     }
-    const timer = setTimeout(resolve, ms)
-    signal.addEventListener('abort', () => {
+    const onAbort = () => {
       clearTimeout(timer)
-      reject(new DOMException('Aborted', 'AbortError'))
-    }, { once: true })
+      reject(signal.reason)
+    }
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort)
+      resolve()
+    }, ms)
+    signal.addEventListener('abort', onAbort, { once: true })
   })
 }
 
@@ -819,7 +812,7 @@ async function extractCustomImages(payload: unknown, result: CustomProviderResul
   return { images, ...(rawImageUrls.length ? { rawImageUrls } : {}) }
 }
 
-async function submitCustomRequest(mapping: CustomProviderSubmitMapping, opts: CallApiOptions, profile: ApiProfile, controller: AbortController, proxyConfig: ReturnType<typeof readClientDevProxyConfig>, useApiProxy: boolean): Promise<unknown> {
+async function submitCustomRequest(mapping: CustomProviderSubmitMapping, opts: CallApiOptions, profile: ApiProfile, signal: AbortSignal, proxyConfig: ReturnType<typeof readClientDevProxyConfig>, useApiProxy: boolean): Promise<unknown> {
   const requestHeaders = createRequestHeaders(profile)
   const context = createCustomProviderContext(opts, profile)
   const method = mapping.method ?? 'POST'
@@ -854,7 +847,7 @@ async function submitCustomRequest(mapping: CustomProviderSubmitMapping, opts: C
     headers,
     cache: 'no-store',
     body,
-    signal: controller.signal,
+    signal,
   })
 
   if (!response.ok) {
@@ -927,19 +920,19 @@ export async function getCustomQueuedImageResult(
   customProvider: CustomProviderDefinition,
   taskId: string,
   params: TaskParams,
+  signal?: AbortSignal,
 ): Promise<CallApiResult> {
   if (!customProvider.poll) throw new Error('自定义异步任务缺少 poll 配置')
   const mime = MIME_MAP[params.output_format] || 'image/png'
-  return pollCustomTaskResult(profile, customProvider.poll, taskId, mime)
+  return pollCustomTaskResult(profile, customProvider.poll, taskId, mime, signal)
 }
 
 async function callCustomHttpImageApi(opts: CallApiOptions, profile: ApiProfile, customProvider: CustomProviderDefinition): Promise<CallApiResult> {
   const { params, inputImageDataUrls } = opts
   const isEdit = inputImageDataUrls.length > 0
   const mime = MIME_MAP[params.output_format] || 'image/png'
-  const controller = new AbortController()
-  const unlinkAbort = linkAbortSignal(controller, opts.signal)
-  let timeoutId: ReturnType<typeof setTimeout> | null = setTimeout(() => controller.abort(), profile.timeout * 1000)
+  const request = createImageRequestTimeout(profile.timeout, opts.signal)
+  const { signal } = request
 
   try {
     const proxyConfig = readClientDevProxyConfig()
@@ -951,7 +944,7 @@ async function callCustomHttpImageApi(opts: CallApiOptions, profile: ApiProfile,
     if (useApiProxy && (submitMapping.taskIdPath || customProvider.poll)) {
       throw new Error('API 代理暂不支持使用异步任务的自定义服务商。请关闭 API 代理，或改用同步返回图片的自定义服务商配置。')
     }
-    const submitPayload = await submitCustomRequest(submitMapping, opts, profile, controller, proxyConfig, useApiProxy)
+    const submitPayload = await submitCustomRequest(submitMapping, opts, profile, signal, proxyConfig, useApiProxy)
     const taskIdValue = submitMapping.taskIdPath ? getByPath(submitPayload, submitMapping.taskIdPath) : undefined
     const taskId = typeof taskIdValue === 'string' ? taskIdValue.trim() : String(taskIdValue ?? '').trim()
     if (submitMapping.taskIdPath && !taskId) {
@@ -959,17 +952,13 @@ async function callCustomHttpImageApi(opts: CallApiOptions, profile: ApiProfile,
       ;(err as any).rawResponsePayload = JSON.stringify(submitPayload, null, 2)
       throw err
     }
-    if (!taskId) return extractCustomImages(submitPayload, submitMapping.result ?? {}, mime, controller.signal)
+    if (!taskId) return await extractCustomImages(submitPayload, submitMapping.result ?? {}, mime, signal)
     if (!customProvider.poll) throw new Error('异步接口返回了 task_id，但服务商配置缺少 poll')
     opts.onCustomTaskEnqueued?.({ taskId })
-    if (timeoutId) {
-      clearTimeout(timeoutId)
-      timeoutId = null
-    }
-    return pollCustomTaskResult(profile, customProvider.poll, taskId, mime, controller.signal)
+    request.clearTimeout()
+    return await pollCustomTaskResult(profile, customProvider.poll, taskId, mime, signal)
   } finally {
-    if (timeoutId) clearTimeout(timeoutId)
-    unlinkAbort()
+    request.clearTimeout()
   }
 }
 
@@ -1039,12 +1028,9 @@ async function callResponsesImageApiSingle(opts: CallApiOptions, profile: ApiPro
     ? prependCodexCliSizePrompt(prompt, params.size)
     : prompt
   const mime = MIME_MAP[params.output_format] || 'image/png'
-  const proxyConfig = readClientDevProxyConfig()
-  const useApiProxy = shouldUseApiProxyForCredential(profile.apiKey, profile.apiProxy, proxyConfig)
   const requestHeaders = createRequestHeaders(profile)
-  const controller = new AbortController()
-  const unlinkAbort = linkAbortSignal(controller, opts.signal)
-  const timeoutId = setTimeout(() => controller.abort(), profile.timeout * 1000)
+  const request = createImageRequestTimeout(profile.timeout, opts.signal)
+  const { signal } = request
 
   try {
     if (opts.maskDataUrl) {
@@ -1069,7 +1055,7 @@ async function callResponsesImageApiSingle(opts: CallApiOptions, profile: ApiPro
       body.stream = true
     }
 
-    const response = await fetch(buildApiUrl(profile.baseUrl, 'responses', proxyConfig, useApiProxy), {
+    const response = await fetch(businessRequestUrl(profile, 'run_agent'), {
       method: 'POST',
       headers: {
         ...requestHeaders,
@@ -1077,7 +1063,7 @@ async function callResponsesImageApiSingle(opts: CallApiOptions, profile: ApiPro
       },
       cache: 'no-store',
       body: JSON.stringify(body),
-      signal: controller.signal,
+      signal,
     })
 
     if (!response.ok) {
@@ -1086,7 +1072,7 @@ async function callResponsesImageApiSingle(opts: CallApiOptions, profile: ApiPro
     }
 
     if (profile.streamImages && isEventStreamResponse(response)) {
-      return parseResponsesApiStreamResponse(response, mime, opts.onPartialImage, controller.signal)
+      return await parseResponsesApiStreamResponse(response, mime, opts.onPartialImage, signal)
     }
 
     const payload = await response.json() as ResponsesApiResponse
@@ -1103,7 +1089,6 @@ async function callResponsesImageApiSingle(opts: CallApiOptions, profile: ApiPro
       revisedPrompts: imageResults.map((result) => result.revisedPrompt),
     }
   } finally {
-    clearTimeout(timeoutId)
-    unlinkAbort()
+    request.clearTimeout()
   }
 }

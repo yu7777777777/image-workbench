@@ -294,6 +294,60 @@ async function checkLegacyKeyRotation(page, base) {
   assert.equal(completions, 2);
 }
 
+async function checkOwnerDefaults(page, base) {
+  const openChat = async () => {
+    await page.goto(base + "/chat/");
+    await waitReady(page);
+  };
+  const setDefault = async (family, level) => {
+    await page.goto(base + "/settings/");
+    await page.getByRole("tab", { name: "独立对话", exact: true }).click();
+    const model = page.getByRole("combobox", { name: /默认模型/ });
+    await model.click();
+    await page.getByRole("option", { name: family, exact: true }).click();
+    if (level) {
+      await page.getByRole("combobox", { name: /默认思考程度/ }).click();
+      await page.getByRole("option", { name: level, exact: true }).click();
+    }
+  };
+  const sendWithModel = async (text, model) => {
+    await send(page, text);
+    await page.getByText(text, { exact: true }).last().waitFor();
+    await waitAnswer(page);
+    assert.equal(requests.at(-1).messages.at(-1).content, text);
+    assert.equal(requests.at(-1).model, model);
+  };
+
+  // Keep an explicit model on A’s current thread while changing the default in Settings.
+  await page.getByRole("combobox", { name: "选择对话模型" }).click();
+  await page.getByRole("option", { name: "GPT-5.5", exact: true }).click();
+  await sendWithModel("账号 A 的旧对话", "gpt-5-5-instant");
+  await setDefault("GPT-6", "中");
+  await openChat();
+  await page.getByText("账号 A 的旧对话", { exact: true }).last().waitFor();
+  await sendWithModel("原对话仍用原模型", "gpt-5-5-instant");
+
+  await page.getByRole("button", { name: "新建对话", exact: true }).click();
+  await sendWithModel("账号 A 的新对话", "gpt-6-thinking");
+  await setDefault("GPT-5.5");
+  await openChat();
+  await sendWithModel("刷新恢复账号 A 的线程模型", "gpt-6-thinking");
+
+  await seed(page, "mock-user-b");
+  await openChat();
+  assert.equal(await page.getByText("账号 A 的新对话", { exact: true }).count(), 0);
+  await setDefault("GPT-6", "即时");
+  await openChat();
+  await sendWithModel("账号 B 的独立对话", "gpt-6-instant");
+
+  await seed(page);
+  await openChat();
+  await page.getByText("账号 A 的新对话", { exact: true }).last().waitFor();
+  assert.equal(await page.getByText("账号 B 的独立对话", { exact: true }).count(), 0);
+  await page.getByRole("button", { name: "新建对话", exact: true }).click();
+  await sendWithModel("切回账号 A 后读取自己的默认模型", "gpt-5-5-instant");
+}
+
 async function checkRichReplies(page, context) {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await send(page, "展示写作模板");
@@ -996,6 +1050,12 @@ async function checkImageWidgets(page) {
       await checkLegacyKeyRotation(page, base);
       assert.deepEqual(errors, []);
       console.log(JSON.stringify({ ok: true, cases: ["legacy-json-login", "message-disabled", "attachment-guard", "reject-new-unicode", "rotate", "recover-history-and-authenticated-requests"] }));
+      return;
+    }
+    if (process.argv.includes("--owner-defaults")) {
+      await checkOwnerDefaults(page, base);
+      assert.deepEqual(errors, []);
+      console.log(JSON.stringify({ ok: true, requests: requests.length, cases: ["two-owners", "settings-default", "existing-thread", "reload", "switch-back"] }));
       return;
     }
     if (process.argv.includes("--widget-radio-default")) {

@@ -22,6 +22,51 @@ describe('callImageApi', () => {
     vi.useRealTimers()
   })
 
+  it.each(['images', 'responses'] as const)('aborts an open %s stream after response headers', async (apiMode) => {
+    const controller = new AbortController()
+    const cancel = vi.fn()
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(new ReadableStream({ cancel }), { headers: { 'Content-Type': 'text/event-stream' } }),
+    )
+    const result = callImageApi({
+      settings: normalizeSettings({
+        ...DEFAULT_SETTINGS,
+        profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key', apiMode, streamImages: true })],
+      }),
+      prompt: 'prompt',
+      params: { ...DEFAULT_PARAMS },
+      inputImageDataUrls: [],
+      signal: controller.signal,
+    })
+    const rejection = expect(result).rejects.toMatchObject({ name: 'AbortError' })
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    controller.abort()
+    await rejection
+    expect(fetchMock.mock.calls[0][1]?.signal?.aborted).toBe(true)
+    expect(cancel).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the image timeout active while reading the stream body', async () => {
+    vi.useFakeTimers()
+    const cancel = vi.fn()
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(new ReadableStream({ cancel }), { headers: { 'Content-Type': 'text/event-stream' } }),
+    )
+    const result = callImageApi({
+      settings: normalizeSettings({
+        ...DEFAULT_SETTINGS,
+        profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key', apiMode: 'images', streamImages: true, timeout: 1 })],
+      }),
+      prompt: 'prompt',
+      params: { ...DEFAULT_PARAMS },
+      inputImageDataUrls: [],
+    })
+    const rejection = expect(result).rejects.toMatchObject({ name: 'AbortError' })
+    await vi.advanceTimersByTimeAsync(1000)
+    await rejection
+    expect(cancel).toHaveBeenCalledOnce()
+  })
+
   it.each(['generation', 'edit', 'responses'] as const)('only omits unsupported parameters in Codex CLI mode for %s', async (kind) => {
     for (const codexCli of [false, true]) {
       const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(JSON.stringify({

@@ -12,6 +12,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict
 
+from api.shared_image_proxy import managed_shared_profiles
 from api.support import require_admin, require_identity, require_legacy_key_identity, resolve_image_base_url
 from services.backup_service import BackupError, backup_service
 from services.config import BASE_DIR, config
@@ -221,7 +222,7 @@ def create_router(app_version: str) -> APIRouter:
     @router.get("/api/shared-profiles")
     async def get_public_shared_profiles(authorization: str | None = Header(default=None)) -> dict[str, list[dict[str, object]]]:
         require_identity(authorization)
-        return {"shared_profiles": config.get_shared_profiles(enabled_only=True)}
+        return {"shared_profiles": managed_shared_profiles()}
 
     @router.post("/api/external/fetch-models")
     async def fetch_external_models_endpoint(body: FetchExternalModelsRequest, authorization: str | None = Header(default=None)):
