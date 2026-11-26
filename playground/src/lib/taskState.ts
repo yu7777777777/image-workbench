@@ -1,8 +1,21 @@
+import { getWorkbenchTabId, isAnotherWorkbenchTabActive } from './workbenchOwner'
 import type { ApiProvider, TaskParams, TaskRecord } from '../types'
 
 type TaskLifecyclePatch = Pick<TaskRecord, 'status' | 'error' | 'finishedAt' | 'elapsed'>
 type ActualParams = Partial<TaskParams>
 type ImageSize = { width?: number; height?: number }
+
+export function createRunningTask(task: Omit<TaskRecord, keyof TaskLifecyclePatch | 'outputImages'>): TaskRecord {
+  return {
+    ...task,
+    workbenchTabId: getWorkbenchTabId(),
+    outputImages: [],
+    status: 'running',
+    error: null,
+    finishedAt: null,
+    elapsed: null,
+  }
+}
 
 export function createTaskDonePatch(task: Pick<TaskRecord, 'createdAt'>, now: number): TaskLifecyclePatch {
   return {
@@ -26,7 +39,7 @@ export function markInterruptedOpenAIRunningTasks(tasks: TaskRecord[], now: numb
   const interruptedTasks: TaskRecord[] = []
   const updatedTasks = tasks.map((task) => {
     const isOpenAITask = (task.apiProvider ?? 'openai') !== 'fal'
-    if (task.status !== 'running' || !isOpenAITask || task.customTaskId) return task
+    if (task.status !== 'running' || !isOpenAITask || task.customTaskId || isAnotherWorkbenchTabActive(task.workbenchTabId)) return task
 
     const updated: TaskRecord = {
       ...task,

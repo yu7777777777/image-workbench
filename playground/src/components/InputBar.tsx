@@ -9,7 +9,7 @@ import { ensureSharedProfilesLoaded, isPoolBuild, POOL_AGENT_PROFILE_ID, POOL_KE
 import { isPoolProfileId } from '../lib/poolProfileIds'
 import { getImageGenerationModel, isGptImage25Model } from '../lib/imageModels'
 import { ensureImageCached, getCachedImage } from '../lib/imageCache'
-import { DEFAULT_FAL_IMAGE_SIZE, getChangedParams, getOutputImageLimitForSettings, normalizeParamsForSettings } from '../lib/paramCompatibility'
+import { DEFAULT_FAL_IMAGE_SIZE, getChangedParams, getImageCapabilities, normalizeParamsForSettings } from '../lib/paramCompatibility'
 import { getAtImageQuery, getImageMentionLabel, getPromptIndexFromVisibleIndex, getPromptMentionParts, getSelectedImageMentionLabel, imageMentionMatches, insertImageMentionAtVisibleRange, insertTextMentionAtVisibleRange, isCursorInSelectedImageMention, stripImageMentionMarkers } from '../lib/promptImageMentions'
 import { normalizeCodexCliImageSize, normalizeImageSize } from '../lib/size'
 import { getInputImageLimit, getInputImageLimitHint } from '../lib/inputImageLimits'
@@ -644,13 +644,14 @@ export default function InputBar() {
   const activeProvider = activeProfile.provider
   const isFalProvider = activeProvider === 'fal'
   const agentAutoImageCount = appMode === 'agent'
-  const moderationDisabled = isFalProvider
+  const capabilities = getImageCapabilities(activeProfile)
+  const moderationDisabled = !capabilities.moderation
   const transparentOutputAvailable = appMode === 'gallery'
   const showTransparentOutputControl = transparentOutputAvailable && (params.output_format === 'png' || params.output_format === 'webp')
   const transparentOutputEnabled = transparentOutputAvailable && showTransparentOutputControl && params.transparent_output
-  const compressionDisabled = params.output_format === 'png' || isFalProvider
-  const outputImageLimit = getOutputImageLimitForSettings(effectiveSettings)
-  const isFalTextToImage = isFalProvider && inputImages.length === 0
+  const compressionDisabled = params.output_format === 'png' || !capabilities.compression
+  const outputImageLimit = capabilities.maxImages
+  const isFalTextToImage = !capabilities.autoSizeForGeneration && inputImages.length === 0
   const nDraftValue = Number(nInput)
   const effectiveNValue = Number.isNaN(nDraftValue) ? params.n : nDraftValue
   const streamConcurrentByN = activeProfile.provider === 'openai' && activeProfile.streamImages === true && !agentAutoImageCount && effectiveNValue > 1
@@ -664,18 +665,8 @@ export default function InputBar() {
     : (activeProfile.codexCli ? normalizeCodexCliImageSize(params.size) : normalizeImageSize(params.size)) || DEFAULT_PARAMS.size
   const displaySize = rawDisplaySize === 'auto' ? '自动' : rawDisplaySize
 
-  const qualityOptions = [
-    ...(!isFalProvider ? [{ label: '自动', value: 'auto' }] : []),
-    { label: '低', value: 'low' },
-    { label: '中', value: 'medium' },
-    { label: '高', value: 'high' },
-    ...(isGptImage25Model(getImageGenerationModel(activeProfile))
-      ? [
-          { label: '极高', value: 'xhigh' },
-          { label: '最高', value: 'max' },
-        ]
-      : []),
-  ]
+  const qualityLabels: Record<string, string> = { auto: '自动', low: '低', medium: '中', high: '高', xhigh: '极高', max: '最高' }
+  const qualityOptions = capabilities.quality.map((value) => ({ label: qualityLabels[value], value }))
   const atImageLimit = inputImages.length > API_MAX_IMAGES
   const uploadImageTooltipText = atImageLimit
     ? getInputImageLimitHint(API_MAX_IMAGES)

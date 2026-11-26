@@ -1,5 +1,7 @@
+import { getWorkbenchTabId, hasAnotherWorkbenchTab, isAnotherWorkbenchTabActive, onWorkbenchDeletion, WORKBENCH_PERSIST_BASE_KEY } from './lib/workbenchOwner'
+import { applyQueuedWorkbenchSettings, createWorkbenchStateStorage } from './lib/workbenchSettings'
 import { create } from 'zustand'
-import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware'
+import { createJSONStorage, persist } from 'zustand/middleware'
 import type {
   AgentConversation,
   AgentInputDraft,
@@ -34,6 +36,7 @@ import {
   putTask as dbPutTask,
   deleteTask as dbDeleteTask,
   commitTaskDeletion,
+  type DeletedAgentElements,
   clearTasks as dbClearTasks,
   migrateLegacyDbToOwner,
   getAllAgentConversations,
@@ -84,14 +87,13 @@ import { ALL_FAVORITES_COLLECTION_ID, DEFAULT_FAVORITE_COLLECTION_ID, createDefa
 import { createAgentTextBuffer } from './lib/agentTextBuffer'
 import { createAgentConversationPersistence } from './lib/agentConversationPersistence'
 import { createPersistedState, mergePersistedAgentConversations, migratePersistedState, normalizePersistedState } from './lib/persistedState'
-import { addImageSizeParam, createTaskDonePatch, createTaskErrorPatch, deriveAgentImageActualParams, deriveGalleryActualParams, firstActualParams, getTaskOutputSlots, hasActualParams, hasActualSizeParam, mapActualParamsByImage, mapRevisedPromptsByImage, markInterruptedOpenAIRunningTasks, type TaskOutputSlot } from './lib/taskState'
+import { addImageSizeParam, createRunningTask, createTaskDonePatch, createTaskErrorPatch, deriveAgentImageActualParams, deriveGalleryActualParams, firstActualParams, getTaskOutputSlots, hasActualParams, hasActualSizeParam, mapActualParamsByImage, mapRevisedPromptsByImage, markInterruptedOpenAIRunningTasks, type TaskOutputSlot } from './lib/taskState'
 import { getInputImageLimit, getInputImageLimitError } from './lib/inputImageLimits'
 import { stripInjectedCodexCliSizePrompt } from './lib/size'
 import { createCanvasSlice, type CanvasSlice } from './store/canvasSlice'
 import { createSettingsSlice, type SettingsSlice } from './store/settingsSlice'
 import { clearCanvasAssetMetadata, loadCanvasAssetMetadata, saveCanvasAssetMetadata } from './lib/canvasAssetMetadata'
 import { clearCanvasPromptLibrary, loadCanvasPromptLibrary, normalizeCanvasPromptLibrary, saveCanvasPromptLibrary } from './lib/canvasPromptLibrary'
-import { getOwnerScopedKey, WORKBENCH_PERSIST_BASE_KEY } from './lib/workbenchOwner'
 
 const FAL_RECOVERY_POLL_MS = 10_000
 const CUSTOM_RECOVERY_POLL_MS = 10_000
@@ -100,7 +102,7 @@ const falRecoveryTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const customRecoveryTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const openAIWatchdogTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const agentRoundControllers = new Map<string, AbortController>()
-const taskAbortControllers = new Map<string, AbortController>()
+const imageTaskControllers = new Map<string, AbortController>()
 const agentRecoveryContinuations = new Set<string>()
 const deletedActiveAgentTasks = new Map<string, { task: TaskRecord; controller: AbortController }>()
 let agentConversationPersistenceReady = false
@@ -252,8 +254,10 @@ export function getPersistedState(state: AppState) {
   return createPersistedState(state, agentConversationMigrationPending && !agentConversationPersistenceReady)
 }
 
-async function replaceStoredAgentConversations(conversations: AgentConversation[]) {
-  await replaceAgentConversations(conversations.map(getPersistableAgentConversation))
+async function replaceStoredAgentConversations(conversations: AgentConversation[], restore = false) {
+  const persistable = conversations.map(getPersistableAgentConversation)
+  if (restore) await replaceAgentConversations(persistable, true)
+  else await replaceAgentConversations(persistable)
 }
 
 function getPersistableAgentConversation(conversation: AgentConversation): AgentConversation {
@@ -423,13 +427,19 @@ export interface AppState extends CanvasSlice, SettingsSlice {
 function isImageReferencedByState(state: AppState, imageId: string) {
   if (state.canvasNodes.some((node) => node.imageId === imageId)) return true
   if (state.inputImages.some((img) => img.id === imageId)) return true
-  if (state.galleryInputDraft?.inputImages.some((img) => img.id === imageId)) return true
-  if (Object.values(state.agentInputDrafts).some((draft) => draft.inputImages.some((img) => img.id === imageId))) return true
+  if (state.maskDraft?.targetImageId === imageId || state.maskEditorImageId === imageId) return true
+  if (state.galleryInputDraft?.inputImages.some((img) => img.id === imageId)
+    || state.galleryInputDraft?.maskDraft?.targetImageId === imageId || state.galleryInputDraft?.maskEditorImageId === imageId) return true
+  if (Object.values(state.agentInputDrafts).some((draft) =>
+    draft.inputImages.some((img) => img.id === imageId)
+    || draft.maskDraft?.targetImageId === imageId || draft.maskEditorImageId === imageId,
+  )) return true
   if (state.tasks.some((task) =>
     task.inputImageIds.includes(imageId) ||
     task.outputImages.includes(imageId) ||
     task.transparentOriginalImages?.includes(imageId) ||
     task.streamPartialImageIds?.includes(imageId) ||
+    task.markupOverlayImageIds?.includes(imageId) ||
     task.maskTargetImageId === imageId ||
     task.maskImageId === imageId
   )) return true
@@ -460,6 +470,13 @@ async function deleteStoredImageIfUnreferenced(imageId: string) {
   if (isImageReferencedByState(useStore.getState(), imageId)) return
   const projects = await listCanvasProjects()
   if (projects.some((project) => project.nodes.some((node) => node.imageId === imageId))) return
+  if (hasAnotherWorkbenchTab()) {
+    const [tasks, conversations] = await Promise.all([getAllTasks(), getAllAgentConversations()])
+    const referenced = new Set<string>()
+    for (const task of tasks) addTaskReferencedImageIds(referenced, task)
+    addAgentReferencedImageIds(referenced, conversations, {})
+    if (referenced.has(imageId)) return
+  }
   const [image, thumbnail] = await Promise.all([getImage(imageId), getStoredImageThumbnail(imageId)])
   if (isImageReferencedByState(useStore.getState(), imageId)) return
 
@@ -482,21 +499,6 @@ async function deleteStoredImageIfUnreferenced(imageId: string) {
       thumbnailVersion: thumbnail.thumbnailVersion,
     })
   }
-}
-
-const ownerScopedStorage: StateStorage = {
-  getItem: (name) => {
-    if (typeof localStorage === 'undefined') return null
-    return localStorage.getItem(getOwnerScopedKey(name))
-  },
-  setItem: (name, value) => {
-    if (typeof localStorage === 'undefined') return
-    localStorage.setItem(getOwnerScopedKey(name), value)
-  },
-  removeItem: (name) => {
-    if (typeof localStorage === 'undefined') return
-    localStorage.removeItem(getOwnerScopedKey(name))
-  },
 }
 
 export const useStore = create<AppState>()(
@@ -878,7 +880,7 @@ export const useStore = create<AppState>()(
       streamPreviewSlots: {},
       setTaskStreamPreview: (taskId, image, requestIndex = 0) => set((s) => {
         if (image) {
-          if (!s.tasks.some((task) => task.id === taskId)) return s
+          if (!s.tasks.some((task) => task.id === taskId && task.status === 'running')) return s
           const slotKey = String(requestIndex)
           const currentSlots = s.streamPreviewSlots[taskId] ?? {}
           if (s.streamPreviews[taskId] === image && currentSlots[slotKey] === image) return s
@@ -1005,17 +1007,13 @@ export const useStore = create<AppState>()(
     {
       name: WORKBENCH_PERSIST_BASE_KEY,
       version: 2,
-      storage: createJSONStorage(() => ownerScopedStorage),
+      storage: createJSONStorage(createWorkbenchStateStorage),
       migrate: migratePersistedState,
       partialize: getPersistedState,
       merge: mergePersistedState,
     },
   ),
 )
-
-export async function rehydrateWorkbenchStoreForOwner() {
-  await useStore.persist.rehydrate()
-}
 
 let lastObservedAgentConversations = useStore.getState().agentConversations
 let agentConversationPersistQueued = false
@@ -1060,8 +1058,25 @@ function getPersistableTask(task: TaskRecord): TaskRecord {
   return rawResponsePayload === task.rawResponsePayload ? task : { ...task, rawResponsePayload }
 }
 
-function putTask(task: TaskRecord): Promise<IDBValidKey> {
-  return dbPutTask(getPersistableTask(task))
+function putTask(task: TaskRecord, restore = false): Promise<IDBValidKey> {
+  return restore ? dbPutTask(getPersistableTask(task), true) : dbPutTask(getPersistableTask(task))
+}
+
+function addTaskToStore(task: TaskRecord) {
+  useStore.getState().setTasks([task, ...useStore.getState().tasks])
+  return putTask(task)
+}
+
+async function runImageTaskRequest<T>(taskId: string, request: (signal: AbortSignal) => Promise<T>) {
+  const controller = new AbortController()
+  imageTaskControllers.set(taskId, controller)
+  try {
+    const result = await request(controller.signal)
+    controller.signal.throwIfAborted()
+    return result
+  } finally {
+    if (imageTaskControllers.get(taskId) === controller) imageTaskControllers.delete(taskId)
+  }
 }
 
 export function getCodexCliPromptKey(settings: AppSettings): string {
@@ -1108,7 +1123,10 @@ function scheduleOpenAIWatchdog(taskId: string, timeoutSeconds: number, profile?
   const timer = setTimeout(() => {
     openAIWatchdogTimers.delete(taskId)
     const failed = failOpenAITaskIfStillRunning(taskId, createOpenAITimeoutError(timeoutSeconds, profile))
-    if (failed) useStore.getState().showToast('OpenAI 任务请求超时', 'error')
+    if (failed) {
+      imageTaskControllers.get(taskId)?.abort()
+      useStore.getState().showToast('OpenAI 任务请求超时', 'error')
+    }
   }, remainingMs)
   openAIWatchdogTimers.set(taskId, timer)
 }
@@ -1425,7 +1443,7 @@ async function completeRecoveredFalTask(task: TaskRecord, result: Awaited<Return
 async function recoverFalTask(taskId: string) {
   const { settings, tasks } = useStore.getState()
   const task = tasks.find((item) => item.id === taskId)
-  if (!task || task.apiProvider !== 'fal' || !task.falRequestId || !task.falEndpoint || task.status === 'done') return
+  if (!task || task.apiProvider !== 'fal' || !task.falRequestId || !task.falEndpoint || (task.status !== 'running' && !task.falRecoverable)) return
 
   const profile = getFalRecoveryProfile(settings, task)
   if (!profile) {
@@ -1434,12 +1452,14 @@ async function recoverFalTask(taskId: string) {
   }
 
   try {
-    const result = await getFalQueuedImageResult(profile, task.falEndpoint, task.falRequestId, task.params)
+    const result = await runImageTaskRequest(taskId, (signal) =>
+      getFalQueuedImageResult(profile, task.falEndpoint!, task.falRequestId!, task.params, signal),
+    )
     clearFalRecoveryTimer(taskId)
     await completeRecoveredFalTask(task, result)
     return
   } catch (err) {
-    if (!useStore.getState().tasks.some((item) => item.id === taskId)) return
+    if (!useStore.getState().tasks.some((item) => item.id === taskId && (item.status === 'running' || item.falRecoverable))) return
     if (isNetworkRecoverableError(err)) {
       scheduleFalRecovery(taskId)
       return
@@ -1458,6 +1478,7 @@ async function recoverFalTask(taskId: string) {
 /** 初始化：从 IndexedDB 加载任务，按需恢复输入图片，并清理孤立图片 */
 export async function initStore() {
   await migrateLegacyDbToOwner()
+  applyQueuedWorkbenchSettings(useStore.getState().setSettings)
   const legacyAgentConversations = normalizeAgentConversations(useStore.getState().agentConversations)
   const storedTasks = await getAllTasks()
   const storedAgentConversations = normalizeAgentConversations(await getAllAgentConversations())
@@ -1512,6 +1533,7 @@ export async function initStore() {
   useStore.getState().setTasks(tasks)
   showSupportPromptForExistingLocalData(tasks)
   for (const task of tasks) {
+    if (isAnotherWorkbenchTabActive(task.workbenchTabId)) continue
     if (
       task.apiProvider === 'fal' &&
       task.falRequestId &&
@@ -1544,17 +1566,8 @@ export async function initStore() {
   const agentConversations = state.agentConversations
   const agentInputDrafts = state.agentInputDrafts
   for (const img of persistedInputImages) referencedIds.add(img.id)
-  if (galleryInputDraft) {
-    for (const img of galleryInputDraft.inputImages) referencedIds.add(img.id)
-  }
-  for (const draft of Object.values(agentInputDrafts)) {
-    for (const img of draft.inputImages) referencedIds.add(img.id)
-  }
-  for (const conversation of agentConversations) {
-    for (const round of conversation.rounds) {
-      for (const id of round.inputImageIds) referencedIds.add(id)
-    }
-  }
+  addInputDraftReferencedImageIds(referencedIds, galleryInputDraft)
+  addAgentReferencedImageIds(referencedIds, agentConversations, agentInputDrafts)
   for (const t of tasks) {
     addTaskReferencedImageIds(referencedIds, t)
   }
@@ -1562,10 +1575,11 @@ export async function initStore() {
   // 只枚举 key 清理孤立图片，避免启动时把所有 4K 原图读进内存。
   const imageIds = await getAllImageIds()
   const referencedImageIds: string[] = []
+  const canCleanOrphans = !hasAnotherWorkbenchTab()
   for (const imgId of imageIds) {
-    if (referencedIds.has(imgId)) {
+    if (referencedIds.has(imgId) || isImageReferencedByState(useStore.getState(), imgId)) {
       referencedImageIds.push(imgId)
-    } else {
+    } else if (canCleanOrphans) {
       await deleteImage(imgId)
     }
   }
@@ -1821,7 +1835,7 @@ export async function submitTask(options: {
   }
 
   const taskId = genId()
-  const task: TaskRecord = {
+  const task = createRunningTask({
     id: taskId,
     prompt: prompt.trim(),
     params: taskParams,
@@ -1837,17 +1851,10 @@ export async function submitTask(options: {
     maskImageId,
     transparentOutput: transparentMeta?.transparentOutput,
     transparentPrompt: transparentMeta?.effectivePrompt,
-    outputImages: [],
-    status: 'running',
-    error: null,
     createdAt: Date.now(),
-    finishedAt: null,
-    elapsed: null,
-  }
+  })
 
-  const latestTasks = useStore.getState().tasks
-  useStore.getState().setTasks([task, ...latestTasks])
-  await putTask(task)
+  await addTaskToStore(task)
   useStore.getState().showToast('任务已提交', 'success')
 
   if (!options.input && settings.clearInputAfterSubmit) {
@@ -1919,6 +1926,8 @@ function markAgentRoundTasksStopped(conversationId: string, roundId: string, now
   for (const task of runningTasks) {
     clearFalRecoveryTimer(task.id)
     clearCustomRecoveryTimer(task.id)
+    imageTaskControllers.get(task.id)?.abort()
+    useStore.getState().setTaskStreamPreview(task.id)
     updateTaskInStore(task.id, {
       ...createTaskErrorPatch(task, AGENT_STOPPED_MESSAGE, now),
       falRecoverable: false,
@@ -2097,29 +2106,34 @@ export function stopAgentResponse(conversationId = useStore.getState().activeAge
   useStore.getState().showToast('已停止生成', 'info')
 }
 
-function addAgentReferencedImageIds(target: Set<string>, conversations = useStore.getState().agentConversations, inputDrafts = useStore.getState().agentInputDrafts) {
+function addAgentReferencedImageIds(target: Set<string>, conversations: AgentConversation[], inputDrafts: Record<string, AgentInputDraft>) {
   for (const conversation of conversations) {
     for (const round of conversation.rounds) {
       for (const id of round.inputImageIds) target.add(id)
       if (round.maskImageId) target.add(round.maskImageId)
+      if (round.maskTargetImageId) target.add(round.maskTargetImageId)
     }
     for (const message of conversation.messages) {
+      for (const id of message.inputImageIds ?? []) target.add(id)
       if (message.maskImageId) target.add(message.maskImageId)
+      if (message.maskTargetImageId) target.add(message.maskTargetImageId)
     }
   }
-  for (const draft of Object.values(inputDrafts)) {
-    for (const img of draft.inputImages) target.add(img.id)
-  }
+  for (const draft of Object.values(inputDrafts)) addInputDraftReferencedImageIds(target, draft)
 }
 
 function addInputDraftReferencedImageIds(target: Set<string>, draft: AgentInputDraft | null) {
   if (!draft) return
   for (const img of draft.inputImages) target.add(img.id)
+  if (draft.maskDraft?.targetImageId) target.add(draft.maskDraft.targetImageId)
+  if (draft.maskEditorImageId) target.add(draft.maskEditorImageId)
 }
 
 function addTaskReferencedImageIds(target: Set<string>, task: TaskRecord) {
   for (const id of task.inputImageIds || []) target.add(id)
   if (task.maskImageId) target.add(task.maskImageId)
+  if (task.maskTargetImageId) target.add(task.maskTargetImageId)
+  for (const id of task.markupOverlayImageIds ?? []) target.add(id)
   for (const id of task.outputImages || []) target.add(id)
   for (const id of task.transparentOriginalImages || []) {
     if (id) target.add(id)
@@ -2179,19 +2193,7 @@ async function storeTaskOutputImages(task: TaskRecord, images: string[]) {
 
 async function deleteUnreferencedImageIds(imageIds: Iterable<string>) {
   const candidates = Array.from(new Set(Array.from(imageIds).filter(Boolean)))
-  if (candidates.length === 0) return
-
-  const { tasks, inputImages, galleryInputDraft } = useStore.getState()
-  const stillUsed = new Set<string>()
-  for (const task of tasks) addTaskReferencedImageIds(stillUsed, task)
-  addAgentReferencedImageIds(stillUsed)
-  addInputDraftReferencedImageIds(stillUsed, galleryInputDraft)
-  for (const img of inputImages) stillUsed.add(img.id)
-
-  for (const imgId of candidates) {
-    if (stillUsed.has(imgId)) continue
-    await deleteStoredImageIfUnreferenced(imgId)
-  }
+  for (const imgId of candidates) await deleteStoredImageIfUnreferenced(imgId)
 }
 
 async function persistTaskStreamPartialImage(taskId: string, dataUrl: string) {
@@ -2200,7 +2202,7 @@ async function persistTaskStreamPartialImage(taskId: string, dataUrl: string) {
     cacheImage(imgId, dataUrl)
 
     const latestTask = useStore.getState().tasks.find((task) => task.id === taskId)
-    if (!latestTask || latestTask.status === 'done') {
+    if (!latestTask || latestTask.status !== 'running') {
       await deleteUnreferencedImageIds([imgId])
       return
     }
@@ -2286,17 +2288,23 @@ function scrubAgentOutputPayloadsForDeletedTasks(deletedTasks: TaskRecord[]) {
   return { updatedTasks, updatedConversations }
 }
 
-async function persistTaskDeletionCleanup(deletedTaskIds: string[], cleanup: ReturnType<typeof scrubAgentOutputPayloadsForDeletedTasks>) {
+async function persistTaskDeletionCleanup(
+  deletedTaskIds: string[], cleanup: ReturnType<typeof scrubAgentOutputPayloadsForDeletedTasks>,
+  deletedElements: DeletedAgentElements[] = [],
+) {
   const tasks = cleanup.updatedTasks.map(getPersistableTask)
   const conversations = cleanup.updatedConversations.map(getPersistableAgentConversation)
   try {
-    await commitTaskDeletion(deletedTaskIds, tasks, conversations)
+    if (deletedElements.length) await commitTaskDeletion(deletedTaskIds, tasks, conversations, deletedElements)
+    else await commitTaskDeletion(deletedTaskIds, tasks, conversations)
   } catch (err) {
     console.warn('原子清理任务关联数据失败，改用逐项持久化', err)
     await Promise.all([
       ...deletedTaskIds.map((taskId) => dbDeleteTask(taskId)),
       ...tasks.map((task) => dbPutTask(task)),
-      ...conversations.map((conversation) => dbPutAgentConversation(conversation)),
+      ...(deletedElements.length
+        ? [commitTaskDeletion([], [], conversations, deletedElements)]
+        : conversations.map((conversation) => dbPutAgentConversation(conversation))),
     ])
   }
 }
@@ -2383,7 +2391,7 @@ async function continueRecoveredAgentRound(taskId: string) {
       updatedAt: Date.now(),
       rounds: current.rounds.map((currentRound) =>
         currentRound.id === round.id
-          ? { ...currentRound, status: 'running', error: null, finishedAt: null }
+          ? { ...currentRound, status: 'running', workbenchTabId: getWorkbenchTabId(), error: null, finishedAt: null }
           : currentRound,
       ),
     }))
@@ -2501,6 +2509,7 @@ export async function submitAgentMessage() {
     maskImageId,
     outputTaskIds: [],
     status: 'running',
+    workbenchTabId: getWorkbenchTabId(),
     error: null,
     createdAt: now,
     finishedAt: null,
@@ -2610,6 +2619,7 @@ export async function regenerateAgentAssistantMessage(conversationId: string, ro
               responseId: undefined,
               responseOutput: undefined,
               status: 'running',
+              workbenchTabId: getWorkbenchTabId(),
               error: null,
               finishedAt: null,
             }
@@ -2639,6 +2649,7 @@ export async function regenerateAgentAssistantMessage(conversationId: string, ro
     maskImageId: sourceRound.maskImageId ?? sourceUserMessage.maskImageId ?? null,
     outputTaskIds: [],
     status: 'running',
+    workbenchTabId: getWorkbenchTabId(),
     error: null,
     createdAt: now,
     finishedAt: null,
@@ -2756,7 +2767,10 @@ async function executeAgentRound(
       const existingTaskId = taskIdByToolCallId.get(toolCallId)
       if (existingTaskId) return existingTaskId
 
-      const existingTask = useStore.getState().tasks.find((task) => task.agentToolCallId === toolCallId)
+      controller.signal.throwIfAborted()
+      const existingTask = useStore.getState().tasks.find((task) =>
+        task.agentConversationId === conversationId && task.agentRoundId === roundId && task.agentToolCallId === toolCallId,
+      )
       if (existingTask) {
         taskIdByToolCallId.set(toolCallId, existingTask.id)
         taskByToolCallId.set(toolCallId, existingTask)
@@ -2764,7 +2778,7 @@ async function executeAgentRound(
         return existingTask.id
       }
 
-      const task: TaskRecord = {
+      const task = createRunningTask({
         id: genId(),
         prompt: taskPrompt,
         params: options.taskParams ?? { ...imageParams, n: 1 },
@@ -2776,12 +2790,7 @@ async function executeAgentRound(
         inputImageIds,
         maskTargetImageId: options.maskTargetImageId !== undefined ? options.maskTargetImageId : round.maskTargetImageId ?? null,
         maskImageId: options.maskImageId !== undefined ? options.maskImageId : round.maskImageId ?? null,
-        outputImages: [],
-        status: 'running',
-        error: null,
         createdAt: options.createdAt ?? Date.now(),
-        finishedAt: null,
-        elapsed: null,
         sourceMode: 'agent',
         agentConversationId: conversationId,
         agentRoundId: roundId,
@@ -2789,33 +2798,40 @@ async function executeAgentRound(
         agentToolCallId: toolCallId,
         ...(options.agentBatchCallId ? { agentBatchCallId: options.agentBatchCallId } : {}),
         ...(options.agentBatchItemId ? { agentBatchItemId: options.agentBatchItemId } : {}),
-      }
+      })
 
       taskIdByToolCallId.set(toolCallId, task.id)
       taskByToolCallId.set(toolCallId, task)
-      useStore.getState().setTasks([task, ...useStore.getState().tasks])
+      const persisted = addTaskToStore(task)
       attachTaskToAgentRound(task.id)
-      await putTask(task)
+      await persisted
       return task.id
     }
 
     const completeAgentImageTask = async (image: AgentApiResultImage, rawResponsePayload?: string) => {
       const toolCallId = image.toolCallId ?? genId()
-      const taskId = await ensureStreamingAgentTask(toolCallId)
+      const pendingTaskId = taskIdByToolCallId.get(toolCallId)
+      if (!pendingTaskId && controller.signal.aborted) return null
+      const taskId = pendingTaskId ?? await ensureStreamingAgentTask(
+        toolCallId, image.revisedPrompt ?? round.prompt ?? userMessage.content, round.inputImageIds,
+        { createdAt: startedAt, taskParams: imageParams },
+      )
       const latestTask = useStore.getState().tasks.find((task) => task.id === taskId)
-      if (latestTask?.status === 'done' && latestTask.outputImages.length > 0) return { taskId, committed: true }
+      if (latestTask?.status === 'done' && latestTask.outputImages.length > 0) return taskId
+      if (latestTask?.status !== 'running' || controller.signal.aborted) return null
 
       const stored = await storeImageWithSize(image.dataUrl, 'generated')
       cacheImage(stored.id, image.dataUrl)
       const latestBeforeUpdate = useStore.getState().tasks.find((task) => task.id === taskId)
-      if (!latestBeforeUpdate) {
+      if (latestBeforeUpdate?.status !== 'running' || controller.signal.aborted) {
         await deleteUnreferencedImageIds([stored.id])
-        return { taskId, committed: false }
+        return null
       }
       const actualParams = deriveAgentImageActualParams(image.actualParams, stored)
       updateTaskInStore(taskId, {
         prompt: image.revisedPrompt ?? latestBeforeUpdate.prompt,
         outputImages: [stored.id],
+        streamPartialImageIds: undefined,
         actualParams,
         actualParamsByImage: { [stored.id]: actualParams },
         revisedPromptByImage: image.revisedPrompt ? { [stored.id]: image.revisedPrompt } : undefined,
@@ -2824,7 +2840,8 @@ async function executeAgentRound(
         agentToolAction: image.action,
       })
       useStore.getState().setTaskStreamPreview(taskId)
-      return { taskId, committed: true }
+      void deleteUnreferencedImageIds(latestBeforeUpdate.streamPartialImageIds ?? [])
+      return taskId
     }
 
     const failAgentImageTask = (toolCallId: string, error: string, rawResponsePayload?: string) => {
@@ -2976,13 +2993,16 @@ async function executeAgentRound(
       signal: AbortSignal
       onPartialImage?: (event: { image: string; partialImageIndex?: number }) => void | Promise<void>
     }) => {
-      const result = await callImageApi({
+      if (!useStore.getState().tasks.some((task) => task.id === opts.taskId && task.status === 'running')) {
+        throw createAgentAbortError()
+      }
+      const result = await runImageTaskRequest(opts.taskId, (taskSignal) => callImageApi({
         settings: imageRequestSettings,
+        signal: AbortSignal.any([opts.signal, taskSignal]),
         prompt: replaceImageMentionsForApi(opts.prompt, opts.referenceImageDataUrls.length),
         params: opts.taskParams,
         inputImageDataUrls: opts.referenceImageDataUrls,
         skipCodexCliSizePrompt: true,
-        signal: opts.signal,
         onPartialImage: opts.onPartialImage
           ? (partial) => {
               void opts.onPartialImage?.({ image: partial.image, partialImageIndex: partial.partialImageIndex ?? partial.requestIndex })
@@ -3001,7 +3021,7 @@ async function executeAgentRound(
             customRecoverable: false,
           })
         },
-      })
+      }))
       if (opts.signal.aborted) throw createAgentAbortError()
       const dataUrl = result.images[0]
       return {
@@ -3062,7 +3082,7 @@ async function executeAgentRound(
         if (controller.signal.aborted) throw createAgentAbortError()
         if (result.image) {
           const completed = await completeAgentImageTask({ ...result.image, toolCallId }, result.rawResponsePayload)
-          if (completed.committed) {
+          if (completed) {
             toolCallsUsed += 1
             return JSON.stringify({ id: item.id, status: 'done' })
           }
@@ -3074,6 +3094,7 @@ async function executeAgentRound(
       } catch (err) {
         const error = err instanceof Error ? err.message : String(err)
         if (controller.signal.aborted) throw createAgentAbortError()
+        if (!useStore.getState().tasks.some((task) => task.id === taskId)) return null
         if (pauseAgentImageTaskForRecovery(toolCallId, err)) throw createAgentRecoveryPauseError()
         failAgentImageTask(toolCallId, error)
         return JSON.stringify({ id: item.id, status: 'error', error })
@@ -3164,7 +3185,7 @@ async function executeAgentRound(
               onImageToolCompleted: shouldStreamAssistantMessage
                 ? async (image) => {
                     if (controller.signal.aborted) return
-                    committed = (await completeAgentImageTask({ ...image, toolCallId: batchToolCallId })).committed
+                    committed = Boolean(await completeAgentImageTask({ ...image, toolCallId: batchToolCallId }))
                   }
                 : undefined,
             })
@@ -3172,7 +3193,7 @@ async function executeAgentRound(
         if (controller.signal.aborted) throw createAgentAbortError()
         // If not streaming and we have an image, complete the pre-created task.
         if (batchResult.image && (requestSettings.agentApiConfigMode === 'hybrid' || !shouldStreamAssistantMessage)) {
-          committed = (await completeAgentImageTask({ ...batchResult.image, toolCallId: batchToolCallId }, batchResult.rawResponsePayload)).committed
+          committed = Boolean(await completeAgentImageTask({ ...batchResult.image, toolCallId: batchToolCallId }, batchResult.rawResponsePayload))
         }
 
         const latestTask = useStore.getState().tasks.find((task) => task.id === taskIdByToolCallId.get(batchToolCallId))
@@ -3345,64 +3366,16 @@ async function executeAgentRound(
         }
       }
 
-      // Process built-in image_generation_call results (single images)
       for (const image of result.images) {
-        if (image.toolCallId && taskIdByToolCallId.has(image.toolCallId)) {
-          const completed = await completeAgentImageTask(image, result.rawResponsePayload)
-          if (!completed.committed) continue
-          const completedTaskId = completed.taskId
-          const promptRefIds = uniqueIds(extractAgentReferenceIds(image.revisedPrompt ?? ''))
-          if (promptRefIds.length > 0) {
-            const promptRefs = await resolveReferenceImages(promptRefIds)
-            if (promptRefs.imageIds.length > 0) {
-              const latestTask = useStore.getState().tasks.find((t) => t.id === completedTaskId)
-              if (latestTask) {
-                const mergedInputIds = uniqueIds([...latestTask.inputImageIds, ...promptRefs.imageIds])
-                if (mergedInputIds.length !== latestTask.inputImageIds.length) {
-                  updateTaskInStore(completedTaskId, { inputImageIds: mergedInputIds })
-                }
-              }
-            }
-          }
-          continue
-        }
-        const promptRefIds = uniqueIds(extractAgentReferenceIds(image.revisedPrompt ?? ''))
-        const promptRefs = await resolveReferenceImages(promptRefIds)
-        const stored = await storeImageWithSize(image.dataUrl, 'generated')
-        cacheImage(stored.id, image.dataUrl)
-        const actualParams = deriveAgentImageActualParams(image.actualParams, stored)
-        const task: TaskRecord = {
-          id: genId(),
-          prompt: image.revisedPrompt ?? round?.prompt ?? userMessage.content,
-          params: imageParams,
-          apiProvider: imageProfile.provider,
-          apiProfileId: imageProfile.id,
-          apiProfileName: imageProfile.name,
-          apiMode: imageProfile.apiMode,
-          apiModel: imageProfile.model,
-          inputImageIds: uniqueIds([...(round?.inputImageIds ?? []), ...promptRefs.imageIds]),
-          maskTargetImageId: round?.maskTargetImageId ?? null,
-          maskImageId: round?.maskImageId ?? null,
-          outputImages: [stored.id],
-          actualParams,
-          actualParamsByImage: { [stored.id]: actualParams },
-          revisedPromptByImage: image.revisedPrompt ? { [stored.id]: image.revisedPrompt } : undefined,
-          rawResponsePayload: result.rawResponsePayload,
-          status: 'done',
-          error: null,
-          createdAt: startedAt,
-          finishedAt: Date.now(),
-          elapsed: Date.now() - startedAt,
-          sourceMode: 'agent',
-          agentConversationId: conversationId,
-          agentRoundId: roundId,
-          agentMessageId: assistantMessageId,
-          agentToolCallId: image.toolCallId,
-          agentToolAction: image.action,
-        }
-        useStore.getState().setTasks([task, ...useStore.getState().tasks])
-        attachTaskToAgentRound(task.id)
-        await putTask(task)
+        const taskId = await completeAgentImageTask(image, result.rawResponsePayload)
+        if (!taskId) continue
+        const referenceIds = uniqueIds(extractAgentReferenceIds(image.revisedPrompt ?? ''))
+        if (!referenceIds.length) continue
+        const { imageIds } = await resolveReferenceImages(referenceIds)
+        const task = useStore.getState().tasks.find((item) => item.id === taskId)
+        if (!task) continue
+        const inputImageIds = uniqueIds([...task.inputImageIds, ...imageIds])
+        if (inputImageIds.length !== task.inputImageIds.length) updateTaskInStore(taskId, { inputImageIds })
       }
 
       if (result.rawResponsePayload && streamingTaskIds.length > 0) {
@@ -3699,9 +3672,6 @@ async function executeTask(taskId: string) {
     scheduleOpenAIWatchdog(taskId, activeProfile.timeout, activeProfile)
   }
 
-  const taskController = new AbortController()
-  taskAbortControllers.set(taskId, taskController)
-
   try {
     // 获取输入图片 data URLs
     const inputDataUrls: string[] = []
@@ -3729,8 +3699,10 @@ async function executeTask(taskId: string) {
       ? task.transparentPrompt
       : task.prompt
 
-    const result = await callImageApi({
+    if (!useStore.getState().tasks.some((item) => item.id === taskId && item.status === 'running')) return
+    const result = await runImageTaskRequest(taskId, (signal) => callImageApi({
       settings: requestSettings,
+      signal,
       prompt: replaceImageMentionsForApi(requestPrompt, inputDataUrls.length),
       params: task.params,
       nativeTransparentBackground: task.params.transparent_output && !task.transparentOutput,
@@ -3740,7 +3712,6 @@ async function executeTask(taskId: string) {
       markupStrokes: task.markupStrokes,
       markupOverlays,
       skipCodexCliSizePrompt: task.sourceMode === 'agent',
-      signal: taskController.signal,
       onFalRequestEnqueued: (request) => {
         falRequestInfo = request
         updateTaskInStore(taskId, {
@@ -3760,7 +3731,7 @@ async function executeTask(taskId: string) {
         useStore.getState().setTaskStreamPreview(taskId, partial.image, partial.requestIndex)
         void persistTaskStreamPartialImage(taskId, partial.image)
       },
-    })
+    }))
 
     const latestBeforeSuccess = useStore.getState().tasks.find((t) => t.id === taskId)
     if (!latestBeforeSuccess || latestBeforeSuccess.status !== 'running') {
@@ -3884,9 +3855,6 @@ async function executeTask(taskId: string) {
       useStore.getState().setDetailTaskId(taskId)
     }
   } finally {
-    if (taskAbortControllers.get(taskId) === taskController) {
-      taskAbortControllers.delete(taskId)
-    }
     // 释放输入图片的内存缓存（已持久化到 IndexedDB，后续按需从 DB 加载）
     for (const imgId of task.inputImageIds) {
       deleteCachedImage(imgId)
@@ -4007,7 +3975,7 @@ export async function retryTask(task: TaskRecord) {
     ? createTransparentOutputMeta(task.prompt.trim())
     : null
   const taskId = genId()
-  const newTask: TaskRecord = {
+  const newTask = createRunningTask({
     id: taskId,
     prompt: task.prompt,
     params: taskParams,
@@ -4021,17 +3989,10 @@ export async function retryTask(task: TaskRecord) {
     maskImageId: task.maskImageId ?? null,
     transparentOutput: transparentMeta?.transparentOutput,
     transparentPrompt: transparentMeta?.effectivePrompt,
-    outputImages: [],
-    status: 'running',
-    error: null,
     createdAt: Date.now(),
-    finishedAt: null,
-    elapsed: null,
-  }
+  })
 
-  const latestTasks = useStore.getState().tasks
-  useStore.getState().setTasks([newTask, ...latestTasks])
-  await putTask(newTask)
+  await addTaskToStore(newTask)
 
   executeTask(taskId)
 }
@@ -4292,15 +4253,11 @@ async function removeTasks(taskIds: string[], updateState?: TaskDeletionStateUpd
   const deletedImageIds = new Set<string>()
   for (const task of deletedTasks) {
     addTaskReferencedImageIds(deletedImageIds, task)
-    const activeTaskController = taskAbortControllers.get(task.id)
-    if (activeTaskController) {
-      activeTaskController.abort()
-      taskAbortControllers.delete(task.id)
-    }
     const controller = task.agentConversationId && task.agentRoundId
       ? agentRoundControllers.get(getAgentRoundControllerKey(task.agentConversationId, task.agentRoundId))
       : undefined
     if (controller) deletedActiveAgentTasks.set(task.id, { task, controller })
+    imageTaskControllers.get(task.id)?.abort()
     clearFalRecoveryTimer(task.id)
     clearCustomRecoveryTimer(task.id)
     clearOpenAIWatchdogTimer(task.id)
@@ -4308,13 +4265,23 @@ async function removeTasks(taskIds: string[], updateState?: TaskDeletionStateUpd
 
   const cleanup = scrubAgentOutputPayloadsForDeletedTasks(deletedTasks)
   const domainUpdatedConversations: AgentConversation[] = []
+  const deletedElements: DeletedAgentElements[] = []
   if (updateState) {
     useStore.setState((state) => {
       const patch = updateState(state, toDelete)
       if (!patch) return state
       if (patch.agentConversations) {
         const previousById = new Map(state.agentConversations.map((conversation) => [conversation.id, conversation]))
-        domainUpdatedConversations.push(...patch.agentConversations.filter((conversation) => previousById.get(conversation.id) !== conversation))
+        for (const conversation of patch.agentConversations) {
+          const previous = previousById.get(conversation.id)
+          if (!previous || previous === conversation) continue
+          domainUpdatedConversations.push(conversation)
+          const retainedRounds = new Set(conversation.rounds.map((round) => round.id))
+          const retainedMessages = new Set(conversation.messages.map((message) => message.id))
+          const rounds = previous.rounds.filter((round) => !retainedRounds.has(round.id)).map((round) => round.id)
+          const messages = previous.messages.filter((message) => !retainedMessages.has(message.id)).map((message) => message.id)
+          if (rounds.length || messages.length) deletedElements.push({ conversationId: conversation.id, rounds, messages })
+        }
       }
       return patch
     })
@@ -4324,9 +4291,37 @@ async function removeTasks(taskIds: string[], updateState?: TaskDeletionStateUpd
   await persistTaskDeletionCleanup(deletedTasks.map((task) => task.id), {
     ...cleanup,
     updatedConversations: [...updatedConversations.values()],
-  })
+  }, deletedElements)
   await deleteUnreferencedImageIds(deletedImageIds)
   return deletedTasks.length
+}
+
+export function syncWorkbenchDeletions() {
+  return onWorkbenchDeletion(({ domain, ids }) => {
+    const state = useStore.getState()
+    if (domain === 'tasks') {
+      const deleted = new Set(ids)
+      const removed = state.tasks.filter((task) => deleted.has(task.id))
+      if (!removed.length) return
+      state.setTasks(state.tasks.filter((task) => !deleted.has(task.id)))
+      state.setSelectedTaskIds(state.selectedTaskIds.filter((id) => !deleted.has(id)))
+      for (const task of removed) {
+        imageTaskControllers.get(task.id)?.abort()
+        clearFalRecoveryTimer(task.id)
+        clearCustomRecoveryTimer(task.id)
+        clearOpenAIWatchdogTimer(task.id)
+        state.setTaskStreamPreview(task.id)
+      }
+      scrubAgentOutputPayloadsForDeletedTasks(removed)
+    } else {
+      for (const id of ids) {
+        const conversation = useStore.getState().agentConversations.find((item) => item.id === id)
+        if (!conversation) continue
+        for (const round of conversation.rounds) agentRoundControllers.get(getAgentRoundControllerKey(id, round.id))?.abort()
+        useStore.getState().deleteAgentConversation(id)
+      }
+    }
+  })
 }
 
 /** 删除多条任务 */
@@ -4533,7 +4528,7 @@ async function completeRecoveredCustomTask(task: TaskRecord, result: Awaited<Ret
 async function recoverCustomTask(taskId: string) {
   const { settings, tasks } = useStore.getState()
   const task = tasks.find((item) => item.id === taskId)
-  if (!task || !task.customTaskId || task.status === 'done') return
+  if (!task || !task.customTaskId || (task.status !== 'running' && !task.customRecoverable)) return
 
   const profile = getCustomRecoveryProfile(settings, task)
   const customProvider = profile ? getCustomProviderDefinition(settings, profile.provider) : null
@@ -4543,12 +4538,14 @@ async function recoverCustomTask(taskId: string) {
   }
 
   try {
-    const result = await getCustomQueuedImageResult(profile, customProvider, task.customTaskId, task.params)
+    const result = await runImageTaskRequest(taskId, (signal) =>
+      getCustomQueuedImageResult(profile, customProvider, task.customTaskId!, task.params, signal),
+    )
     clearCustomRecoveryTimer(taskId)
     await completeRecoveredCustomTask(task, result)
   } catch (err) {
     clearCustomRecoveryTimer(taskId)
-    if (!useStore.getState().tasks.some((item) => item.id === taskId)) return
+    if (!useStore.getState().tasks.some((item) => item.id === taskId && (item.status === 'running' || item.customRecoverable))) return
     updateTaskInStore(taskId, {
       ...createTaskErrorPatch(task, err instanceof Error ? err.message : String(err), Date.now()),
       ...getRawErrorPayload(err),
@@ -4757,7 +4754,7 @@ export async function importData(input: File | File[], options: ImportOptions = 
       }
 
       for (const task of importedTasks) {
-        await putTask(task)
+        await putTask(task, true)
       }
 
       const tasks = await getAllTasks()
@@ -4790,7 +4787,7 @@ export async function importData(input: File | File[], options: ImportOptions = 
           activeAgentConversationId,
         }
       })
-      await replaceStoredAgentConversations(useStore.getState().agentConversations)
+      await replaceStoredAgentConversations(useStore.getState().agentConversations, true)
       skipSupportPromptForImportedData(tasks)
       scheduleThumbnailBackfill(importedImageIds)
     }

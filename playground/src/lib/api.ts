@@ -7,8 +7,11 @@ export type { CallApiOptions, CallApiResult } from './imageApiShared'
 export { normalizeBaseUrl } from './devProxy'
 
 export async function callImageApi(opts: CallApiOptions): Promise<CallApiResult> {
+  opts.signal?.throwIfAborted()
   const profile = getActiveApiProfile(opts.settings)
-  if (profile.provider === 'fal') return callFalAiImageApi(opts, profile)
-
-  return callOpenAICompatibleImageApi(opts, profile, getCustomProviderDefinition(opts.settings, profile.provider))
+  const result = profile.provider === 'fal'
+    ? await callFalAiImageApi(opts, profile)
+    : await callOpenAICompatibleImageApi(opts, profile, getCustomProviderDefinition(opts.settings, profile.provider))
+  opts.signal?.throwIfAborted()
+  return result
 }
