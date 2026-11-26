@@ -36,6 +36,7 @@ vi.mock('./lib/db', () => {
     putActiveCanvasProjectId: async (id: string) => { activeCanvasProjectId = id; return id },
     clearCanvasProjects: async () => { canvasProjects.clear() },
     CURRENT_THUMBNAIL_VERSION: 2,
+    migrateLegacyDbToOwner: async () => {},
     getAllTasks: async () => [...tasks.values()],
     putTask: async (task: TaskRecord) => {
       tasks.set(task.id, task)

@@ -108,7 +108,7 @@ function PersistentImageWorkspaceInner() {
       }
       if (event.data?.type === "account-pool-ready") {
         frame.current?.contentWindow?.postMessage(
-          { type: "account-pool-session", key: session.key },
+          { type: "account-pool-session", key: session.key, owner: `${session.role}:${session.subjectId}` },
           window.location.origin
         );
       }
@@ -141,13 +141,26 @@ function PersistentImageWorkspaceInner() {
   }, [session, hasVisitedImage, currentMode, isImageRoute, ready, router]);
 
   const sessionKey = session?.key;
+  const sessionOwner = session ? `${session.role}:${session.subjectId}` : "";
+  const lastOwnerRef = useRef<string>("");
+
+  // 登录账号切换时强制重置工作台 iframe，彻底隔离内存 Zustand 状态与请求控制器。
+  useEffect(() => {
+    if (sessionOwner === lastOwnerRef.current) return;
+    if (lastOwnerRef.current && sessionOwner) {
+      setReady(false);
+      setSlow(false);
+    }
+    lastOwnerRef.current = sessionOwner;
+  }, [sessionOwner]);
+
   useEffect(() => {
     if (!sessionKey || !hasVisitedImage) return;
     frame.current?.contentWindow?.postMessage(
-      { type: "account-pool-session", key: sessionKey },
+      { type: "account-pool-session", key: sessionKey, owner: sessionOwner },
       window.location.origin
     );
-  }, [sessionKey, hasVisitedImage, attempt]);
+  }, [sessionKey, sessionOwner, hasVisitedImage, attempt]);
 
   useEffect(() => {
     if (ready || !sessionKey || !hasVisitedImage) return;
@@ -189,7 +202,7 @@ function PersistentImageWorkspaceInner() {
           </div>
         )}
         {hasVisitedImage && session && <iframe
-          key={attempt}
+          key={`${sessionOwner}:${attempt}`}
           ref={frame}
           src={`/playground/?v=${encodeURIComponent(process.env.NEXT_PUBLIC_APP_VERSION || "0")}&retry=${attempt}`}
           title="生图工作台"

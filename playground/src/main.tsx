@@ -1,7 +1,6 @@
 import 'core-js/actual/array/at'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import App from './App'
 import 'streamdown/styles.css'
 import 'katex/dist/katex.min.css'
 import './index.css'
@@ -33,8 +32,10 @@ if (!isPoolBuild && 'serviceWorker' in navigator) {
   }
 }
 
+// 等待账号池会话握手拿到 owner 后再加载 store/App，确保 Zustand persist 读取当前用户的隔离存储键。
 const start = isPoolBuild ? connectAccountPool() : Promise.resolve()
-void start.then(() => {
+void start.then(async () => {
+  const { default: App } = await import('./App')
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <App />

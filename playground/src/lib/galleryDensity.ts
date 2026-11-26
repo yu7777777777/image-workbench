@@ -1,3 +1,5 @@
+import { getOwnerScopedKey } from './workbenchOwner'
+
 export type GalleryDensity = 'compact' | 'standard' | 'large'
 
 export interface GalleryDensitySpec {
@@ -71,7 +73,7 @@ export function computeGalleryColumns(width: number, density: GalleryDensity): n
 export function loadGalleryDensity(): GalleryDensity {
   try {
     if (typeof window === 'undefined' || !window.localStorage) return DEFAULT_GALLERY_DENSITY
-    const saved = window.localStorage.getItem(GALLERY_DENSITY_STORAGE_KEY)
+    const saved = window.localStorage.getItem(getOwnerScopedKey(GALLERY_DENSITY_STORAGE_KEY))
     return isGalleryDensity(saved) ? saved : DEFAULT_GALLERY_DENSITY
   } catch {
     return DEFAULT_GALLERY_DENSITY
@@ -81,7 +83,7 @@ export function loadGalleryDensity(): GalleryDensity {
 export function saveGalleryDensity(density: GalleryDensity): void {
   try {
     if (typeof window === 'undefined' || !window.localStorage) return
-    window.localStorage.setItem(GALLERY_DENSITY_STORAGE_KEY, density)
+    window.localStorage.setItem(getOwnerScopedKey(GALLERY_DENSITY_STORAGE_KEY), density)
   } catch {
     // 忽略无痕模式或受限存储环境错误
   }

@@ -1,3 +1,10 @@
+# 1.16.38
+
+- 实现生图工作台按登录用户（`owner = role:subjectId`）隔离存储：IndexedDB（任务、图片、缩略图、Agent 会话、画布工程）与 `localStorage`（工作台配置、画廊密度、画布素材元数据、画布提示词库）均按当前登录账号分区；首次登录用户一次性认领旧版未分区本地数据，切换账号时彻底隔离并重置常驻工作台 iframe。
+- 收口设置页与工作台设置写入口：新增 `playground-settings-bridge`，工作台挂载时由设置页经 `postMessage` 下发字段补丁交由工作台 Zustand store 统一写入，未挂载时按当前账号定向更新对应字段，避免整包快照覆盖。
+- 补全图片请求外部取消信号（`CallApiOptions.signal`）：删除或停止运行中的画廊/画布/Agent 图片任务时立即中止底层请求与流读取。
+- 修复 `web/tests/chat-models.test.ts`、`chat-widgets.test.ts` 与 `chat-browser.cjs` 基线断言，补全 `Dockerfile` COPY 白名单并校准 `check_whitelist.py` 对 `main.py` 的识别，移除过时的 `版本待更新内容.txt`。
+
 # 1.16.37
 
 - 独立对话支持更多消息内组件语法，包括循环表格、数学公式、代码块、按钮状态、索引复选、标签页和本地表单。单个无法解析的控件折叠原文，保留相邻内容。
