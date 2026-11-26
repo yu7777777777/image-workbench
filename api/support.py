@@ -10,7 +10,7 @@ from threading import Event, Thread
 from fastapi import HTTPException, Request
 
 from services.account_service import account_service
-from services.auth_service import auth_service
+from services.auth_service import auth_service, can_use_auth_header
 from services.config import config
 
 BASE_DIR = Path(__file__).resolve().parents[1]
@@ -32,7 +32,16 @@ def _legacy_admin_identity(token: str) -> dict[str, object] | None:
 
 
 def require_identity(authorization: str | None) -> dict[str, object]:
-    token = extract_bearer_token(authorization)
+    return _require_identity_for_key(extract_bearer_token(authorization))
+
+
+def require_legacy_key_identity(raw_key: str) -> dict[str, object]:
+    key = raw_key.strip()
+    # Only callers that cannot send their existing key as an HTTP header use the JSON path.
+    return _require_identity_for_key(key if key and not can_use_auth_header(key) else "")
+
+
+def _require_identity_for_key(token: str) -> dict[str, object]:
     identity = _legacy_admin_identity(token) or auth_service.authenticate(token)
     if identity is None:
         raise HTTPException(status_code=401, detail={"error": "密钥无效或已失效，请重新登录"})

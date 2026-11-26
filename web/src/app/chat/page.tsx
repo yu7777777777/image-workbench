@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import Link from "next/link";
 import {
   ArrowDown,
   ArrowRight,
@@ -37,6 +38,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthGuard } from "@/lib/use-auth-guard";
+import { isHttpAuthKey, LEGACY_AUTH_KEY_MESSAGE } from "@/lib/auth-key";
 import { useChatModels } from "@/hooks/use-chat-models";
 import { createChatId } from "@/lib/chat-stream";
 import {
@@ -93,7 +95,8 @@ export default function ChatPage() {
   const following = useRef(true);
   const thread = chat.threads.find((t) => t.id === chat.activeId);
   const owner = session ? `${session.role}:${session.subjectId}` : "";
-  const { models, modelError, isLoadingModels, retry: loadModels } = useChatModels(owner);
+  const hasLegacyKey = !!session && !isHttpAuthKey(session.key);
+  const { models, modelError, isLoadingModels, retry: loadModels } = useChatModels(hasLegacyKey ? "" : owner);
   useEffect(() => {
     if (owner) void useChatStore.getState().load(owner);
   }, [owner]);
@@ -138,7 +141,7 @@ export default function ChatPage() {
   const selection = chatSelection(thread.model, thread.effort);
   const families = chatFamilies(models);
   const selectedFamily = families.find(({ id }) => id === selection?.family)?.id ?? "";
-  const canSend = !!selection && models.includes(thread.model) && !modelError
+  const canSend = !hasLegacyKey && !!selection && models.includes(thread.model) && !modelError
     && chatLevelAvailable(selection.family, selection.level, models);
   const choose = (family: string, level: string) => {
     const next = chatChoice(family, level, models);
@@ -214,7 +217,12 @@ export default function ChatPage() {
 
   const notices = (
     <>
-      {!isLoadingModels && !modelError && !canSend && <div className="chat-notice">
+      {hasLegacyKey && (
+        <div role="alert" className="chat-notice">
+          {LEGACY_AUTH_KEY_MESSAGE} <Link href="/settings/" className="underline">打开账号设置</Link>
+        </div>
+      )}
+      {!hasLegacyKey && !isLoadingModels && !modelError && !canSend && <div className="chat-notice">
         {models.length ? "当前模型设置不可用，请选择可用的模型和思考程度。" : "当前账号池暂无可用的对话模型。"}
       </div>}
       {modelError && (
@@ -257,7 +265,7 @@ export default function ChatPage() {
       >
         <SelectTrigger
           aria-label="选择对话模型"
-          aria-busy={isLoadingModels}
+          aria-busy={!hasLegacyKey && isLoadingModels}
           className="chat-model-control"
         >
           <SelectValue placeholder="选择模型" />

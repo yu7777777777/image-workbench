@@ -14,6 +14,15 @@ from services.storage.base import StorageBackend
 AuthRole = Literal["admin", "user"]
 
 
+def can_use_auth_header(key: str) -> bool:
+    return bool(key) and all(" " <= char <= "~" or "\u00a0" <= char <= "\u00ff" for char in key)
+
+
+def validate_new_auth_key(key: str) -> None:
+    if not key or any(not " " <= char <= "~" for char in key):
+        raise ValueError("新密钥只能使用可打印的 ASCII 字符，例如英文字母、数字和英文标点")
+
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -106,8 +115,9 @@ class AuthService:
         candidate = self._clean(raw_key)
         if not candidate:
             raise ValueError("请输入新的专用密钥")
+        validate_new_auth_key(candidate)
         admin_key = self._clean(config.auth_key)
-        if admin_key and hmac.compare_digest(candidate, admin_key):
+        if admin_key and hmac.compare_digest(candidate.encode("utf-8"), admin_key.encode("utf-8")):
             raise ValueError("这个密钥和管理员密钥冲突了，请换一个新的密钥")
         key_hash = _hash_key(candidate)
         if self._has_key_hash_locked(key_hash, exclude_id=exclude_id):

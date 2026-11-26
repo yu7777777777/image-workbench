@@ -1,4 +1,6 @@
+import { bearerAuthHeader, isHttpAuthKey, validateNewAuthKey } from "@/lib/auth-key";
 import { httpRequest, request } from "@/lib/request";
+import { getStoredAuthKey } from "@/store/auth";
 
 export type AccountType = string;
 export type AccountStatus = "正常" | "限流" | "异常" | "禁用";
@@ -353,13 +355,14 @@ export type UserKey = {
 
 export async function login(authKey: string) {
   const normalizedAuthKey = String(authKey || "").trim();
+  if (!normalizedAuthKey) throw new Error("请输入密钥");
+  const headerCompatible = isHttpAuthKey(normalizedAuthKey);
   return httpRequest<LoginResponse>("/auth/login", {
     method: "POST",
-    body: {},
-    headers: {
-      Authorization: `Bearer ${normalizedAuthKey}`,
-    },
+    body: headerCompatible ? {} : { key: normalizedAuthKey },
+    headers: headerCompatible ? { Authorization: bearerAuthHeader(normalizedAuthKey) } : undefined,
     redirectOnUnauthorized: false,
+    sendStoredAuth: false,
   });
 }
 
@@ -812,6 +815,7 @@ export async function createUserKey(name: string) {
 }
 
 export async function updateUserKey(keyId: string, updates: { enabled?: boolean; name?: string; key?: string }) {
+  if (updates.key !== undefined) validateNewAuthKey(updates.key);
   return httpRequest<{ item: UserKey; items: UserKey[] }>(`/api/auth/users/${keyId}`, {
     method: "POST",
     body: updates,
@@ -825,9 +829,13 @@ export async function deleteUserKey(keyId: string) {
 }
 
 export async function updateSelfProfile(payload: { name?: string; old_key?: string; new_key?: string }) {
+  if (payload.new_key !== undefined) validateNewAuthKey(payload.new_key);
+  const storedKey = payload.new_key ? await getStoredAuthKey() : "";
+  const rotatingLegacyKey = Boolean(storedKey) && !isHttpAuthKey(storedKey);
   return httpRequest<{ success: boolean; message: string; new_key?: string | null; user?: UserKey }>("/api/auth/self/profile", {
     method: "POST",
     body: payload,
+    ...(rotatingLegacyKey ? { sendStoredAuth: false, redirectOnUnauthorized: false } : {}),
   });
 }
 
