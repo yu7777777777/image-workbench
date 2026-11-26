@@ -35,16 +35,27 @@ export function GallerySettingsCard({ showSharedProfiles = true, owner = "" }: {
   const [chatProfileNames, setChatProfileNames] = useState<string[]>([]);
 
   useEffect(() => {
-    const snapshot = readPlaygroundSettingsSnapshot(owner);
-    setSettings(snapshot.settings);
-    setChatProfileNames(snapshot.chatProfileNames);
+    const refresh = () => {
+      const snapshot = readPlaygroundSettingsSnapshot(owner);
+      setSettings(snapshot.settings);
+      setChatProfileNames(snapshot.chatProfileNames);
+    };
+    refresh();
+    window.addEventListener("storage", refresh);
+    return () => window.removeEventListener("storage", refresh);
   }, [owner]);
 
   const updateSetting = <K extends keyof GallerySettings>(key: K, value: GallerySettings[K]) => {
     const next = { ...settings, [key]: value };
     setSettings(next);
-    void updatePlaygroundSettings(owner, { [key]: value });
-    setIsSaved(true);
+    try {
+      updatePlaygroundSettings(owner, { [key]: value });
+      setIsSaved(true);
+    } catch (error) {
+      setSettings(readPlaygroundSettingsSnapshot(owner).settings);
+      console.warn("保存工作台设置失败", error);
+      return;
+    }
     setTimeout(() => setIsSaved(false), 2000);
   };
 
@@ -188,14 +199,14 @@ export function GallerySettingsCard({ showSharedProfiles = true, owner = "" }: {
             <Label className="text-xs font-medium text-stone-700">Agent API 模式</Label>
             <Select
               value={settings.agentApiConfigMode}
-              onValueChange={(val: "off" | "single" | "hybrid") => updateSetting("agentApiConfigMode", val)}
+              onValueChange={(val: "off" | "native" | "hybrid") => updateSetting("agentApiConfigMode", val)}
             >
               <SelectTrigger className="h-9 rounded-xl border-stone-200 bg-white">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="rounded-xl">
                 <SelectItem value="hybrid">混合模式（默认：本站账号对话 + 本站账号生图）</SelectItem>
-                <SelectItem value="single">单接口配置（使用当前主配置处理对话与生图）</SelectItem>
+                <SelectItem value="native">原生（使用 Responses 内置生图工具）</SelectItem>
                 <SelectItem value="off">关闭 Agent 独立接口</SelectItem>
               </SelectContent>
             </Select>

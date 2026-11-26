@@ -1,5 +1,5 @@
+import { businessRequestUrl } from './businessRequests'
 import { DEFAULT_AGENT_MAX_TOOL_ROUNDS, DEFAULT_PARAMS, DEFAULT_STREAM_PARTIAL_IMAGES, type ApiProfile, type AppSettings, type ResponsesApiResponse, type ResponsesOutputItem, type TaskParams } from '../types'
-import { buildApiUrl, readClientDevProxyConfig, shouldUseApiProxy, shouldUseApiProxyForCredential } from './devProxy'
 import { appendStreamingFormatHint, getApiErrorMessage, getResponsesImageResultBase64, maybeAppendStreamingHint, MIME_MAP, normalizeBase64Image, pickActualParams, PROMPT_REWRITE_GUARD_PREFIX } from './imageApiShared'
 import { getImageGenerationModel } from './imageModels'
 import { normalizeResponsesOutputItems } from './responsesOutputState'
@@ -194,9 +194,7 @@ export function sanitizeRewrittenPrompt(raw: string): string {
  * completions but reject the Responses endpoint with 405. */
 export async function callAgentTextCompletionApi(opts: { profile: ApiProfile; prompt: string; signal?: AbortSignal }): Promise<string> {
   const { profile, prompt, signal } = opts
-  const proxyConfig = readClientDevProxyConfig()
-  const useApiProxy = shouldUseApiProxyForCredential(profile.apiKey, profile.apiProxy, proxyConfig)
-  const response = await fetch(buildApiUrl(profile.baseUrl, 'chat/completions', proxyConfig, useApiProxy), {
+  const response = await fetch(businessRequestUrl(profile, 'complete_text'), {
     method: 'POST', headers: createHeaders(profile), cache: 'no-store', signal,
     body: JSON.stringify({ model: profile.model, messages: [{ role: 'user', content: prompt }], temperature: 0.7 }),
   })
@@ -708,8 +706,6 @@ export async function callAgentResponsesApi(opts: {
 }): Promise<AgentApiResult> {
   const { settings, profile, imageProfile, params, input, maskDataUrl, signal, onTextDelta, onOutputItems, onImageToolStarted, onImagePartialImage, onImageToolCompleted, onImageToolFailed } = opts
   const mime = MIME_MAP[params.output_format] || 'image/png'
-  const proxyConfig = readClientDevProxyConfig()
-  const useApiProxy = shouldUseApiProxyForCredential(profile.apiKey, profile.apiProxy, proxyConfig)
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), profile.timeout * 1000)
   const abortFromCaller = () => controller.abort()
@@ -728,7 +724,7 @@ export async function callAgentResponsesApi(opts: {
       body.stream = true
     }
 
-    const response = await fetch(buildApiUrl(profile.baseUrl, 'responses', proxyConfig, useApiProxy), {
+    const response = await fetch(businessRequestUrl(profile, 'run_agent'), {
       method: 'POST',
       headers: createHeaders(profile),
       cache: 'no-store',
@@ -742,7 +738,7 @@ export async function callAgentResponsesApi(opts: {
     }
 
     if (profile.streamImages && isEventStreamResponse(response)) {
-      return parseAgentStreamResponse(response, mime, controller.signal, signal, onTextDelta, onOutputItems, onImageToolStarted, onImagePartialImage, onImageToolCompleted, onImageToolFailed)
+      return await parseAgentStreamResponse(response, mime, controller.signal, signal, onTextDelta, onOutputItems, onImageToolStarted, onImagePartialImage, onImageToolCompleted, onImageToolFailed)
     }
 
     const rawPayload = await response.json() as unknown
@@ -770,8 +766,6 @@ export async function callAgentConversationTitleApi(opts: {
   signal?: AbortSignal
 }): Promise<string> {
   const { settings, profile, prompt, imageDataUrls, signal } = opts
-  const proxyConfig = readClientDevProxyConfig()
-  const useApiProxy = shouldUseApiProxyForCredential(profile.apiKey, profile.apiProxy, proxyConfig)
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), profile.timeout * 1000)
   const abortFromCaller = () => controller.abort()
@@ -793,7 +787,7 @@ export async function callAgentConversationTitleApi(opts: {
     }
     if (profile.reasoningEffort) body.reasoning = { effort: profile.reasoningEffort }
 
-    const response = await fetch(buildApiUrl(profile.baseUrl, 'responses', proxyConfig, useApiProxy), {
+    const response = await fetch(businessRequestUrl(profile, 'run_agent'), {
       method: 'POST',
       headers: createHeaders(profile),
       cache: 'no-store',
@@ -846,8 +840,6 @@ export async function callBatchImageSingle(opts: {
 }): Promise<BatchImageCallResult> {
   const { profile, params, batchItemId, prompt, referenceImageDataUrls, referenceIds, allowPromptRewrite, signal, onImageToolStarted, onPartialImage, onImageToolCompleted } = opts
   const mime = MIME_MAP[params.output_format] || 'image/png'
-  const proxyConfig = readClientDevProxyConfig()
-  const useApiProxy = shouldUseApiProxyForCredential(profile.apiKey, profile.apiProxy, proxyConfig)
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), profile.timeout * 1000)
   const abortFromCaller = () => controller.abort()
@@ -907,7 +899,7 @@ export async function callBatchImageSingle(opts: {
       body.stream = true
     }
 
-    const response = await fetch(buildApiUrl(profile.baseUrl, 'responses', proxyConfig, useApiProxy), {
+    const response = await fetch(businessRequestUrl(profile, 'run_agent'), {
       method: 'POST',
       headers: createHeaders(profile),
       cache: 'no-store',

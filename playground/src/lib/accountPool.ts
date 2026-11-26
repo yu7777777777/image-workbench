@@ -3,7 +3,7 @@ import { createDefaultFalProfile, createDefaultOpenAIProfile, normalizeSettings 
 
 // 账号池 profile ID 定义在 poolProfileIds.ts（叶子模块），避免 apiProfiles.ts ↔ accountPool.ts 循环依赖。
 import { isPoolProfileId, LEGACY_LOCAL_POOL_PROFILE_ID, POOL_AGENT_PROFILE_ID, POOL_PROFILE_ID } from './poolProfileIds'
-import { claimLegacyWorkbenchLocalStorage, normalizeWorkbenchOwner, setWorkbenchOwner } from './workbenchOwner'
+import { claimLegacyWorkbenchForSession, getWorkbenchOwner, normalizeWorkbenchOwner, setWorkbenchOwner } from './workbenchOwner'
 
 export { isPoolProfileId, POOL_AGENT_PROFILE_ID, POOL_PROFILE_ID } from './poolProfileIds'
 
@@ -17,24 +17,28 @@ export interface SharedProfileItem {
   name: string
   role: 'chat' | 'image'
   provider: 'openai' | 'fal' | 'custom'
-  base_url: string
-  api_key: string
+  base_url?: string
+  api_key?: string
+  managed?: boolean
   model: string
   description?: string
   enabled: boolean
 }
 
-let cachedSharedProfiles: ApiProfile[] = []
+let cachedSharedProfiles: ApiProfile[] | undefined
+let sharedProfilesRequest = 0
 
-export function convertSharedProfileToApiProfile(sp: SharedProfileItem): ApiProfile {
+export function convertSharedProfileToApiProfile(sp: SharedProfileItem, origin = getSharedProfilesWindow()?.location.origin ?? ''): ApiProfile {
   const isChat = sp.role === 'chat'
+  const managedBase = sp.managed && origin ? origin + '/v1/workbench/shared/' + encodeURIComponent(sp.id) : ''
+  const apiKey = managedBase ? POOL_KEY : sp.api_key || ''
   if (sp.provider === 'fal') {
     return createDefaultFalProfile({
       id: `shared-${sp.id}`,
       name: `[共享] ${sp.name}`,
       description: sp.description || (isChat ? '全站共享对话模型' : '全站共享生图模型'),
-      baseUrl: sp.base_url || 'https://fal.run',
-      apiKey: sp.api_key || '',
+      baseUrl: managedBase ? managedBase + '/fal' : sp.base_url || 'https://fal.run',
+      apiKey,
       model: sp.model || (isChat ? 'gpt-4o' : 'fal-ai/flux/schnell'),
       apiMode: isChat ? 'responses' : 'images',
       streamImages: false,
@@ -45,14 +49,14 @@ export function convertSharedProfileToApiProfile(sp: SharedProfileItem): ApiProf
     id: `shared-${sp.id}`,
     name: `[共享] ${sp.name}`,
     description: sp.description || (isChat ? '全站共享对话模型' : '全站共享生图模型'),
-    baseUrl: sp.base_url || 'https://api.openai.com/v1',
-    apiKey: sp.api_key || '',
+    baseUrl: managedBase ? managedBase + '/' : sp.base_url || 'https://api.openai.com/v1',
+    apiKey,
     model: sp.model || (isChat ? 'gpt-4o' : 'dall-e-3'),
     imageGenerationModel: isChat ? undefined : (sp.model || 'dall-e-3'),
     apiMode: isChat ? 'responses' : 'images',
     // Shared image requests go through the same-origin restricted proxy. This
     // avoids browser CORS failures and lets the server return upstream errors.
-    apiProxy: !isChat,
+    apiProxy: !managedBase && !isChat,
     streamImages: false,
   })
 }
@@ -70,6 +74,8 @@ let sharedProfilesAuth: SharedProfilesAuth | null = null
 export function setSharedProfilesAuth(auth: SharedProfilesAuth | null): void {
   sharedProfilesAuth = auth
   currentSessionKey = ''
+  cachedSharedProfiles = undefined
+  sharedProfilesRequest++
 }
 
 function resolveSharedProfilesToken(): string {
@@ -85,6 +91,7 @@ function resolveSharedProfilesToken(): string {
  */
 export async function fetchSharedProfiles(token: string, origin: string): Promise<boolean> {
   currentSessionKey = token
+  const request = ++sharedProfilesRequest
   try {
     const res = await fetch(`${origin}/api/shared-profiles`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -92,10 +99,10 @@ export async function fetchSharedProfiles(token: string, origin: string): Promis
     })
     if (!res.ok) return false
     const data = await res.json()
-    if (!Array.isArray(data.shared_profiles)) return false
+    if (!Array.isArray(data.shared_profiles) || request !== sharedProfilesRequest) return false
     cachedSharedProfiles = data.shared_profiles
       .filter((sp: SharedProfileItem) => sp.enabled !== false)
-      .map(convertSharedProfileToApiProfile)
+      .map((item: SharedProfileItem) => convertSharedProfileToApiProfile(item, origin))
     return true
   } catch (err) {
     console.warn('Failed to fetch shared profiles', err)
@@ -200,7 +207,18 @@ export function poolSettings(settings: AppSettings, origin: string): Partial<App
     codexCli: false,
     streamImages: true,
   })
-  const sharedProfiles = [...cachedSharedProfiles]
+  const sharedProfiles = cachedSharedProfiles ?? settings.profiles
+    .filter((item) => item.id.startsWith('shared-'))
+    .map((item) => convertSharedProfileToApiProfile({
+      id: item.id.slice('shared-'.length),
+      name: item.name.replace(/^\[共享\]\s*/, ''),
+      role: item.apiMode === 'responses' ? 'chat' : 'image',
+      provider: item.provider === 'fal' ? 'fal' : 'openai',
+      model: item.model,
+      description: item.description,
+      enabled: true,
+      managed: true,
+    }, origin))
   // 只有拿到过共享模型列表后，才隐藏没填密钥的默认配置：
   // 否则共享模型明明存在，用户却看到列表里空空如也（与管理员视角不一致）。
   const dropDefaultProfile = sharedProfiles.length > 0 && !isPoolBuild
@@ -237,9 +255,14 @@ export function poolSettings(settings: AppSettings, origin: string): Partial<App
 export function poolFetch(fetcher: typeof fetch, origin: string, getKey: () => string): typeof fetch {
   return async (input, init) => {
     const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined))
-    if (headers.get('Authorization') !== `Bearer ${POOL_KEY}`) return fetcher(input, init)
+    const token = headers.get('Authorization')
+    const isFal = token === 'Key ' + POOL_KEY
+    if (!isFal && token !== 'Bearer ' + POOL_KEY) return fetcher(input, init)
     const url = new URL(input instanceof Request ? input.url : String(input), origin)
-    if (url.origin !== origin || !url.pathname.startsWith('/v1/')) {
+    const allowedPath = isFal
+      ? /^\/v1\/workbench\/shared\/[^/]+\/fal$/.test(url.pathname)
+      : url.pathname.startsWith('/v1/')
+    if (url.origin !== origin || !allowedPath) {
       throw new Error('本站登录凭据只能用于本站 API，请为其他服务单独填写密钥。')
     }
     const key = getKey()
@@ -257,6 +280,7 @@ export function connectAccountPool(): Promise<void> {
   // 会话 key 由父页面通过 postMessage 下发，这里把认证方式交给共享模型刷新逻辑；
   // 父页面若在登录 key 到位前就请求刷新，会先得到空 key 并直接跳过，不会带着占位符发请求。
   let key = ''
+  let hydratedOwner = false
   setSharedProfilesAuth({ kind: 'pool-session', getKey: () => key })
   return new Promise((resolve) => {
     window.fetch = poolFetch(window.fetch.bind(window), window.location.origin, () => key)
@@ -268,14 +292,15 @@ export function connectAccountPool(): Promise<void> {
         event.data?.type === 'sync-shared-profiles' ||
         event.data?.type === 'sync-stored-settings'
       ) {
+        if (!hydratedOwner) return
         void refreshSharedProfiles(window.location.origin)
         return
       }
       if (event.data?.type !== 'account-pool-session' || typeof event.data.key !== 'string' || !event.data.key) return
       const nextOwner = normalizeWorkbenchOwner(event.data.owner)
-      if (nextOwner) {
+      if (!nextOwner || (key && nextOwner !== getWorkbenchOwner())) return
+      if (!key) {
         setWorkbenchOwner(nextOwner)
-        claimLegacyWorkbenchLocalStorage(nextOwner)
       }
       if (event.data.key === key) return
       const hadSession = Boolean(key)
@@ -283,12 +308,20 @@ export function connectAccountPool(): Promise<void> {
       currentSessionKey = key
       window.clearInterval(timer)
       // 共享配置可在工作台挂载后加载，避免慢请求阻塞首屏。
-      resolve()
-      if (hadSession) void refreshSharedProfiles(window.location.origin)
+      if (hadSession) {
+        void refreshSharedProfiles(window.location.origin)
+      } else {
+        void claimLegacyWorkbenchForSession(nextOwner)
+          .catch((error) => console.warn('无法认领旧工作台数据', error))
+          .finally(() => {
+            hydratedOwner = true
+            resolve()
+          })
+      }
     }
     window.addEventListener('message', receive)
     window.addEventListener('focus', () => {
-      void refreshSharedProfiles(window.location.origin)
+      if (hydratedOwner) void refreshSharedProfiles(window.location.origin)
     })
     ready()
   })

@@ -9,21 +9,21 @@ export interface GallerySettings {
   allowPromptRewrite: boolean;
   taskCompletionNotification: boolean;
   agentWebSearch: boolean;
-  agentApiConfigMode: "off" | "single" | "hybrid";
+  agentApiConfigMode: "off" | "native" | "hybrid";
   agentMaxToolRounds: number;
 }
 
 export const DEFAULT_GALLERY_SETTINGS: GallerySettings = {
   enterSubmit: false,
-  clearInputAfterSubmit: true,
+  clearInputAfterSubmit: false,
   persistInputOnRestart: true,
   reuseTaskApiProfileTemporarily: false,
   alwaysShowRetryButton: false,
-  allowPromptRewrite: true,
+  allowPromptRewrite: false,
   taskCompletionNotification: false,
-  agentWebSearch: true,
+  agentWebSearch: false,
   agentApiConfigMode: "hybrid",
-  agentMaxToolRounds: 10,
+  agentMaxToolRounds: 15,
 };
 
 const BASE_STORAGE_KEY = "gpt-image-playground";
@@ -62,7 +62,7 @@ function extractGallerySettings(source: Record<string, unknown> | null | undefin
         ? s.agentWebSearch
         : DEFAULT_GALLERY_SETTINGS.agentWebSearch,
     agentApiConfigMode:
-      s.agentApiConfigMode === "off" || s.agentApiConfigMode === "single" || s.agentApiConfigMode === "hybrid"
+      s.agentApiConfigMode === "off" || s.agentApiConfigMode === "native" || s.agentApiConfigMode === "hybrid"
         ? s.agentApiConfigMode
         : DEFAULT_GALLERY_SETTINGS.agentApiConfigMode,
     agentMaxToolRounds:
@@ -74,23 +74,7 @@ function extractGallerySettings(source: Record<string, unknown> | null | undefin
 
 export function getPlaygroundStorageKey(owner?: string): string {
   const normalized = (owner || "").trim();
-  if (!normalized) return BASE_STORAGE_KEY;
-  if (typeof window !== "undefined") {
-    try {
-      const claimedBy = window.localStorage.getItem(LEGACY_OWNER_CLAIM_KEY);
-      if (!claimedBy) {
-        window.localStorage.setItem(LEGACY_OWNER_CLAIM_KEY, normalized);
-        const legacy = window.localStorage.getItem(BASE_STORAGE_KEY);
-        const scopedKey = `${BASE_STORAGE_KEY}:${normalized}`;
-        if (legacy != null && window.localStorage.getItem(scopedKey) == null) {
-          window.localStorage.setItem(scopedKey, legacy);
-        }
-      }
-    } catch {
-      // 忽略受限存储异常
-    }
-  }
-  return `${BASE_STORAGE_KEY}:${normalized}`;
+  return normalized ? BASE_STORAGE_KEY + ":" + normalized : BASE_STORAGE_KEY;
 }
 
 export function readPlaygroundSettingsSnapshot(owner?: string): {
@@ -101,10 +85,17 @@ export function readPlaygroundSettingsSnapshot(owner?: string): {
     return { settings: DEFAULT_GALLERY_SETTINGS, chatProfileNames: [] };
   }
   try {
-    const raw = window.localStorage.getItem(getPlaygroundStorageKey(owner));
-    if (!raw) return { settings: DEFAULT_GALLERY_SETTINGS, chatProfileNames: [] };
-    const parsed = JSON.parse(raw) as { state?: { settings?: Record<string, unknown> } };
-    const rawSettings = parsed?.state?.settings;
+    const key = getPlaygroundStorageKey(owner);
+    const legacy = owner && window.localStorage.getItem(LEGACY_OWNER_CLAIM_KEY) === owner
+      ? window.localStorage.getItem(BASE_STORAGE_KEY)
+      : null;
+    const parsed = JSON.parse(window.localStorage.getItem(key) ?? legacy ?? "{}") as { state?: { settings?: Record<string, unknown> } };
+    const rawSettings = { ...parsed?.state?.settings };
+    for (const field of Object.keys(DEFAULT_GALLERY_SETTINGS)) {
+      const override = window.localStorage.getItem(key + ":settings-patch:" + field)
+        ?? window.localStorage.getItem(key + ":settings-field:" + field);
+      if (override != null) rawSettings[field] = JSON.parse(override).value;
+    }
     const profiles = Array.isArray(rawSettings?.profiles) ? rawSettings.profiles : [];
     const chatProfileNames = profiles
       .filter(
@@ -122,83 +113,17 @@ export function readPlaygroundSettingsSnapshot(owner?: string): {
   }
 }
 
-export function patchPlaygroundSettingsFields(
-  owner: string | undefined,
-  patch: Partial<GallerySettings>,
-): void {
-  if (typeof window === "undefined") return;
-  try {
-    const storageKey = getPlaygroundStorageKey(owner);
-    const raw = window.localStorage.getItem(storageKey);
-    let parsed: Record<string, unknown> = {};
-    if (raw) {
-      try {
-        const candidate = JSON.parse(raw);
-        if (candidate && typeof candidate === "object") parsed = candidate as Record<string, unknown>;
-      } catch {
-        parsed = {};
-      }
-    }
-    const prevState =
-      parsed.state && typeof parsed.state === "object"
-        ? (parsed.state as Record<string, unknown>)
-        : {};
-    const prevSettings =
-      prevState.settings && typeof prevState.settings === "object"
-        ? (prevState.settings as Record<string, unknown>)
-        : {};
-    parsed.state = {
-      ...prevState,
-      settings: {
-        ...prevSettings,
-        ...patch,
-      },
-    };
-    if (typeof parsed.version !== "number") parsed.version = 2;
-    window.localStorage.setItem(storageKey, JSON.stringify(parsed));
-  } catch (err) {
-    console.error("Failed to patch gallery settings in localStorage", err);
+export function patchPlaygroundSettingsFields(owner: string | undefined, patch: Partial<GallerySettings>): void {
+  const key = getPlaygroundStorageKey(owner);
+  for (const [field, value] of Object.entries(patch)) {
+    window.localStorage.setItem(key + ":settings-patch:" + field, JSON.stringify({ value, id: crypto.randomUUID?.() ?? Math.random() }));
   }
 }
 
-/**
- * 单写入口：优先通过 postMessage 让常驻 playground iframe 内的 Zustand store 写入设置；
- * 仅当工作台尚未挂载（用户直达设置页未打开过工作台）时，才按 owner 定向补丁 localStorage。
- */
-export async function updatePlaygroundSettings(
-  owner: string | undefined,
-  patch: Partial<GallerySettings>,
-): Promise<"iframe" | "storage"> {
-  if (typeof window === "undefined") return "storage";
-  const iframe = document.querySelector('iframe[src*="playground"]') as HTMLIFrameElement | null;
-  const targetWindow = iframe?.contentWindow;
-  if (targetWindow) {
-    const requestId = `pg-patch-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const acked = await new Promise<boolean>((resolve) => {
-      let settled = false;
-      const done = (ok: boolean) => {
-        if (settled) return;
-        settled = true;
-        window.clearTimeout(timer);
-        window.removeEventListener("message", onMessage);
-        resolve(ok);
-      };
-      const onMessage = (event: MessageEvent) => {
-        if (event.origin !== window.location.origin || event.source !== targetWindow) return;
-        if (event.data?.type === "patch-playground-settings-ack" && event.data?.requestId === requestId) {
-          done(true);
-        }
-      };
-      const timer = window.setTimeout(() => done(false), 180);
-      window.addEventListener("message", onMessage);
-      targetWindow.postMessage(
-        { type: "patch-playground-settings", owner: owner || "", patch, requestId },
-        window.location.origin,
-      );
-    });
-    if (acked) return "iframe";
-  }
-
+export function updatePlaygroundSettings(owner: string | undefined, patch: Partial<GallerySettings>): void {
   patchPlaygroundSettingsFields(owner, patch);
-  return "storage";
+  document.querySelector<HTMLIFrameElement>('iframe[src*="playground"]')?.contentWindow?.postMessage(
+    { type: "apply-playground-settings", owner: owner || "" },
+    window.location.origin,
+  );
 }

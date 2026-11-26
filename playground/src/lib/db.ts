@@ -1,6 +1,7 @@
 import type { AgentConversation, TaskRecord, StoredImage, StoredImageThumbnail, CanvasProject } from '../types'
 import { hasImageDimensions } from './size'
 import {
+  broadcastWorkbenchDeletion,
   getOwnerDbName,
   getWorkbenchOwner,
   isLegacyOwnerClaimedBy,
@@ -48,7 +49,11 @@ function openNamedDB(dbName: string): Promise<IDBDatabase> {
     req.onupgradeneeded = (e) => {
       createStoresOnUpgrade((e.target as IDBOpenDBRequest).result)
     }
-    req.onsuccess = () => resolve(req.result)
+    req.onsuccess = () => {
+      const db = req.result
+      db.onversionchange = () => db.close()
+      resolve(db)
+    }
     req.onerror = () => reject(req.error)
   })
 }
@@ -89,34 +94,6 @@ function readAllStoreEntries(db: IDBDatabase, storeName: string): Promise<Array<
   })
 }
 
-function countStoreRecords(db: IDBDatabase, storeName: string): Promise<number> {
-  return new Promise((resolve, reject) => {
-    if (!db.objectStoreNames.contains(storeName)) {
-      resolve(0)
-      return
-    }
-    const tx = db.transaction(storeName, 'readonly')
-    const req = tx.objectStore(storeName).count()
-    req.onsuccess = () => resolve(req.result)
-    req.onerror = () => reject(req.error)
-  })
-}
-
-function writeStoreEntries(db: IDBDatabase, storeName: string, entries: Array<{ key: IDBValidKey; value: unknown }>, outOfLineKeys: boolean): Promise<void> {
-  if (!entries.length || !db.objectStoreNames.contains(storeName)) return Promise.resolve()
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, 'readwrite')
-    const store = tx.objectStore(storeName)
-    for (const entry of entries) {
-      if (outOfLineKeys) store.put(entry.value, entry.key)
-      else store.put(entry.value)
-    }
-    tx.oncomplete = () => resolve()
-    tx.onerror = () => reject(tx.error)
-    tx.onabort = () => reject(tx.error)
-  })
-}
-
 /**
  * 首次启用按用户隔离时，若当前用户已认领旧版未分区本地数据，
  * 把旧 `gpt-image-playground` IndexedDB 中的记录一次性复制到该用户的隔离库中。
@@ -125,11 +102,11 @@ export async function migrateLegacyDbToOwner(owner = getWorkbenchOwner()): Promi
   if (!owner || typeof indexedDB === 'undefined') return
   if (!isLegacyOwnerClaimedBy(owner)) return
   try {
-    if (typeof localStorage !== 'undefined' && localStorage.getItem(LEGACY_DB_MIGRATED_KEY) === 'done') return
+    if (typeof localStorage !== 'undefined' && localStorage.getItem(LEGACY_DB_MIGRATED_KEY) === 'atomic-v1') return
     if (typeof indexedDB.databases === 'function') {
       const dbs = await indexedDB.databases()
       if (!dbs.some((item) => item.name === LEGACY_DB_NAME)) {
-        if (typeof localStorage !== 'undefined') localStorage.setItem(LEGACY_DB_MIGRATED_KEY, 'done')
+        if (typeof localStorage !== 'undefined') localStorage.setItem(LEGACY_DB_MIGRATED_KEY, 'atomic-v1')
         return
       }
     }
@@ -141,16 +118,28 @@ export async function migrateLegacyDbToOwner(owner = getWorkbenchOwner()): Promi
       openNamedDB(targetDbName),
     ])
     try {
-      for (const storeName of ALL_DB_STORES) {
-        const targetCount = await countStoreRecords(targetDb, storeName)
-        if (targetCount > 0) continue
-        const entries = await readAllStoreEntries(legacyDb, storeName)
-        if (entries.length > 0) {
-          await writeStoreEntries(targetDb, storeName, entries, storeName === STORE_CANVAS_META)
+      const source = await Promise.all(ALL_DB_STORES.map((name) => readAllStoreEntries(legacyDb, name)))
+      await runTransaction(targetDb, [...ALL_DB_STORES], 'readwrite', (tx) => {
+        const meta = tx.objectStore(STORE_CANVAS_META)
+        const marker = meta.get(LEGACY_DB_MIGRATED_KEY)
+        marker.onsuccess = () => {
+          if (marker.result === 'done') return
+          for (const [index, name] of ALL_DB_STORES.entries()) {
+            const target = tx.objectStore(name)
+            for (const { key, value } of source[index]) {
+              const previous = target.getKey(key)
+              previous.onsuccess = () => {
+                if (previous.result !== undefined) return
+                if (name === STORE_CANVAS_META) target.add(value, key)
+                else putIfLive(tx, name, key, value, false)
+              }
+            }
+          }
+          meta.put('done', LEGACY_DB_MIGRATED_KEY)
         }
-      }
+      })
       if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(LEGACY_DB_MIGRATED_KEY, 'done')
+        localStorage.setItem(LEGACY_DB_MIGRATED_KEY, 'atomic-v1')
       }
     } finally {
       legacyDb.close()
@@ -161,21 +150,126 @@ export async function migrateLegacyDbToOwner(owner = getWorkbenchOwner()): Promi
   }
 }
 
+function runTransaction<T>(
+  db: IDBDatabase,
+  stores: string | string[],
+  mode: IDBTransactionMode,
+  start: (tx: IDBTransaction) => IDBRequest<T> | void,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    let tx: IDBTransaction
+    try {
+      tx = db.transaction(stores, mode)
+    } catch (error) {
+      reject(error)
+      return
+    }
+    tx.onabort = () => reject(tx.error ?? new Error('IndexedDB transaction aborted'))
+    let request: IDBRequest<T> | void
+    try {
+      request = start(tx)
+    } catch (error) {
+      tx.abort()
+      reject(error)
+      return
+    }
+    tx.oncomplete = () => resolve(request?.result as T)
+  })
+}
+
+async function inWorkbenchDb<T>(
+  stores: string | string[],
+  mode: IDBTransactionMode,
+  start: (tx: IDBTransaction) => IDBRequest<T> | void,
+): Promise<T> {
+  const db = await openDB()
+  try {
+    return await runTransaction(db, stores, mode, start)
+  } finally {
+    db.close()
+  }
+}
+
 function dbTransaction<T>(
   storeName: string,
   mode: IDBTransactionMode,
   fn: (store: IDBObjectStore) => IDBRequest<T>,
 ): Promise<T> {
-  return openDB().then(
-    (db) =>
-      new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, mode)
-        const store = tx.objectStore(storeName)
-        const req = fn(store)
-        req.onsuccess = () => resolve(req.result)
-        req.onerror = () => reject(req.error)
-      }),
+  return inWorkbenchDb(storeName, mode, (tx) => fn(tx.objectStore(storeName)))
+}
+
+function deletionKey(storeName: string, id: IDBValidKey): string {
+  return 'deleted:' + storeName + ':' + String(id)
+}
+
+function recordDeletion(tx: IDBTransaction, storeName: string, id: IDBValidKey) {
+  tx.objectStore(STORE_CANVAS_META).put(true, deletionKey(storeName, id))
+  tx.objectStore(storeName).delete(id)
+}
+
+export type DeletedAgentElements = { conversationId: string; rounds: string[]; messages: string[] }
+
+function deletedElementsKey(id: string) {
+  return 'deleted:agent-elements:' + id
+}
+
+function recordAgentElementDeletions(tx: IDBTransaction, removed: DeletedAgentElements) {
+  const meta = tx.objectStore(STORE_CANVAS_META)
+  const key = deletedElementsKey(removed.conversationId)
+  const existing = meta.get(key)
+  existing.onsuccess = () => {
+    const previous = existing.result as DeletedAgentElements | undefined
+    meta.put({
+      conversationId: removed.conversationId,
+      rounds: [...new Set([...(previous?.rounds ?? []), ...removed.rounds])],
+      messages: [...new Set([...(previous?.messages ?? []), ...removed.messages])],
+    }, key)
+  }
+}
+
+function omitDeletedAgentElements(conversation: AgentConversation, removed: DeletedAgentElements | undefined) {
+  if (!removed) return conversation
+  const roundIds = new Set(removed.rounds)
+  const messageIds = new Set(removed.messages)
+  const rounds = conversation.rounds.filter((round) => !roundIds.has(round.id)).map((round) =>
+    round.assistantMessageId && messageIds.has(round.assistantMessageId)
+      ? { ...round, assistantMessageId: undefined } : round,
   )
+  return {
+    ...conversation,
+    activeRoundId: conversation.activeRoundId && roundIds.has(conversation.activeRoundId)
+      ? rounds[rounds.length - 1]?.id ?? null : conversation.activeRoundId,
+    rounds,
+    messages: conversation.messages.filter((message) => !messageIds.has(message.id) && !roundIds.has(message.roundId)),
+  }
+}
+
+function putIfLive(tx: IDBTransaction, storeName: string, id: IDBValidKey, value: unknown, keepNewest: boolean) {
+  const deleted = tx.objectStore(STORE_CANVAS_META).get(deletionKey(storeName, id))
+  const store = tx.objectStore(storeName)
+  deleted.onsuccess = () => {
+    if (deleted.result) return
+    if (!keepNewest) {
+      store.put(value)
+      return
+    }
+    const latest = store.get(id)
+    latest.onsuccess = () => {
+      const incoming = value as AgentConversation
+      if (latest.result && latest.result.updatedAt > incoming.updatedAt) return
+      const removed = tx.objectStore(STORE_CANVAS_META).get(deletedElementsKey(incoming.id))
+      removed.onsuccess = () => store.put(omitDeletedAgentElements(incoming, removed.result))
+    }
+  }
+}
+
+function clearWithDeletions(storeName: string): Promise<undefined> {
+  return inWorkbenchDb([storeName, STORE_CANVAS_META], 'readwrite', (tx) => {
+    const keys = tx.objectStore(storeName).getAllKeys()
+    keys.onsuccess = () => {
+      for (const key of keys.result) recordDeletion(tx, storeName, key)
+    }
+  })
 }
 
 // ===== Tasks =====
@@ -184,33 +278,34 @@ export function getAllTasks(): Promise<TaskRecord[]> {
   return dbTransaction(STORE_TASKS, 'readonly', (s) => s.getAll())
 }
 
-export function putTask(task: TaskRecord): Promise<IDBValidKey> {
-  return dbTransaction(STORE_TASKS, 'readwrite', (s) => s.put(task))
+export async function putTask(task: TaskRecord, restore = false): Promise<IDBValidKey> {
+  await inWorkbenchDb([STORE_TASKS, STORE_CANVAS_META], 'readwrite', (tx) => {
+    if (restore) tx.objectStore(STORE_CANVAS_META).delete(deletionKey(STORE_TASKS, task.id))
+    putIfLive(tx, STORE_TASKS, task.id, task, false)
+  })
+  return task.id
 }
 
-export function deleteTask(id: string): Promise<undefined> {
-  return dbTransaction(STORE_TASKS, 'readwrite', (s) => s.delete(id))
+export async function deleteTask(id: string): Promise<undefined> {
+  await inWorkbenchDb([STORE_TASKS, STORE_CANVAS_META], 'readwrite', (tx) => recordDeletion(tx, STORE_TASKS, id))
+  broadcastWorkbenchDeletion('tasks', [id])
 }
 
-export function commitTaskDeletion(deletedTaskIds: string[], updatedTasks: TaskRecord[], updatedConversations: AgentConversation[]): Promise<undefined> {
-  return openDB().then(
-    (db) =>
-      new Promise((resolve, reject) => {
-        const tx = db.transaction([STORE_TASKS, STORE_AGENT_CONVERSATIONS], 'readwrite')
-        const taskStore = tx.objectStore(STORE_TASKS)
-        const conversationStore = tx.objectStore(STORE_AGENT_CONVERSATIONS)
-        for (const id of deletedTaskIds) taskStore.delete(id)
-        for (const task of updatedTasks) taskStore.put(task)
-        for (const conversation of updatedConversations) conversationStore.put(conversation)
-        tx.oncomplete = () => resolve(undefined)
-        tx.onerror = () => reject(tx.error)
-        tx.onabort = () => reject(tx.error)
-      }),
-  )
+export async function commitTaskDeletion(
+  deletedTaskIds: string[], updatedTasks: TaskRecord[], updatedConversations: AgentConversation[],
+  deletedAgentElements: DeletedAgentElements[] = [],
+): Promise<undefined> {
+  await inWorkbenchDb([STORE_TASKS, STORE_AGENT_CONVERSATIONS, STORE_CANVAS_META], 'readwrite', (tx) => {
+    for (const id of deletedTaskIds) recordDeletion(tx, STORE_TASKS, id)
+    for (const removed of deletedAgentElements) recordAgentElementDeletions(tx, removed)
+    for (const task of updatedTasks) putIfLive(tx, STORE_TASKS, task.id, task, false)
+    for (const conversation of updatedConversations) putIfLive(tx, STORE_AGENT_CONVERSATIONS, conversation.id, conversation, true)
+  })
+  broadcastWorkbenchDeletion('tasks', deletedTaskIds)
 }
 
 export function clearTasks(): Promise<undefined> {
-  return dbTransaction(STORE_TASKS, 'readwrite', (s) => s.clear())
+  return clearWithDeletions(STORE_TASKS)
 }
 
 // ===== Agent conversations =====
@@ -219,39 +314,34 @@ export function getAllAgentConversations(): Promise<AgentConversation[]> {
   return dbTransaction(STORE_AGENT_CONVERSATIONS, 'readonly', (s) => s.getAll())
 }
 
-export function putAgentConversation(conversation: AgentConversation): Promise<IDBValidKey> {
-  return dbTransaction(STORE_AGENT_CONVERSATIONS, 'readwrite', (s) => s.put(conversation))
+export async function putAgentConversation(conversation: AgentConversation): Promise<IDBValidKey> {
+  await saveAgentConversationChanges([conversation], [])
+  return conversation.id
 }
 
 export function clearAgentConversations(): Promise<undefined> {
-  return dbTransaction(STORE_AGENT_CONVERSATIONS, 'readwrite', (s) => s.clear())
+  return clearWithDeletions(STORE_AGENT_CONVERSATIONS)
 }
 
-export function saveAgentConversationChanges(updated: AgentConversation[], deletedIds: string[]): Promise<void> {
-  return openDB().then((db) => new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_AGENT_CONVERSATIONS, 'readwrite')
-    const store = tx.objectStore(STORE_AGENT_CONVERSATIONS)
-    for (const id of deletedIds) store.delete(id)
-    for (const conversation of updated) store.put(conversation)
-    tx.oncomplete = () => resolve()
-    tx.onerror = () => reject(tx.error)
-    tx.onabort = () => reject(tx.error)
-  }))
+export async function saveAgentConversationChanges(updated: AgentConversation[], deletedIds: string[]): Promise<void> {
+  await inWorkbenchDb([STORE_AGENT_CONVERSATIONS, STORE_CANVAS_META], 'readwrite', (tx) => {
+    for (const id of deletedIds) recordDeletion(tx, STORE_AGENT_CONVERSATIONS, id)
+    for (const conversation of updated) putIfLive(tx, STORE_AGENT_CONVERSATIONS, conversation.id, conversation, true)
+  })
+  broadcastWorkbenchDeletion('conversations', deletedIds)
 }
 
-export function replaceAgentConversations(conversations: AgentConversation[]): Promise<undefined> {
-  return openDB().then(
-    (db) =>
-      new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE_AGENT_CONVERSATIONS, 'readwrite')
-        const store = tx.objectStore(STORE_AGENT_CONVERSATIONS)
-        store.clear()
-        for (const conversation of conversations) store.put(conversation)
-        tx.oncomplete = () => resolve(undefined)
-        tx.onerror = () => reject(tx.error)
-        tx.onabort = () => reject(tx.error)
-      }),
-  )
+export function replaceAgentConversations(conversations: AgentConversation[], restore = false): Promise<undefined> {
+  // Hydration and imports reconcile snapshots. An absent row may have been added by another tab.
+  return inWorkbenchDb([STORE_AGENT_CONVERSATIONS, STORE_CANVAS_META], 'readwrite', (tx) => {
+    for (const conversation of conversations) {
+      if (restore) {
+        tx.objectStore(STORE_CANVAS_META).delete(deletionKey(STORE_AGENT_CONVERSATIONS, conversation.id))
+        tx.objectStore(STORE_CANVAS_META).delete(deletedElementsKey(conversation.id))
+      }
+      putIfLive(tx, STORE_AGENT_CONVERSATIONS, conversation.id, conversation, true)
+    }
+  })
 }
 
 // ===== Images =====
@@ -562,7 +652,7 @@ export function clearCanvasProjects(): Promise<undefined> {
       new Promise((resolve, reject) => {
         const tx = db.transaction([STORE_CANVAS_PROJECTS, STORE_CANVAS_META], 'readwrite')
         tx.objectStore(STORE_CANVAS_PROJECTS).clear()
-        tx.objectStore(STORE_CANVAS_META).clear()
+        tx.objectStore(STORE_CANVAS_META).delete('activeProjectId')
         tx.oncomplete = () => resolve(undefined)
         tx.onerror = () => reject(tx.error)
       }),
