@@ -17,6 +17,36 @@ const richReply = readFile(join(__dirname, "fixtures/chat-rich-reply.txt"), "utf
 const observedReplies = require("./fixtures/chat-observed-replies.json");
 const extendedReplies = require("./fixtures/chat-extended-replies.json");
 const expandedWidgets = require("./fixtures/chat-widget-expansion.json");
+const componentPlayground = readFile(join(__dirname, "fixtures/chat-component-playground.txt"), "utf8");
+const imageQueries = ["园区 游戏地图", "装备背包", "园区战斗"];
+const imageReply = `## 资源路线
+
+<box gap={3}>
+  <row align=start gap={3}>
+    <AsyncImage query="监控室 游戏地图" aspectRatio="1:1" maxWidth="112px"/>
+    <box flex="1" gap={1}>**路线 A**\n<badge color="success">潜能优先</badge>\n- 查看地图</box>
+  </row>
+  <divider color="subtle"/>
+  <row align=start gap={3}>
+    <AsyncImage query="没有返回的图"/>
+    <box flex="1">**路线 B**</box>
+  </row>
+</box>
+
+<box border radius="lg" padding={3} gap={3}>
+  <title>每日循环</title>
+  <list connector="solid" marker="number" gap={3}>
+    <list-item>**第一轮**\n\n收集材料。</list-item>
+    <list-item>**第二轮**\n\n整理装备。</list-item>
+  </list>
+  <caption>按实际情况调整路线。</caption>
+</box>
+
+<AsyncImageGroup query={${JSON.stringify(imageQueries)}} aspectRatio="5:4" layout="bento"/>
+
+<AsyncImageGroup query={["未找到的地图", "未找到的装备"]} layout="bento"/>
+
+图组之后的正文。`;
 const observedPrompts = new Map([
   ["检查公式和流程图", observedReplies.markdown_math_code],
   ["检查嵌套表单", observedReplies.writing_and_native_form],
@@ -24,6 +54,7 @@ const observedPrompts = new Map([
   ["检查文件正文", observedReplies.downloadable_file],
   ...Object.entries(extendedReplies).map(([name, reply]) => [`检查 ${name}`, reply]),
   ...Object.entries(expandedWidgets).map(([name, reply]) => [`检查组件 ${name}`, reply]),
+  ["检查图文路线", imageReply],
 ]);
 const server = createServer(async (req, res) => {
   try {
@@ -56,8 +87,8 @@ const server = createServer(async (req, res) => {
       const data = JSON.parse(body);
       requests.push(data);
       const last = data.messages.at(-1).content;
-      const rich = last === "展示写作模板" || last === "展示其他表单" || observedPrompts.has(last);
-      const reply = observedPrompts.get(last) ?? (rich ? await richReply : answer);
+      const rich = last === "展示写作模板" || last === "展示其他表单" || last === "检查组件实验室" || observedPrompts.has(last);
+      const reply = last === "检查组件实验室" ? await componentPlayground : observedPrompts.get(last) ?? (rich ? await richReply : answer);
       const contentText = last === "展示其他表单" ? reply.replace("+kind+", "+window.location.href+") : reply;
       if (
         last === "失败测试" &&
@@ -73,7 +104,7 @@ const server = createServer(async (req, res) => {
       });
       let index = 0;
       const slow = last === "停止测试" || last === "切换测试";
-      const chunkSize = slow ? 2 : rich ? 17 : 12;
+      const chunkSize = slow ? 2 : last === "检查组件实验室" ? 170 : rich ? 17 : 12;
       const timer = setInterval(
         () => {
           const content = contentText.slice(index, index + chunkSize);
@@ -83,9 +114,14 @@ const server = createServer(async (req, res) => {
           );
           if (index >= contentText.length) {
             clearInterval(timer);
-            res.end(
-              'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n',
-            );
+            const terminal = { choices: [{ delta: {}, finish_reason: "stop" }] };
+            if (last === "检查图文路线") {
+              terminal.workbench = { blocks: [
+                { id: "route", type: "image", queries: ["监控室 游戏地图"], title: "监控室测试图片", imageUrl: "https://example.org/chat-fixtures/route.svg" },
+                ...imageQueries.map((title, i) => ({ id: `group-${i}`, type: "image", queries: imageQueries, title, imageUrl: `https://example.org/chat-fixtures/${i}.svg` })),
+              ] };
+            }
+            res.end(`data: ${JSON.stringify(terminal)}\n\ndata: [DONE]\n\n`);
           }
         },
         slow ? 180 : rich ? 15 : 35,
@@ -436,6 +472,118 @@ async function checkExpandedWidgets(page) {
   await page.locator('video[aria-label="短片"][controls]').waitFor();
 }
 
+async function checkComponentPlayground(page) {
+  await send(page, "检查组件实验室");
+  await waitAnswer(page);
+  const reply = page.locator(".chat-message.assistant").last();
+  await reply.getByText("组件演示结束。", { exact: true }).waitFor();
+  assert.equal(await reply.locator("details.chat-reply-source").count(), 0);
+  assert.equal(await reply.locator(".chat-widget-unsupported").count(), 1);
+  await reply.getByText("未知组件之前", { exact: true }).waitFor();
+  await reply.getByText("未知组件之后", { exact: true }).waitFor();
+  await reply.getByText("UI Component Lab", { exact: true }).waitFor();
+  await reply.getByRole("button", { name: "点击我", exact: true }).click();
+  await reply.getByRole("button", { name: "危险按钮示例", exact: true }).click();
+  await reply.getByText("点击次数: 2", { exact: true }).waitFor();
+  await reply.getByRole("button", { name: "重置", exact: true }).click();
+  await reply.getByText("点击次数: 0", { exact: true }).waitFor();
+  await reply.getByRole("textbox", { name: "单行输入", exact: true }).fill("新名字");
+  await reply.getByText("实时结果: 新名字", { exact: true }).waitFor();
+  await reply.getByRole("textbox", { name: "多行输入", exact: true }).fill("四个字符");
+  await reply.getByText("字符数: 4", { exact: true }).waitFor();
+  await reply.getByRole("combobox", { name: "框架选择" }).selectOption("Vue");
+  await reply.getByText("已选择: Vue", { exact: true }).waitFor();
+  await reply.getByRole("radio", { name: "选项 B" }).check();
+  await reply.getByText("单选: B", { exact: true }).waitFor();
+  await reply.getByRole("checkbox", { name: "通知" }).uncheck();
+  await reply.getByText("已选: 无", { exact: true }).waitFor();
+  await reply.getByRole("checkbox", { name: "邮件" }).check();
+  await reply.getByRole("checkbox", { name: "短信" }).check();
+  await reply.getByText("已选: 邮件、短信", { exact: true }).waitFor();
+  await reply.getByRole("slider", { name: "调整 SLIDER" }).press("ArrowRight");
+  await reply.getByText("音量: 55", { exact: true }).waitFor();
+  await reply.getByRole("radio", { name: "周", exact: true }).check();
+  await reply.getByText("当前视图: 周", { exact: true }).waitFor();
+  await reply.getByLabel("日期选择", { exact: true }).fill("2026-12-01");
+  await reply.getByText("日期: 2026-12-01", { exact: true }).waitFor();
+  await reply.getByRole("spinbutton", { name: "数字输入" }).fill("25");
+  await reply.getByText("输入值: 25", { exact: true }).waitFor();
+  await reply.getByRole("radio", { name: "关闭", exact: true }).check();
+  assert.equal(await reply.locator('.chat-widget-badge[data-color="secondary"]').filter({ hasText: /^关闭$/ }).count(), 1);
+  await reply.getByText("基础交互控件", { exact: true }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: join(artifacts, "playground-controls-desktop.png") });
+
+  assert.equal(await reply.locator(".chat-widget-grid-item").count(), 21);
+  assert.equal(await reply.locator(".chat-widget-flow-item").count(), 5);
+  await reply.getByText("D", { exact: true }).waitFor();
+  await reply.getByText("第三行", { exact: true }).waitFor();
+  await reply.getByText("标签五", { exact: true }).waitFor();
+  await reply.getByText("上方内容", { exact: true }).waitFor();
+  await reply.getByText("下方内容", { exact: true }).waitFor();
+  assert.equal(await reply.locator(".chat-widget-spacer").count(), 1);
+  await reply.getByRole("button", { name: "下一项" }).click();
+  await reply.getByText("第二张幻灯片", { exact: true }).waitFor();
+  await reply.getByText("当前幻灯片: 2/3", { exact: true }).waitFor();
+  await reply.getByText("点击打开弹出层", { exact: true }).click();
+  await reply.getByText("这里可以放说明。", { exact: true }).waitFor();
+  await reply.getByRole("button", { name: "切换卡片状态" }).press("Space");
+  await reply.getByText("已点击", { exact: true }).waitFor();
+  assert.equal(await reply.getByRole("button", { name: "切换卡片状态" }).getAttribute("aria-pressed"), "true");
+  await reply.getByRole("combobox", { name: "地图标记" }).selectOption("1");
+  const location = await reply.getByRole("link", { name: "在 OpenStreetMap 中查找地址" }).getAttribute("href");
+  assert.equal(new URL(location).searchParams.get("query"), "San Francisco, California, USA");
+  const svg = reply.getByRole("img", { name: "矢量图" });
+  assert.equal(await svg.locator("rect, circle, path").count(), 4);
+  assert.equal(requests.length, 1);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await waitReady(page);
+  await reply.getByText("组件演示结束。", { exact: true }).waitFor();
+  await reply.getByText("点击次数: 0", { exact: true }).waitFor();
+  await reply.getByRole("checkbox", { name: "通知" }).scrollIntoViewIfNeeded();
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await page.screenshot({ path: join(artifacts, "playground-controls-mobile.png") });
+  await reply.getByRole("img", { name: "矢量图" }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: join(artifacts, "playground-media-mobile.png") });
+}
+
+async function checkImageWidgets(page) {
+  await page.route("https://example.org/chat-fixtures/**", (route) => {
+    const index = Number(new URL(route.request().url()).pathname.match(/(\d)\.svg$/)?.[1]);
+    const color = ["#bad5e1", "#d9ddd0", "#d8cedf"][index] ?? "#b9ced1";
+    return route.fulfill({ contentType: "image/svg+xml", body: `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="100"><rect width="160" height="100" fill="${color}"/></svg>` });
+  });
+  await send(page, "检查图文路线");
+  await waitAnswer(page);
+  const reply = page.locator(".chat-message.assistant").last();
+  await reply.getByText("图组之后的正文。", { exact: true }).waitFor();
+  assert.equal(await reply.locator("details.chat-reply-source").count(), 0);
+  assert.equal(await reply.locator(".chat-widget-list > li").count(), 2);
+  assert.equal(await reply.locator(".chat-widget-caption").innerText(), "按实际情况调整路线。");
+  await reply.getByText("路线 B", { exact: true }).waitFor();
+  await reply.getByText("图片未返回", { exact: true }).waitFor();
+  await reply.getByText("图片组未返回", { exact: true }).waitFor();
+  await reply.locator(".chat-widget-image-group img").first().scrollIntoViewIfNeeded();
+  await page.waitForFunction(() => [...document.querySelectorAll('.chat-widget-image-group img')].length === 3
+    && [...document.querySelectorAll('.chat-widget-image-group img')].every((image) => image.complete && image.naturalWidth > 0));
+  const tiles = await reply.locator(".chat-widget-image-group img").evaluateAll((images) => images.map((image) => image.getBoundingClientRect().toJSON()));
+  assert(tiles[0].right <= tiles[1].left && tiles[0].right <= tiles[2].left);
+  assert(tiles[1].bottom <= tiles[2].top);
+  const thumbnail = reply.getByRole("img", { name: "监控室测试图片" });
+  assert.equal(Math.round((await thumbnail.boundingBox()).width), 112);
+  assert.equal(await reply.locator(".chat-resource-gallery").count(), 0);
+  await page.screenshot({ path: join(artifacts, "image-widgets-desktop.png") });
+  await reply.locator(".chat-widget-box").first().scrollIntoViewIfNeeded();
+  await page.screenshot({ path: join(artifacts, "image-widgets-routes.png") });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await waitReady(page);
+  await reply.getByText("图组之后的正文。", { exact: true }).waitFor();
+  assert.equal(await reply.locator(".chat-widget-image-group img").count(), 3);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await page.screenshot({ path: join(artifacts, "image-widgets-mobile.png") });
+}
+
 (async () => {
   await mkdir(artifacts, { recursive: true });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
@@ -459,6 +607,18 @@ async function checkExpandedWidgets(page) {
     await page.goto(base + "/chat/");
     await waitReady(page);
     await page.emulateMedia({ reducedMotion: "reduce" });
+    if (process.argv.includes("--component-playground")) {
+      await checkComponentPlayground(page);
+      assert.deepEqual(errors, []);
+      console.log(JSON.stringify({ ok: true, cases: ["widget-isolation", "counter-reset", "input-feedback", "select-and-radio", "checkbox-list", "slider-and-segments", "date-and-number", "layout-loops", "linked-carousel", "popover", "pressable", "address-map", "svg", "mobile-reload"], artifacts }));
+      return;
+    }
+    if (process.argv.includes("--image-widgets")) {
+      await checkImageWidgets(page);
+      assert.deepEqual(errors, []);
+      console.log(JSON.stringify({ ok: true, cases: ["route-content", "numbered-list-and-caption", "image-placement", "bento-group", "missing-images", "mobile-reload"], artifacts }));
+      return;
+    }
     if (process.argv.includes("--rich-replies")) {
       await checkRichReplies(page, context);
       await checkObservedReplies(page);

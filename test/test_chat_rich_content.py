@@ -87,6 +87,33 @@ def test_rich_blocks_use_actual_results_and_current_turn_detail(monkeypatch: pyt
     assert all(word not in exposed for word in ("foreign history", "internal", "connector secret", "sig=private", "private tool plumbing"))
 
 
+def test_image_components_preserve_only_their_own_query_results() -> None:
+    markup = '<AsyncImageGroup query={["地图", "装备", "场景"]} layout="bento"/>'
+    text = '前文\n<AsyncImage query="监控室"/>\n' + markup
+    distractions = [{"type": "search_result", "thumbnail_url": f"https://example.org/other-{i}.png"} for i in range(15)]
+    answer = _message("answer", "assistant", {"content_type": "text", "parts": [text]},
+        search_result_groups=distractions,
+        content_references=[
+            {"type": "async_image", "component_resolution_id": "route-img", "genui_attributes": {"query": "监控室"}},
+            {"type": "async_image_group", "component_resolution_id": "overview-img", "start_index": text.index(markup), "end_index": len(text)},
+        ],
+        model_dil_v2={"appData": {"opGenui": {"componentResults": {
+            "route-img": {"state": {"images": [{"thumbnail_url": "https://example.org/route.png", "ref_id": "unrelated-image-ref"}]}},
+            "overview-img": {"state": {"image_urls": ["https://example.org/a.png", "https://example.org/b.png", "http://127.0.0.1/nonpublic.png"]}},
+        }}}})
+    backend = Mock()
+    backend._get_editable_conversation_detail.return_value = {}
+    rich = ChatRichContent("owner-a")
+    rich.observe(backend, _event(answer, text))
+    rich.finish(backend)
+    associated = [block for block in rich.blocks if block.get("queries")]
+    assert [(block["ref"], block["queries"], block["imageUrl"]) for block in associated] == [
+        ("route-img", ["监控室"], "https://example.org/route.png"),
+        ("overview-img", ["地图", "装备", "场景"], "https://example.org/a.png"),
+        ("overview-img", ["地图", "装备", "场景"], "https://example.org/b.png"),
+    ]
+
+
 def test_attachment_resolution_rejects_non_visible_paths_and_other_turns(monkeypatch: pytest.MonkeyPatch) -> None:
     text = "[wrong](sandbox:/mnt/data/%2e%2e/file.txt) [missing](sandbox:/mnt/data/test.txt)"
     current = _message("current", "assistant", {"content_type": "text", "parts": [text]})

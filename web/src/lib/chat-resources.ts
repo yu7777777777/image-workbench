@@ -2,6 +2,7 @@ export type ChatResource = {
   id: string;
   type: "attachment" | "python" | "source" | "image" | "product" | "tool";
   ref?: string;
+  queries?: string[];
   path?: string;
   title?: string;
   url?: string;
@@ -44,6 +45,13 @@ export function chatPublicMediaUrl(value: unknown): string | undefined {
     && !/\.(?:localhost|local|internal|test|invalid)\.?$/i.test(hostname)) return href;
 }
 
+export function chatImageQueries(value: unknown): string[] | undefined {
+  if (!Array.isArray(value) || !value.length || value.length > 8
+    || !value.every((query): query is string => typeof query === "string" && !!query.trim()
+      && query.length <= 400 && !/[\u0000-\u001f\u007f]/.test(query))) return;
+  return value.map((query) => query.trim());
+}
+
 export function attachmentPath(value: unknown): string | undefined {
   const prefix = "sandbox:/mnt/data/";
   if (typeof value !== "string" || value.length > 2048 || !value.startsWith(prefix)) return;
@@ -67,6 +75,8 @@ export function readChatResources(value: unknown): ChatResource[] {
     if (!resourceTypes.has(type)) continue;
     const resource: ChatResource = { id: item.id, type };
     if (typeof item.ref === "string" && resourceKey.test(item.ref)) resource.ref = item.ref;
+    const queries = type === "image" ? chatImageQueries(item.queries) : undefined;
+    if (queries) resource.queries = queries;
     const path = attachmentPath(item.path);
     if (path) resource.path = path;
     const url = chatExternalUrl(item.url);

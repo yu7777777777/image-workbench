@@ -131,7 +131,7 @@ export function prepareReplyMarkdown(
   inlineSources?: ReadonlyMap<string, ChatResource>,
 ): string {
   const parts: string[] = [];
-  const tokens = /^ {0,3}(`{3,}|~{3,})[^\r\n]*|(`+)|(?<!\\)\\\(([^\r\n]+?)\\\)|(?<!\\)\\\[([\s\S]+?)\\\]|<Cite\s+refs=\{\s*\[(\s*(?:"[^"<>]*"\s*,?\s*)+)\]\s*\}\s*\/\s*>|<Link\s+ref="([\w.:-]{1,160})"\s+title="([^"<>]+)"\s*\/\s*>|<icon\s+[^<>]*\/\s*>|<badge(?:\s[^<>]*)?>([^<>]*)<\/badge>/gm;
+  const tokens = /^ {0,3}(`{3,}|~{3,})[^\r\n]*|(`+)|(?<!\\)\\\(([^\r\n]+?)\\\)|(?<!\\)\\\[([\s\S]+?)\\\]|<Cite\s+refs=\{\s*\[(\s*(?:"[^"<>]*"\s*,?\s*)+)\]\s*\}\s*\/\s*>|<Link\s+ref="([\w.:-]{1,160})"\s+title="([^"<>]+)"\s*\/\s*>|<icon\s+[^<>]*\/\s*>|<badge(?:\s[^<>]*)?>([^<>]*)<\/badge>|(<divider(?:\s+color=(?:"[a-z]+"|'[a-z]+'))?\s*\/\s*>)/gm;
   let cursor = 0;
   for (let token = tokens.exec(text); token; token = tokens.exec(text)) {
     if (token[1]) {
@@ -147,6 +147,7 @@ export function prepareReplyMarkdown(
     parts.push(text.slice(cursor, token.index));
     if (token[3] !== undefined) parts.push(`$${token[3].trim()}$`);
     else if (token[4] !== undefined) parts.push(`\n\n$$\n${token[4].trim()}\n$$\n\n`);
+    else if (token[9]) parts.push("\n\n---\n\n");
     else if (token[8] !== undefined) parts.push(token[8]);
     else if (token[7] || token[5]) {
       const title = token[7] ? escapeReplyMarkdown(token[7]) : "来源";

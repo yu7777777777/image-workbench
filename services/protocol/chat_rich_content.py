@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import ipaddress
+import json
 import re
 import time
 from collections.abc import Iterable, Iterator
@@ -14,11 +15,12 @@ from services.openai_backend_api import EditableFileArtifact, OpenAIBackendAPI
 from services.protocol.conversation import assistant_message_text, is_visible_assistant_message
 
 
-RichBlock = dict[str, str]
-_MARKUP = re.compile(r"<(?:Cite|AsyncImage|Entity|Link)\b")
+RichBlock = dict[str, Any]
+_MARKUP = re.compile(r"<(?:Cite|AsyncImage(?:Group)?|Entity|Link)\b")
 _REFERENCE = re.compile(r"[A-Za-z0-9_.:-]{1,128}")
 _OBJECT_ID = re.compile(r"[A-Za-z0-9_-]{1,128}")
 _MARKUP_REF = re.compile(r"\bref\s*=\s*[\"']([A-Za-z0-9_.:-]{1,128})[\"']")
+_MARKUP_IMAGE_QUERY = re.compile(r"<AsyncImage(?:Group)?\b[^<>]*?\squery\s*=\s*(\{\s*)?(?=[\[\"'])")
 _SANDBOX_LINK = re.compile(r"(?:<sandbox:(/mnt/data/[^>\r\n]+)>|(?<=\]\()sandbox:(/mnt/data/[^)\s<>]+))")
 _MAX_MESSAGES = 128
 _MAX_ATTACHMENTS = 3
@@ -111,13 +113,16 @@ def _image_url(item: dict[str, Any]) -> str:
     return next((url for value in options if (url := _public_url(value))), "")
 
 
-def _image_block(item: dict[str, Any], ref: str = "") -> RichBlock | None:
+def _image_block(item: dict[str, Any], ref: str = "", queries: list[str] | None = None) -> RichBlock | None:
     image_url = _image_url(item)
     if not image_url:
         return None
-    ref = _ref(item.get("ref_id")) or _ref(item.get("ref")) or ref
-    return _block("image", f"{ref}:{image_url}", ref=ref, imageUrl=image_url, url=_public_url(item.get("url")),
-                  title=_text(item.get("title") or item.get("alt")))
+    ref = ref if queries and ref else _ref(item.get("ref_id")) or _ref(item.get("ref")) or ref
+    block = _block("image", f"{ref}:{image_url}", ref=ref, imageUrl=image_url, url=_public_url(item.get("url")),
+                   title=_text(item.get("title") or item.get("alt")))
+    if queries:
+        block["queries"] = queries
+    return block
 
 
 def _price(value: object) -> str:
@@ -149,8 +154,34 @@ def _product_block(item: dict[str, Any], ref: str) -> RichBlock | None:
                   merchant=_text(merchant or offer.get("merchant_name")) or _text(_obj(merchant).get("name")))
 
 
-def _component_aliases(metadata: dict[str, Any], text: str) -> dict[str, str]:
-    aliases: dict[str, str] = {}
+def _image_queries(value: object) -> list[str]:
+    queries = [value] if isinstance(value, str) else _items(value)
+    if 0 < len(queries) <= 8 and all(isinstance(query, str) and 0 < len(query) <= 400 and query.strip()
+                                       and not re.search(r"[\x00-\x1f\x7f]", query) for query in queries):
+        return [query.strip() for query in queries]
+    return []
+
+
+def _markup_image_queries(markup: str) -> list[str]:
+    match = _MARKUP_IMAGE_QUERY.search(markup)
+    if not match:
+        return []
+    rest = markup[match.end():]
+    if rest.startswith("'"):
+        literal = re.match(r"'([^'\r\n]{1,400})'", rest)
+        value, end = (literal.group(1), literal.end()) if literal else (None, 0)
+    else:
+        try:
+            value, end = json.JSONDecoder().raw_decode(rest)
+        except (ValueError, RecursionError):
+            return []
+    if match[1] and not rest[end:].lstrip().startswith("}"):
+        return []
+    return _image_queries(value)
+
+
+def _component_bindings(metadata: dict[str, Any], text: str) -> dict[str, tuple[str, list[str]]]:
+    bindings: dict[str, tuple[str, list[str]]] = {}
     for item in _items(metadata.get("content_references"))[:128]:
         item = _obj(item)
         component = _ref(item.get("component_resolution_id"))
@@ -158,13 +189,19 @@ def _component_aliases(metadata: dict[str, Any], text: str) -> dict[str, str]:
             continue
         attrs = _obj(item.get("genui_attributes"))
         alias = _ref(attrs.get("ref"))
+        image = item.get("type") in ("async_image", "async_image_group")
+        queries = _image_queries(attrs.get("query") or attrs.get("queries")) if image else []
         start, end = item.get("start_index"), item.get("end_index")
-        if not alias and type(start) is int and type(end) is int and 0 <= start < end <= len(text):
-            match = _MARKUP_REF.search(text[start:end])
-            alias = match.group(1) if match else ""
-        if alias:
-            aliases[component] = alias
-    return aliases
+        if type(start) is int and type(end) is int and 0 <= start < end <= len(text) and end - start <= 8192:
+            markup = text[start:end]
+            if not alias and (match := _MARKUP_REF.search(markup)):
+                alias = match.group(1)
+            if not queries:
+                queries = _markup_image_queries(markup)
+        if alias or queries:
+            previous_alias, previous_queries = bindings.get(component, ("", []))
+            bindings[component] = alias or previous_alias, queries or previous_queries
+    return bindings
 
 
 def _resource_blocks(message: dict[str, Any], visible_assistant: bool) -> Iterator[RichBlock]:
@@ -185,19 +222,26 @@ def _resource_blocks(message: dict[str, Any], visible_assistant: bool) -> Iterat
         return
     app_data = _obj(_obj(metadata.get("model_dil_v2")).get("appData"))
     components = _obj(_obj(app_data.get("opGenui")).get("componentResults"))
-    aliases = _component_aliases(metadata, assistant_message_text(message))
+    bindings = _component_bindings(metadata, assistant_message_text(message))
     for component, result in list(components.items())[:64]:
-        ref = aliases.get(component) or _ref(component)
+        alias, queries = bindings.get(component, ("", []))
+        ref = alias or _ref(component)
         state = _obj(_obj(result).get("state"))
+        queries = queries or _image_queries(state.get("query") or state.get("queries"))
         products = [product for item in _objects(state) if (product := _product_block(item, ref))]
         if products:
             # A component's action can repeat the very same product in multiple places.
             yield from {block["id"]: block for block in reversed(products)}.values()
             continue
         for item in _objects(state):
-            image = _image_block(item, ref)
+            image = _image_block(item, ref, queries)
             if image:
                 yield image
+            if queries:
+                for value in _items(item.get("image_urls"))[:8]:
+                    image = _image_block({**item, "image_url": value, "thumbnail_url": None}, ref, queries)
+                    if image:
+                        yield image
 
 
 def _python_block(message: dict[str, Any]) -> RichBlock | None:
@@ -346,8 +390,15 @@ class ChatRichContent:
 
         def keep(block: RichBlock) -> None:
             kind, block_id = block["type"], block["id"]
-            if len(blocks[kind]) < _BLOCK_LIMITS[kind] or block_id in blocks[kind]:
-                blocks[kind][block_id] = block
+            group = blocks[kind]
+            if len(group) >= _BLOCK_LIMITS[kind] and block_id not in group:
+                if kind != "image" or not block.get("queries"):
+                    return
+                replace = next((key for key in reversed(group) if not group[key].get("queries")), None)
+                if replace is None:
+                    return
+                del group[replace]
+            group[block_id] = block
 
         if paths and self._conversation_id:
             for block in self._attachments(backend, paths, time.monotonic() + 12.0):
