@@ -91,6 +91,7 @@ def cfg_host(cfg: dict, target: str = "online") -> dict:
         "disk_min_gb": cfg.get("disk_min_gb", 4),
         "image_prefix": cfg.get("image_prefix", "chatgpt2api"),
         "keep_images": cfg.get("keep_images", 3),
+        "keep_releases": cfg.get("keep_releases", 1),
     }
 
 

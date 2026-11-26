@@ -7,6 +7,7 @@
   "health_url": "http://127.0.0.1:3000/health?format=json",
   "disk_min_gb": 4,
   "keep_images": 0,
+  "keep_releases": 1,
   "image_prefix": "chatgpt2api",
   "credentials_file": "服务器连接.txt",
   "credentials_offset": 4,

@@ -112,8 +112,19 @@ export function VersionReleaseDialog({ className, compact = false, canUpgrade = 
                   已成功升级到 {upgradeResult.version}（耗时 {upgradeResult.elapsed_secs ?? "-"} 秒），请刷新页面使用新版本。
                 </div>
               ) : upgradeResult?.status === "failed" ? (
-                <div className="text-sm text-red-600 dark:text-red-400">
-                  升级到 {upgradeResult.version} 失败：{upgradeResult.error ?? "未知原因"}（服务器已自动回滚）
+                <div className="space-y-2.5">
+                  <div className="text-sm text-red-600 dark:text-red-400">
+                    升级到 {upgradeResult.version} 失败：{upgradeResult.error ?? "未知原因"}（服务器已自动回滚）
+                  </div>
+                  {hasNewVersion && latestVersion ? (
+                    <Button
+                      size="sm"
+                      className="w-full"
+                      onClick={() => void startUpgrade(latestVersion)}
+                    >
+                      重试升级到 {latestVersion}
+                    </Button>
+                  ) : null}
                 </div>
               ) : (
                 <div className="text-xs text-stone-400 dark:text-gray-500">当前已是最新版本。</div>

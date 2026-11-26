@@ -274,8 +274,10 @@ def create_router(app_version: str) -> APIRouter:
         exists = await run_in_threadpool(_github_release_exists, version)
         if not exists:
             raise HTTPException(status_code=400, detail={"error": f"GitHub 上不存在 v{version} 的 Release，无法升级"})
-        trigger, _ = _upgrade_paths()
+        trigger, result = _upgrade_paths()
         trigger.parent.mkdir(parents=True, exist_ok=True)
+        # 发起新升级或重试升级时清理旧结果文件，避免前端轮询立刻读到上一次同版本的失败记录。
+        result.unlink(missing_ok=True)
         trigger.write_text(
             json.dumps({"version": version, "requested_at": datetime.now(timezone.utc).isoformat()}, ensure_ascii=False),
             encoding="utf-8",

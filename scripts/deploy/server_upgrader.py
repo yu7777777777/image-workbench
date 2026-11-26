@@ -100,6 +100,7 @@ def run_deploy(root: Path, release_dir: Path, container: str) -> dict:
         "disk_min_gb": 4,
         "image_prefix": "chatgpt2api",
         "keep_images": 0,
+        "keep_releases": 1,
     }
     config_path = release_dir / "host-config.json"
     config_path.write_text(json.dumps(host_cfg), encoding="utf-8")
