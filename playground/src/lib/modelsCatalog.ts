@@ -20,13 +20,40 @@ export function filterHiddenImageModels(models: string[]): string[] {
   return models.filter((id) => !HIDDEN_IMAGE_MODELS.includes(id))
 }
 
-export async function fetchAvailableImageModels(apiKey?: string, baseUrl = '', apiProxy = false): Promise<string[]> {
+export interface AvailableImageModelsResult {
+  ok: boolean
+  models: string[]
+}
+
+const availableImageModelsCache = new Map<string, string[]>()
+
+function resolveModelsEndpoint(apiKey?: string, baseUrl = '', apiProxy = false) {
+  const proxyConfig = readClientDevProxyConfig()
+  const useApiProxy = !isPoolBuild && shouldUseApiProxyForCredential(apiKey, apiProxy, proxyConfig)
+  const authKey = isPoolBuild ? POOL_KEY : useApiProxy ? 'local-proxy-placeholder' : apiKey || POOL_KEY
+  const url = isPoolBuild ? `${window.location.origin}/v1/models` : buildApiUrl(baseUrl, 'models', proxyConfig, useApiProxy)
+  const cacheKey = `${isPoolBuild ? 'pool' : 'direct'}::${url}::${useApiProxy ? 'proxy' : authKey}`
+  return { url, authKey, cacheKey }
+}
+
+export function getCachedAvailableImageModels(apiKey?: string, baseUrl = '', apiProxy = false): string[] | null {
+  try {
+    const { cacheKey } = resolveModelsEndpoint(apiKey, baseUrl, apiProxy)
+    const cached = availableImageModelsCache.get(cacheKey)
+    return cached ? [...cached] : null
+  } catch {
+    return null
+  }
+}
+
+export function clearAvailableImageModelsCache() {
+  availableImageModelsCache.clear()
+}
+
+export async function fetchAvailableImageModelsResult(apiKey?: string, baseUrl = '', apiProxy = false): Promise<AvailableImageModelsResult> {
   const fallback = isPoolBuild ? [] : DEFAULT_IMAGE_MODELS
   try {
-    const proxyConfig = readClientDevProxyConfig()
-    const useApiProxy = !isPoolBuild && shouldUseApiProxyForCredential(apiKey, apiProxy, proxyConfig)
-    const authKey = isPoolBuild ? POOL_KEY : useApiProxy ? 'local-proxy-placeholder' : apiKey || POOL_KEY
-    const url = isPoolBuild ? `${window.location.origin}/v1/models` : buildApiUrl(baseUrl, 'models', proxyConfig, useApiProxy)
+    const { url, authKey, cacheKey } = resolveModelsEndpoint(apiKey, baseUrl, apiProxy)
     const res = await fetch(url, {
       cache: 'no-store',
       headers: {
@@ -34,7 +61,7 @@ export async function fetchAvailableImageModels(apiKey?: string, baseUrl = '', a
         ...(authKey ? { Authorization: `Bearer ${authKey}` } : {}),
       },
     })
-    if (!res.ok) return fallback
+    if (!res.ok) return { ok: false, models: fallback }
     const data = (await res.json()) as { data?: ModelItem[] }
     if (Array.isArray(data?.data)) {
       const filtered = data.data
@@ -59,11 +86,19 @@ export async function fetchAvailableImageModels(apiKey?: string, baseUrl = '', a
           if (idxB !== -1) return 1
           return a.localeCompare(b)
         })
-        return filtered
+        availableImageModelsCache.set(cacheKey, filtered)
+        return { ok: true, models: filtered }
       }
+      availableImageModelsCache.set(cacheKey, fallback)
+      return { ok: true, models: fallback }
     }
-    return fallback
+    return { ok: false, models: fallback }
   } catch {
-    return fallback
+    return { ok: false, models: fallback }
   }
+}
+
+export async function fetchAvailableImageModels(apiKey?: string, baseUrl = '', apiProxy = false): Promise<string[]> {
+  const result = await fetchAvailableImageModelsResult(apiKey, baseUrl, apiProxy)
+  return result.models
 }

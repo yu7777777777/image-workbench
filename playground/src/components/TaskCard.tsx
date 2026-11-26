@@ -18,6 +18,7 @@ interface Props {
   onClick: (e: React.MouseEvent | React.TouchEvent) => void
   isSelected?: boolean
   disableSwipe?: boolean
+  adaptiveAspect?: boolean
 }
 
 function TaskActionButton({
@@ -67,6 +68,7 @@ export default function TaskCard({
   onClick,
   isSelected,
   disableSwipe,
+  adaptiveAspect = false,
 }: Props) {
   const [thumbSrc, setThumbSrc] = useState<string>('')
   const [coverRatio, setCoverRatio] = useState<string>('')
@@ -419,12 +421,17 @@ export default function TaskCard({
       <div className="studio-task-layout">
         {/* 左侧图片区域 */}
         <div
-          className="studio-task-media relative flex items-center justify-center overflow-hidden shrink-0"
-          style={isTransparentOutput ? {
-            backgroundImage: 'linear-gradient(45deg, #808080 25%, transparent 25%), linear-gradient(-45deg, #808080 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #808080 75%), linear-gradient(-45deg, transparent 75%, #808080 75%)',
-            backgroundSize: '16px 16px',
-            backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0px',
-          } : undefined}
+          className={`studio-task-media relative flex items-center justify-center overflow-hidden shrink-0${adaptiveAspect ? ' studio-task-media-adaptive' : ''}`}
+          style={{
+            ...(isTransparentOutput ? {
+              backgroundImage: 'linear-gradient(45deg, #808080 25%, transparent 25%), linear-gradient(-45deg, #808080 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #808080 75%), linear-gradient(-45deg, transparent 75%, #808080 75%)',
+              backgroundSize: '16px 16px',
+              backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0px',
+            } : undefined),
+            ...(adaptiveAspect && task.status === 'done' && thumbSrc && coverDims && coverDims.width > 0 && coverDims.height > 0 ? {
+              aspectRatio: `${Math.min(2.4, Math.max(0.65, coverDims.width / coverDims.height))}`,
+            } : undefined),
+          }}
         >
           {task.status === 'running' && streamPreviewSrc && (
             <>

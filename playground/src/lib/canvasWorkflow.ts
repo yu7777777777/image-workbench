@@ -12,11 +12,14 @@ export const CANVAS_NODE_DEFAULTS: Record<CanvasNode['type'], { width: number; h
   task: { width: 280, height: 280 },
   image: { width: 280, height: 280 },
   text: { width: 280, height: 280 },
-  generation: { width: 320, height: 400 },
+  generation: { width: 340, height: 450 },
 }
 
 /** Minimum height a generation node must have for its controls to fit. */
-export const CANVAS_GENERATION_MIN_HEIGHT = 400
+export const CANVAS_GENERATION_MIN_HEIGHT = 445
+
+/** Minimum height when a generation node has connected prompt-mode controls. */
+export const CANVAS_GENERATION_CONNECTED_MIN_HEIGHT = 485
 
 /** 提示词节点也要装得下文本框 + 模板库/对话/润色三行。 */
 export const CANVAS_TEXT_MIN_HEIGHT = 280
@@ -27,6 +30,39 @@ const CANVAS_NODE_MIN_WIDTH = 160
 /** Resolves the default size for a node type while keeping the legacy 280 fallback. */
 export function canvasNodeDefaultSize(type: CanvasNode['type']): { width: number; height: number } {
   return CANVAS_NODE_DEFAULTS[type] ?? { width: 280, height: 280 }
+}
+
+/**
+ * 为通过工具栏/素材库新建的节点计算不与已有节点原点重叠的位置，
+ * 避免连续新增节点直接堆叠在同一坐标上。
+ */
+export function findNonOverlappingCanvasPosition(
+  base: { x: number; y: number },
+  nodes: Pick<CanvasNode, 'position'>[],
+  options: { stepX?: number; stepY?: number; threshold?: number; maxAttempts?: number } = {},
+): { x: number; y: number } {
+  const stepX = options.stepX ?? 44
+  const stepY = options.stepY ?? 36
+  const threshold = options.threshold ?? 28
+  const maxAttempts = options.maxAttempts ?? 24
+
+  const isOccupied = (candidate: { x: number; y: number }) =>
+    nodes.some((node) =>
+      Math.abs(node.position.x - candidate.x) < threshold
+      && Math.abs(node.position.y - candidate.y) < threshold,
+    )
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const column = Math.floor(attempt / 6)
+    const row = attempt % 6
+    const candidate = {
+      x: base.x + row * stepX + column * 60,
+      y: base.y + row * stepY,
+    }
+    if (!isOccupied(candidate)) return candidate
+  }
+
+  return { x: base.x + stepX, y: base.y + stepY }
 }
 
 export function getCanvasGroupMembers(nodes: CanvasNode[], groupId: string): CanvasNode[] {

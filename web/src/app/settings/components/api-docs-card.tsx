@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown, FileArchive, FileText, KeyRound, ListChecks, type LucideIcon } from "lucide-react";
+import { Check, ChevronDown, Copy, Eye, EyeOff, FileArchive, FileText, KeyRound, ListChecks, type LucideIcon } from "lucide-react";
+import { toast } from "sonner";
 
 import { Card, CardContent } from "@/components/ui/card";
 import webConfig from "@/constants/common-env";
+import { maskSecretKey } from "@/lib/mask-secret";
 import { getStoredAuthSession } from "@/store/auth";
 
 type ParamRow = [string, string, string];
@@ -223,9 +225,25 @@ function ParamTable({ rows }: { rows: ParamRow[] }) {
 
 export function ApiDocsCard() {
   const [authKey, setAuthKey] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [copiedKey, setCopiedKey] = useState(false);
   const serviceBaseUrl = webConfig.apiUrl.replace(/\/$/, "") || (typeof window !== "undefined" ? window.location.origin : "");
   const openAIBaseUrl = `${serviceBaseUrl}/v1`;
-  const displayKey = authKey || "<当前密钥>";
+  const displayKey = authKey
+    ? (showApiKey ? authKey : maskSecretKey(authKey))
+    : "<当前密钥>";
+
+  const copyApiKey = async () => {
+    if (!authKey) return;
+    try {
+      await navigator.clipboard.writeText(authKey);
+      setCopiedKey(true);
+      toast.success("已复制到剪贴板");
+      setTimeout(() => setCopiedKey(false), 2000);
+    } catch {
+      toast.error("复制失败，请手动选择文本");
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -260,7 +278,31 @@ export function ApiDocsCard() {
             <div className="break-all font-mono text-xs text-stone-800">{openAIBaseUrl}</div>
           </div>
           <div className="space-y-1 rounded-xl border border-stone-200 bg-white px-3 py-2">
-            <div className="text-xs text-stone-500">API Key</div>
+            <div className="flex items-center justify-between gap-2 text-xs text-stone-500">
+              <span>API Key</span>
+              {authKey ? (
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKey((visible) => !visible)}
+                    aria-label={showApiKey ? "隐藏密钥" : "显示密钥"}
+                    aria-pressed={showApiKey}
+                    className="inline-flex items-center gap-1 text-[11px] text-stone-500 hover:text-stone-800"
+                  >
+                    {showApiKey ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
+                    {showApiKey ? "隐藏" : "显示"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void copyApiKey()}
+                    className="inline-flex items-center gap-1 text-[11px] text-stone-500 hover:text-stone-800"
+                  >
+                    {copiedKey ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
+                    复制
+                  </button>
+                </div>
+              ) : null}
+            </div>
             <div className="break-all font-mono text-xs text-stone-800">{displayKey}</div>
           </div>
           <div className="space-y-1 rounded-xl border border-stone-200 bg-white px-3 py-2">

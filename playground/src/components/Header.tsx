@@ -18,6 +18,7 @@ export default function Header() {
   const [showHistoryModal, setShowHistoryModal] = useState(false)
   const historyButtonRef = useRef<HTMLButtonElement>(null)
   const isFirstMount = useRef(true)
+  const lastReportedMode = useRef(appMode)
   const createConversation = useStore((s) => s.createAgentConversation)
   const settings = useStore((s) => s.settings)
   const setSettings = useStore((s) => s.setSettings)
@@ -47,8 +48,8 @@ export default function Header() {
 
       if (data.type === 'set-app-mode') {
         if (data.mode === 'gallery' || data.mode === 'agent' || data.mode === 'canvas') {
+          lastReportedMode.current = data.mode
           useStore.getState().setAppMode(data.mode)
-          window.location.hash = data.mode
         }
       } else if (data.type === 'export-data-request') {
         try {
@@ -94,6 +95,8 @@ export default function Header() {
       isFirstMount.current = false
       return
     }
+    if (lastReportedMode.current === appMode) return
+    lastReportedMode.current = appMode
     window.parent.postMessage({ type: 'app-mode-sync', mode: appMode }, window.location.origin)
   }, [appMode])
 

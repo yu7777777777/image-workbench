@@ -104,7 +104,7 @@ test("controls retain accessibility, disabled-state and task-only scope explanat
   assert.match(source, /disabled={config\?\.image_parallel_generation === false}/);
   assert.match(source, /逐张串行生成/);
   assert.match(source, /不是单账号限制，也不是全站总并发/);
-  const page = readFileSync(new URL("../src/app/settings/page.tsx", import.meta.url), "utf8");
+  const page = readFileSync(new URL("../src/app/settings/components/admin-settings-page.tsx", import.meta.url), "utf8");
   assert.match(page, /void initialize\(\)/);
   assert.match(page, /<ConfigCard \/>/);
 });

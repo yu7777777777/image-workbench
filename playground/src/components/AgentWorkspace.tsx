@@ -68,13 +68,26 @@ function ChatImageThumb({ imageId, imageIndex, maskImageId }: { imageId: string;
   )
 }
 
-function AgentStreamingCursor() {
+function AgentStreamingCursor({ label = '正在思考与准备回复…' }: { label?: string }) {
   return (
-    <span
-      aria-label="正在生成"
-      className="ml-1 inline-block h-2 w-2 animate-pulse rounded-full bg-blue-500 align-baseline dark:bg-blue-400"
-    />
+    <div
+      role="status"
+      aria-live="polite"
+      className="inline-flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400"
+    >
+      <span
+        aria-hidden="true"
+        className="inline-block h-2 w-2 animate-pulse rounded-full bg-blue-500 dark:bg-blue-400"
+      />
+      <span>{label}</span>
+    </div>
   )
+}
+
+const agentScrollMemory = new Map<string, { scrollTop: number; atBottom: boolean }>()
+
+export function resetAgentScrollMemoryForTests() {
+  agentScrollMemory.clear()
 }
 
 function formatTime(value: number) {
@@ -169,22 +182,50 @@ export default function AgentWorkspace() {
   const touchStartY = useRef(-1)
   const conversationLongPressTimer = useRef<number | null>(null)
   const autoScrollStateRef = useRef<{ conversationId: string | null; lastUserMessageSignature: string | null }>({ conversationId: null, lastUserMessageSignature: null })
+  const restoredScrollConversationRef = useRef<string | null>(null)
   const errorCopyPointerDownRef = useRef<{ x: number; y: number } | null>(null)
 
   const updateIsScrolledToBottom = useCallback(() => {
-    const sentinel = bottomSentinelRef.current
-    if (appMode !== 'agent' || !sentinel) {
+    const container = scrollContainerRef.current
+    if (appMode !== 'agent') {
       setIsScrolledToBottom(true)
       return
     }
-
+    if (container) {
+      const distanceToBottom = container.scrollHeight - container.scrollTop - container.clientHeight
+      const atBottom = distanceToBottom <= 28
+      setIsScrolledToBottom(atBottom)
+      if (conversation?.id && restoredScrollConversationRef.current === conversation.id) {
+        agentScrollMemory.set(conversation.id, { scrollTop: container.scrollTop, atBottom })
+      }
+      return
+    }
+    const sentinel = bottomSentinelRef.current
+    if (!sentinel) {
+      setIsScrolledToBottom(true)
+      return
+    }
     const viewportHeight = window.visualViewport?.height ?? window.innerHeight
     setIsScrolledToBottom(sentinel.getBoundingClientRect().top <= viewportHeight + 24)
-  }, [appMode])
+  }, [appMode, conversation?.id])
 
-  const scrollToAgentBottom = useCallback(() => {
-    bottomSentinelRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [])
+  const scrollToAgentBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    const container = scrollContainerRef.current
+    if (container && typeof container.scrollTo === 'function') {
+      container.scrollTo({ top: container.scrollHeight, behavior })
+    } else if (container) {
+      container.scrollTop = container.scrollHeight
+    } else {
+      bottomSentinelRef.current?.scrollIntoView({ behavior })
+    }
+    if (conversation?.id) {
+      agentScrollMemory.set(conversation.id, {
+        scrollTop: container ? container.scrollHeight : 0,
+        atBottom: true,
+      })
+    }
+    setIsScrolledToBottom(true)
+  }, [conversation?.id])
 
   const handleTouchStart = (e: React.TouchEvent) => {
     const touchY = e.touches[0]?.clientY ?? -1
@@ -270,14 +311,15 @@ export default function AgentWorkspace() {
     if (appMode !== 'agent') return
 
     setMobileTopBarVisible(true)
-    let lastScrollY = window.scrollY
+    const container = scrollContainerRef.current
+    let lastScrollY = container ? container.scrollTop : window.scrollY
     let ticking = false
 
     const handleScroll = () => {
       if (ticking) return
 
       window.requestAnimationFrame(() => {
-        const currentScrollY = window.scrollY
+        const currentScrollY = container ? container.scrollTop : window.scrollY
         if (currentScrollY < 20) {
           setMobileTopBarVisible(true)
         } else if (currentScrollY > lastScrollY + 10) {
@@ -296,12 +338,14 @@ export default function AgentWorkspace() {
 
     const initialFrame = window.requestAnimationFrame(updateIsScrolledToBottom)
     const visualViewport = window.visualViewport
+    container?.addEventListener('scroll', handleScroll, { passive: true })
     window.addEventListener('scroll', handleScroll, { passive: true })
     window.addEventListener('resize', updateIsScrolledToBottom)
     visualViewport?.addEventListener('resize', updateIsScrolledToBottom)
 
     return () => {
       window.cancelAnimationFrame(initialFrame)
+      container?.removeEventListener('scroll', handleScroll)
       window.removeEventListener('scroll', handleScroll)
       window.removeEventListener('resize', updateIsScrolledToBottom)
       visualViewport?.removeEventListener('resize', updateIsScrolledToBottom)
@@ -355,27 +399,61 @@ export default function AgentWorkspace() {
   }, [activeRounds, conversation])
 
   useEffect(() => {
-    const conversationId = conversation?.id ?? null
-    const lastMessage = activeMessages[activeMessages.length - 1] ?? null
-    const lastUserMessageSignature = lastMessage?.role === 'user'
-      ? `${lastMessage.id}:${lastMessage.createdAt}:${lastMessage.content}`
-      : null
-    const previous = autoScrollStateRef.current
-    const shouldScroll = appMode === 'agent' &&
-      agentScrollToBottomAfterSubmit &&
-      previous.conversationId === conversationId &&
-      lastMessage?.role === 'user' &&
-      lastUserMessageSignature != null &&
-      previous.lastUserMessageSignature !== lastUserMessageSignature
-
-    autoScrollStateRef.current = { conversationId, lastUserMessageSignature }
-    if (!shouldScroll) return
-
+    if (appMode !== 'agent' || !conversation?.id) return
+    if (restoredScrollConversationRef.current === conversation.id) return
+    if (activeMessages.length === 0) {
+      restoredScrollConversationRef.current = conversation.id
+      return
+    }
+    const conversationId = conversation.id
     const frame = window.requestAnimationFrame(() => {
-      scrollToAgentBottom()
+      const container = scrollContainerRef.current
+      restoredScrollConversationRef.current = conversationId
+      if (!container) return
+      const saved = agentScrollMemory.get(conversationId)
+      if (!saved || saved.atBottom) {
+        container.scrollTop = container.scrollHeight
+        agentScrollMemory.set(conversationId, { scrollTop: container.scrollTop, atBottom: true })
+        setIsScrolledToBottom(true)
+      } else {
+        container.scrollTop = Math.min(saved.scrollTop, Math.max(0, container.scrollHeight - container.clientHeight))
+        updateIsScrolledToBottom()
+      }
     })
     return () => window.cancelAnimationFrame(frame)
-  }, [activeMessages, agentScrollToBottomAfterSubmit, appMode, conversation?.id, scrollToAgentBottom])
+  }, [activeMessages.length, appMode, conversation?.id, updateIsScrolledToBottom])
+
+  useEffect(() => {
+    const conversationId = conversation?.id ?? null
+    let lastUserMessage: AgentMessage | null = null
+    for (let index = activeMessages.length - 1; index >= 0; index -= 1) {
+      if (activeMessages[index].role === 'user') {
+        lastUserMessage = activeMessages[index]
+        break
+      }
+    }
+    const lastUserMessageSignature = lastUserMessage
+      ? `${lastUserMessage.id}:${lastUserMessage.createdAt}:${lastUserMessage.content}`
+      : null
+    const previous = autoScrollStateRef.current
+    const shouldScrollOnNewUserMessage = appMode === 'agent' &&
+      agentScrollToBottomAfterSubmit &&
+      previous.conversationId === conversationId &&
+      lastUserMessageSignature != null &&
+      previous.lastUserMessageSignature !== lastUserMessageSignature
+    const isStreamingActiveRound = activeRounds.some((round) => round.status === 'running')
+    const shouldFollowStream = appMode === 'agent' &&
+      isStreamingActiveRound &&
+      Boolean(conversationId && agentScrollMemory.get(conversationId)?.atBottom)
+
+    autoScrollStateRef.current = { conversationId, lastUserMessageSignature }
+    if (!shouldScrollOnNewUserMessage && !shouldFollowStream) return
+
+    const frame = window.requestAnimationFrame(() => {
+      scrollToAgentBottom(shouldScrollOnNewUserMessage ? 'smooth' : 'auto')
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [activeMessages, activeRounds, agentScrollToBottomAfterSubmit, appMode, conversation?.id, scrollToAgentBottom])
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(updateIsScrolledToBottom)
@@ -892,6 +970,7 @@ export default function AgentWorkspace() {
                                   <TaskCard
                                     task={block.task}
                                     disableSwipe={true}
+                                    adaptiveAspect={true}
                                     onClick={() => setDetailTaskId(block.task.id)}
                                     onReuse={() => handleReuse(block.task)}
                                     onEditOutputs={() => editOutputs(block.task)}
@@ -1065,7 +1144,7 @@ export default function AgentWorkspace() {
         </div>
 
         <button
-          onClick={scrollToAgentBottom}
+          onClick={() => scrollToAgentBottom('smooth')}
           className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 backdrop-blur shadow-[0_2px_12px_rgba(0,0,0,0.1)] border border-gray-200/50 text-gray-500 transition-all duration-300 hover:bg-gray-50 hover:text-gray-800 dark:border-white/[0.08] dark:bg-gray-800/90 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200 ${
             !isScrolledToBottom && activeMessages.length > 0 ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0 pointer-events-none'
           }`}

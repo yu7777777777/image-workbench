@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Copy, KeyRound, LoaderCircle, User } from "lucide-react";
+import { Check, Copy, Eye, EyeOff, KeyRound, LoaderCircle, User } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import webConfig from "@/constants/common-env";
 import { updateSelfProfile } from "@/lib/api";
+import { maskSecretKey } from "@/lib/mask-secret";
 import { setStoredAuthSession, type StoredAuthSession } from "@/store/auth";
 
 type AccountSettingsCardProps = {
@@ -25,6 +26,7 @@ export function AccountSettingsCard({ session, onSessionChange }: AccountSetting
   const [isSavingName, setIsSavingName] = useState(false);
   const [isSavingKey, setIsSavingKey] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [showApiKey, setShowApiKey] = useState(false);
   const [baseUrl, setBaseUrl] = useState("");
 
   useEffect(() => {
@@ -136,7 +138,7 @@ export function AccountSettingsCard({ session, onSessionChange }: AccountSetting
             <Button
               type="submit"
               disabled={isSavingName}
-              className="rounded-xl bg-stone-950 text-white hover:bg-stone-800"
+              className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {isSavingName ? <LoaderCircle className="mr-1.5 size-4 animate-spin" /> : null}
               保存名称
@@ -193,7 +195,7 @@ export function AccountSettingsCard({ session, onSessionChange }: AccountSetting
             <Button
               type="submit"
               disabled={isSavingKey}
-              className="rounded-xl bg-stone-950 text-white hover:bg-stone-800"
+              className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {isSavingKey ? <LoaderCircle className="mr-1.5 size-4 animate-spin" /> : null}
               确认修改
@@ -230,19 +232,31 @@ export function AccountSettingsCard({ session, onSessionChange }: AccountSetting
             </div>
           </div>
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs font-medium text-stone-600">
+            <div className="flex items-center justify-between gap-2 text-xs font-medium text-stone-600">
               <span>API Key</span>
-              <button
-                type="button"
-                onClick={() => void copyToClipboard(session.key, "api-key")}
-                className="flex items-center gap-1 text-[11px] text-stone-500 hover:text-stone-800"
-              >
-                {copiedField === "api-key" ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
-                复制密钥
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowApiKey((visible) => !visible)}
+                  aria-label={showApiKey ? "隐藏密钥" : "显示密钥"}
+                  aria-pressed={showApiKey}
+                  className="flex items-center gap-1 text-[11px] text-stone-500 hover:text-stone-800"
+                >
+                  {showApiKey ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
+                  {showApiKey ? "隐藏密钥" : "显示密钥"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void copyToClipboard(session.key, "api-key")}
+                  className="flex items-center gap-1 text-[11px] text-stone-500 hover:text-stone-800"
+                >
+                  {copiedField === "api-key" ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
+                  复制密钥
+                </button>
+              </div>
             </div>
             <div className="truncate rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 font-mono text-xs text-stone-800">
-              {session.key}
+              {showApiKey ? session.key : maskSecretKey(session.key)}
             </div>
           </div>
         </CardContent>

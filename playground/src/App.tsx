@@ -34,6 +34,7 @@ export default function App() {
   const appMode = useStore((s) => s.appMode)
   const filterFavorite = useStore((s) => s.filterFavorite)
   const activeFavoriteCollectionId = useStore((s) => s.activeFavoriteCollectionId)
+  const inCollectionOverview = filterFavorite && !activeFavoriteCollectionId
   useDockerApiUrlMigrationNotice()
   useGlobalClickSuppression()
 
@@ -116,10 +117,7 @@ export default function App() {
             })
           : current.settings
         current.setSettings(await applyUrlSettings(settings))
-        if (isPoolBuild) {
-          current.setSettings(poolSettings(useStore.getState().settings, window.location.origin))
-          window.parent.postMessage({ type: 'account-pool-mounted' }, window.location.origin)
-        } else {
+        if (!isPoolBuild) {
           // 先尝试取回本站共享模型（禁止首帧以「无共享模型」的状态渲染后一直停留）；
           // 拿不到时由 ensureSharedProfilesLoaded 在后台退避重试，不阻塞首屏。
           await Promise.race([
@@ -129,15 +127,24 @@ export default function App() {
         }
         clearAppliedUrlSettings()
       })
-      .catch((error) => {
+      .catch(async (error) => {
         console.warn('Failed to import preset config:', error)
         setPresetConfig(null)
         const state = useStore.getState()
-        void applyUrlSettings(state.settings).then((settings) => {
-          useStore.getState().setSettings(settings)
+        try {
+          state.setSettings(await applyUrlSettings(state.settings))
           clearAppliedUrlSettings()
           if (!isPoolBuild) void ensureSharedProfilesLoaded()
-        })
+        } catch (error) {
+          console.warn('Failed to restore URL settings:', error)
+        }
+      })
+      .finally(() => {
+        if (!isPoolBuild) return
+        const state = useStore.getState()
+        state.setSettings(poolSettings(state.settings, window.location.origin))
+        window.parent.postMessage({ type: 'account-pool-mounted' }, window.location.origin)
+        void ensureSharedProfilesLoaded()
       })
   }, [])
 
@@ -192,14 +199,14 @@ export default function App() {
           </Suspense>
         </ErrorBoundary>
       ) : (
-        <main data-home-main data-drag-select-surface className="studio-gallery">
+        <main data-home-main data-drag-select-surface className={inCollectionOverview ? "studio-gallery [--input-bar-clearance:0px]" : "studio-gallery"}>
           <div className="safe-area-x mx-auto w-full max-w-[1680px] px-4 sm:px-6 lg:px-8">
             <SearchBar />
-            {filterFavorite && !activeFavoriteCollectionId ? <FavoriteCollectionsView /> : <TaskGrid />}
+            {inCollectionOverview ? <FavoriteCollectionsView /> : <TaskGrid />}
           </div>
         </main>
       )}
-      {appMode === 'gallery' && <InputBar />}
+      {appMode === 'gallery' && !inCollectionOverview && <InputBar />}
       <DetailModal />
       <GalleryAnnotatorHost />
       <Lightbox />

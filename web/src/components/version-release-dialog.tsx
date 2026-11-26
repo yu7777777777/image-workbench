@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/dialog";
 import webConfig from "@/constants/common-env";
 import { useVersionCheck } from "@/hooks/use-version-check";
-import { getValidatedAuthSession } from "@/lib/auth-session";
 import { cn } from "@/lib/utils";
 
 function typeVariant(type: string): "success" | "danger" | "info" | "violet" | "outline" {
@@ -23,7 +22,7 @@ function typeVariant(type: string): "success" | "danger" | "info" | "violet" | "
   return "outline";
 }
 
-export function VersionReleaseDialog({ className, compact = false }: { className?: string; compact?: boolean }) {
+export function VersionReleaseDialog({ className, compact = false, canUpgrade = false }: { className?: string; compact?: boolean; canUpgrade?: boolean }) {
   const {
     open,
     setOpen,
@@ -36,17 +35,10 @@ export function VersionReleaseDialog({ className, compact = false }: { className
     upgrading,
     upgradeResult,
     startUpgrade,
-  } = useVersionCheck();
-  const [isAdmin, setIsAdmin] = useState(false);
+  } = useVersionCheck(canUpgrade);
   const hasPendingRelease = Boolean(
     hasNewVersion && latestVersion && upgradeResult?.version !== latestVersion,
   );
-
-  useEffect(() => {
-    void getValidatedAuthSession().then((session) => {
-      setIsAdmin(session?.role === "admin");
-    });
-  }, [open]);
 
   useEffect(() => {
     const handleOpen = () => openReleaseModal();
@@ -101,7 +93,7 @@ export function VersionReleaseDialog({ className, compact = false }: { className
               }
             />
           </div>
-          {isAdmin && (
+          {canUpgrade && (
             <div className="rounded-xl border border-stone-200 bg-stone-50/70 p-3 dark:border-white/10 dark:bg-white/[0.04]">
               {upgrading ? (
                 <div className="text-sm text-stone-700 dark:text-stone-300">

@@ -66,7 +66,7 @@ html[data-embedded]:not(.dark) .canvas-workspace { background-color: transparent
 .canvas-port { position: absolute; top: 48px; width: 16px; height: 16px; border-radius: 50%; background: var(--cw-panel); border: 2px solid var(--cw-accent); z-index: 3; touch-action: none; }
 .canvas-port-input { left: -9px; }
 .canvas-port-output { right: -9px; }
-.canvas-generation-body { flex: 1 1 auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
+.canvas-generation-body { flex: 1 1 auto; padding: 14px 14px 24px; display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
 /* 子项一律不收缩，避免 textarea 抢高度把下面的尺寸/按钮挤没 */
 .canvas-generation-body > * { flex-shrink: 0; }
 .canvas-generation-body label { display: flex; flex-direction: column; gap: 5px; font-size: 10px; color: var(--cw-muted); }
@@ -82,6 +82,7 @@ html[data-embedded]:not(.dark) .canvas-workspace { background-color: transparent
 .canvas-prompt-presets { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; flex-shrink: 0; margin-top: -4px; color: var(--cw-muted); font-size: 10px; }
 .canvas-prompt-presets span { margin-right: 2px; }
 .canvas-prompt-presets button { padding: 4px 7px; border: 1px solid var(--cw-line); border-radius: 5px; color: var(--cw-muted); background: var(--cw-panel); font-size: 10px; }
+.canvas-prompt-presets select { width: auto; max-width: 148px; height: 24px; padding: 0 5px; font-size: 10px; }
 .canvas-prompt-presets button:hover { border-color: var(--cw-accent); color: var(--cw-accent); background: var(--cw-accent-soft); }
 .canvas-text-body { flex: 1 1 auto; display: flex; flex-direction: column; gap: 6px; min-height: 0; overflow: hidden; }
 .canvas-text-node { flex: 0 0 auto; height: 108px; min-height: 108px; margin: 10px 10px 0; width: calc(100% - 20px); overflow-y: auto; resize: none; }
@@ -129,7 +130,7 @@ html[data-embedded]:not(.dark) .canvas-workspace { background-color: transparent
 .canvas-selection-actions button { min-height: 27px; padding: 0 8px; border-radius: 6px; color: var(--cw-muted); font-size: 10px; }
 .canvas-selection-actions button:hover { background: var(--cw-accent-soft); color: var(--cw-accent); }
 .canvas-selection-actions button.is-danger:hover { background: #bd624e1a; color: #bd624e; }
-.canvas-library { position: absolute; right: 15px; top: 77px; bottom: 85px; width: 285px; border-radius: 14px; border: 1px solid var(--cw-line); background: var(--cw-panel); z-index: 10002; display: flex; flex-direction: column; box-shadow: 0 8px 30px #0000000a; padding: 16px; }
+.canvas-library { position: absolute; right: 15px; top: 20px; bottom: 184px; width: 285px; border-radius: 14px; border: 1px solid var(--cw-line); background: var(--cw-panel); z-index: 10002; display: flex; flex-direction: column; box-shadow: 0 8px 30px #0000000a; padding: 16px; }
 .canvas-library header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px; }
 .canvas-library strong { font-size: 13px; font-weight: 600; }
 .canvas-library header p { color: var(--cw-muted); font-size: 10px; margin-top: 5px; }
@@ -156,7 +157,7 @@ html[data-embedded]:not(.dark) .canvas-workspace { background-color: transparent
 .canvas-library-editor > div { display: flex; justify-content: flex-end; gap: 6px; }
 .canvas-library-editor > div button { padding: 6px 10px; border-radius: 6px; color: var(--cw-muted); font-size: 10px; }
 .canvas-library-editor > div button.primary { color: white; background: var(--studio-action); }
-.canvas-prompt-library { position: absolute; right: 15px; top: 77px; bottom: 85px; width: 310px; border-radius: 14px; border: 1px solid var(--cw-line); background: var(--cw-panel); z-index: 10002; display: flex; flex-direction: column; box-shadow: 0 8px 30px #0000000a; padding: 16px; }
+.canvas-prompt-library { position: absolute; right: 15px; top: 20px; bottom: 184px; width: 310px; border-radius: 14px; border: 1px solid var(--cw-line); background: var(--cw-panel); z-index: 10002; display: flex; flex-direction: column; box-shadow: 0 8px 30px #0000000a; padding: 16px; }
 .canvas-prompt-library header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px; }
 .canvas-prompt-library strong { font-size: 13px; font-weight: 600; }
 .canvas-prompt-library header p { color: var(--cw-muted); font-size: 10px; margin-top: 5px; }
@@ -204,7 +205,11 @@ html[data-embedded]:not(.dark) .canvas-workspace { background-color: transparent
 .canvas-load-state button { border: 1px solid var(--cw-line); padding: 9px 15px; border-radius: 8px; }
 .canvas-drop-overlay { background: color-mix(in srgb, var(--cw-bg) 94%, transparent); pointer-events: none; border: 2px dashed var(--cw-accent); margin: 12px; border-radius: 20px; color: var(--cw-text); }
 .canvas-workspace.hand-tool, .canvas-workspace.hand-tool .canvas-node { cursor: grab; }
-.canvas-minimap { position: absolute; right: 22px; bottom: 22px; z-index: 10001; width: 190px; padding: 7px; border: 1px solid var(--cw-line); border-radius: 12px; background: color-mix(in srgb, var(--cw-panel) 94%, transparent); box-shadow: 0 8px 28px #00000012; backdrop-filter: blur(10px); }
+.canvas-minimap { position: absolute; right: 22px; bottom: 22px; z-index: 10001; width: 190px; padding: 7px; border: 1px solid var(--cw-line); border-radius: 12px; background: color-mix(in srgb, var(--cw-panel) 94%, transparent); box-shadow: 0 8px 28px #00000012; backdrop-filter: blur(10px); transition: opacity .18s ease; }
+@media (max-width: 1240px) {
+  .canvas-workspace.has-side-drawer .canvas-minimap { opacity: 0; pointer-events: none; }
+  .canvas-library, .canvas-prompt-library { bottom: 85px; }
+}
 .canvas-minimap-title { padding: 1px 3px 5px; color: var(--cw-muted); font-size: 9px; letter-spacing: .06em; }
 .canvas-minimap svg { display: block; width: 176px; height: 112px; cursor: crosshair; }
 .canvas-minimap-bg { fill: var(--cw-bg); stroke: var(--cw-line); }

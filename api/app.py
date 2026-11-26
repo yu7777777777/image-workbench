@@ -149,12 +149,14 @@ def create_app() -> FastAPI:
     async def serve_web(full_path: str):
         asset = resolve_web_asset(full_path)
         if asset is not None:
-            return FileResponse(asset)
-        if full_path.strip("/").startswith("_next/"):
+            # HTML 与路由数据须来自同一次部署，避免缓存引用已经替换的构建文件。
+            headers = {"Cache-Control": "no-cache"} if asset.suffix in {".html", ".txt"} else None
+            return FileResponse(asset, headers=headers)
+        if full_path.strip("/").startswith("_next/") or full_path.rstrip("/").endswith(".txt"):
             raise HTTPException(status_code=404, detail="Not Found")
         fallback = resolve_web_asset("")
         if fallback is None:
             raise HTTPException(status_code=404, detail="Not Found")
-        return FileResponse(fallback)
+        return FileResponse(fallback, headers={"Cache-Control": "no-cache"})
 
     return app

@@ -386,4 +386,37 @@ describe('persisted state codec', () => {
     expect(merged.map((item) => item.id)).toEqual(['first', 'same'])
     expect(merged[1].title).toBe('legacy')
   })
+
+  it('does not leak gallery draft or top-level prompt mirror into Agent or Canvas mode', () => {
+    const encoded = createPersistedState({
+      ...source(),
+      appMode: 'agent',
+      prompt: '',
+      inputImages: [],
+      galleryInputDraft: {
+        prompt: '画廊提示词 @',
+        inputImages: [imageA],
+        maskDraft: null,
+        maskEditorImageId: null,
+        updatedAt: 50,
+      },
+      agentInputDrafts: {},
+    })
+
+    const restoredAgent = normalizePersistedState(encoded, fallback(), 100)!
+    expect(restoredAgent.state.appMode).toBe('agent')
+    expect(restoredAgent.state.prompt).toBe('')
+    expect(restoredAgent.state.inputImages).toEqual([])
+    expect(restoredAgent.state.agentInputDrafts).toEqual({})
+    expect(restoredAgent.state.galleryInputDraft).toMatchObject({
+      prompt: '画廊提示词 @',
+      inputImages: [{ id: imageA.id, dataUrl: '' }],
+    })
+
+    const restoredCanvas = normalizePersistedState({ ...encoded, appMode: 'canvas' }, fallback(), 100)!
+    expect(restoredCanvas.state.appMode).toBe('canvas')
+    expect(restoredCanvas.state.prompt).toBe('')
+    expect(restoredCanvas.state.inputImages).toEqual([])
+    expect(restoredCanvas.state.galleryInputDraft).toMatchObject({ prompt: '画廊提示词 @' })
+  })
 })
