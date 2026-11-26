@@ -20,137 +20,30 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { fetchExternalModels, testExternalModel, type SharedProfile } from "@/lib/api";
+import {
+  DEFAULT_GALLERY_SETTINGS,
+  readPlaygroundSettingsSnapshot,
+  updatePlaygroundSettings,
+  type GallerySettings,
+} from "@/lib/playground-settings-bridge";
 import { useSettingsStore } from "../store";
 
-const STORAGE_KEY = "gpt-image-playground";
-
-interface GallerySettings {
-  enterSubmit: boolean;
-  clearInputAfterSubmit: boolean;
-  persistInputOnRestart: boolean;
-  reuseTaskApiProfileTemporarily: boolean;
-  alwaysShowRetryButton: boolean;
-  allowPromptRewrite: boolean;
-  taskCompletionNotification: boolean;
-  agentWebSearch: boolean;
-  agentApiConfigMode: "off" | "single" | "hybrid";
-  agentMaxToolRounds: number;
-}
-
-const defaultSettings: GallerySettings = {
-  enterSubmit: false,
-  clearInputAfterSubmit: true,
-  persistInputOnRestart: true,
-  reuseTaskApiProfileTemporarily: false,
-  alwaysShowRetryButton: false,
-  allowPromptRewrite: true,
-  taskCompletionNotification: false,
-  agentWebSearch: true,
-  agentApiConfigMode: "hybrid",
-  agentMaxToolRounds: 10,
-};
-
-function readStoredSettings(): GallerySettings {
-  if (typeof window === "undefined") return defaultSettings;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultSettings;
-    const parsed = JSON.parse(raw);
-    const s = parsed?.state?.settings || {};
-    return {
-      enterSubmit: s.enterSubmit ?? defaultSettings.enterSubmit,
-      clearInputAfterSubmit: s.clearInputAfterSubmit ?? defaultSettings.clearInputAfterSubmit,
-      persistInputOnRestart: s.persistInputOnRestart ?? defaultSettings.persistInputOnRestart,
-      reuseTaskApiProfileTemporarily: s.reuseTaskApiProfileTemporarily ?? defaultSettings.reuseTaskApiProfileTemporarily,
-      alwaysShowRetryButton: s.alwaysShowRetryButton ?? defaultSettings.alwaysShowRetryButton,
-      allowPromptRewrite: s.allowPromptRewrite ?? defaultSettings.allowPromptRewrite,
-      taskCompletionNotification: s.taskCompletionNotification ?? defaultSettings.taskCompletionNotification,
-      agentWebSearch: s.agentWebSearch ?? defaultSettings.agentWebSearch,
-      agentApiConfigMode: s.agentApiConfigMode ?? defaultSettings.agentApiConfigMode,
-      agentMaxToolRounds: s.agentMaxToolRounds ?? defaultSettings.agentMaxToolRounds,
-    };
-  } catch {
-    return defaultSettings;
-  }
-}
-
-function saveStoredSettings(next: GallerySettings) {
-  if (typeof window === "undefined") return;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    let parsed: any = {};
-    if (raw) {
-      try {
-        parsed = JSON.parse(raw);
-      } catch {
-        parsed = {};
-      }
-    }
-    if (!parsed || typeof parsed !== "object") parsed = {};
-    if (!parsed.state || typeof parsed.state !== "object") parsed.state = {};
-    if (!parsed.state.settings || typeof parsed.state.settings !== "object") parsed.state.settings = {};
-
-    Object.assign(parsed.state.settings, {
-      enterSubmit: next.enterSubmit,
-      clearInputAfterSubmit: next.clearInputAfterSubmit,
-      persistInputOnRestart: next.persistInputOnRestart,
-      reuseTaskApiProfileTemporarily: next.reuseTaskApiProfileTemporarily,
-      alwaysShowRetryButton: next.alwaysShowRetryButton,
-      allowPromptRewrite: next.allowPromptRewrite,
-      taskCompletionNotification: next.taskCompletionNotification,
-      agentWebSearch: next.agentWebSearch,
-      agentApiConfigMode: next.agentApiConfigMode,
-      agentMaxToolRounds: next.agentMaxToolRounds,
-    });
-
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-
-    // 通知常驻 iframe 重新拉取全站共享模型并重建配置列表（普通用户会话同样需要）
-    const iframe = document.querySelector('iframe[src*="playground"]') as HTMLIFrameElement | null;
-    if (iframe && iframe.contentWindow) {
-      iframe.contentWindow.postMessage(
-        { type: "sync-stored-settings" },
-        window.location.origin
-      );
-      iframe.contentWindow.postMessage(
-        { type: "sync-shared-profiles" },
-        window.location.origin
-      );
-    }
-  } catch (err) {
-    console.error("Failed to save gallery settings to localStorage", err);
-  }
-}
-
-export function GallerySettingsCard({ showSharedProfiles = true }: { showSharedProfiles?: boolean } = {}) {
-  const [settings, setSettings] = useState<GallerySettings>(defaultSettings);
+export function GallerySettingsCard({ showSharedProfiles = true, owner = "" }: { showSharedProfiles?: boolean; owner?: string } = {}) {
+  const [settings, setSettings] = useState<GallerySettings>(DEFAULT_GALLERY_SETTINGS);
   const [isSaved, setIsSaved] = useState(false);
   // 对话模型候选：本站账号池 (Agent) 直接用登录身份，是最省事的默认项；第三方 Responses 配置其次。
   const [chatProfileNames, setChatProfileNames] = useState<string[]>([]);
 
   useEffect(() => {
-    setSettings(readStoredSettings());
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      const profiles: any[] = JSON.parse(raw || "{}")?.state?.settings?.profiles || [];
-      setChatProfileNames(
-        profiles
-          .filter((p) => p?.provider === "openai" && p?.apiMode === "responses")
-          .map((p) => String(p.name || p.id)),
-      );
-    } catch {
-      setChatProfileNames([]);
-    }
-  }, []);
+    const snapshot = readPlaygroundSettingsSnapshot(owner);
+    setSettings(snapshot.settings);
+    setChatProfileNames(snapshot.chatProfileNames);
+  }, [owner]);
 
   const updateSetting = <K extends keyof GallerySettings>(key: K, value: GallerySettings[K]) => {
     const next = { ...settings, [key]: value };
     setSettings(next);
-    saveStoredSettings(next);
+    void updatePlaygroundSettings(owner, { [key]: value });
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2000);
   };

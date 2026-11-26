@@ -134,7 +134,7 @@ test("compiles the component playground without falling back to whole sections o
 });
 
 test("renders screenshot examples through the normal rich-reply parser", async () => {
-  const fixture = await Bun.file(new URL("./fixtures/chat-widget-compatibility.txt", import.meta.url)).text();
+  const fixture = (await Bun.file(new URL("./fixtures/chat-widget-compatibility.txt", import.meta.url)).text()).replaceAll("\r\n", "\n");
   const widgets = splitChatReply(fixture).flatMap((block) => block.kind === "widget" ? [block.widget] : []);
   expect(widgets).toHaveLength(5);
   const [buttons, selection, input, overlays, media] = widgets;

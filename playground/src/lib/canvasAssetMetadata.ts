@@ -1,3 +1,5 @@
+import { getOwnerScopedKey } from './workbenchOwner'
+
 export interface CanvasAssetMetadata {
   category: string
   tags: string[]
@@ -24,7 +26,7 @@ export function normalizeCanvasAssetMetadata(value: unknown): CanvasAssetMetadat
 export function loadCanvasAssetMetadata(): CanvasAssetMetadataMap {
   if (typeof localStorage === 'undefined') return {}
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(getOwnerScopedKey(STORAGE_KEY))
     if (!raw) return {}
     const parsed: unknown = JSON.parse(raw)
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
@@ -40,7 +42,7 @@ export function loadCanvasAssetMetadata(): CanvasAssetMetadataMap {
 export function saveCanvasAssetMetadata(metadata: CanvasAssetMetadataMap): void {
   if (typeof localStorage === 'undefined') return
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(metadata))
+    localStorage.setItem(getOwnerScopedKey(STORAGE_KEY), JSON.stringify(metadata))
   } catch {
     // 存储空间不足时素材本身仍可正常使用。
   }
@@ -48,7 +50,7 @@ export function saveCanvasAssetMetadata(metadata: CanvasAssetMetadataMap): void 
 
 export function clearCanvasAssetMetadata(): void {
   if (typeof localStorage === 'undefined') return
-  try { localStorage.removeItem(STORAGE_KEY) } catch { /* 忽略不可用的本地存储 */ }
+  try { localStorage.removeItem(getOwnerScopedKey(STORAGE_KEY)) } catch { /* 忽略不可用的本地存储 */ }
 }
 
 export function updateCanvasAssetMetadata(key: string, value: Partial<CanvasAssetMetadata>, current = loadCanvasAssetMetadata()): CanvasAssetMetadataMap {

@@ -1,7 +1,13 @@
 import type { AgentConversation, TaskRecord, StoredImage, StoredImageThumbnail, CanvasProject } from '../types'
 import { hasImageDimensions } from './size'
+import {
+  getOwnerDbName,
+  getWorkbenchOwner,
+  isLegacyOwnerClaimedBy,
+  LEGACY_DB_MIGRATED_KEY,
+  LEGACY_DB_NAME,
+} from './workbenchOwner'
 
-const DB_NAME = 'gpt-image-playground'
 const DB_VERSION = 5
 const STORE_TASKS = 'tasks'
 const STORE_IMAGES = 'images'
@@ -15,33 +21,144 @@ const THUMBNAIL_VERSION = 2
 
 export const CURRENT_THUMBNAIL_VERSION = THUMBNAIL_VERSION
 
-function openDB(): Promise<IDBDatabase> {
+function createStoresOnUpgrade(db: IDBDatabase) {
+  if (!db.objectStoreNames.contains(STORE_TASKS)) {
+    db.createObjectStore(STORE_TASKS, { keyPath: 'id' })
+  }
+  if (!db.objectStoreNames.contains(STORE_IMAGES)) {
+    db.createObjectStore(STORE_IMAGES, { keyPath: 'id' })
+  }
+  if (!db.objectStoreNames.contains(STORE_THUMBNAILS)) {
+    db.createObjectStore(STORE_THUMBNAILS, { keyPath: 'id' })
+  }
+  if (!db.objectStoreNames.contains(STORE_AGENT_CONVERSATIONS)) {
+    db.createObjectStore(STORE_AGENT_CONVERSATIONS, { keyPath: 'id' })
+  }
+  if (!db.objectStoreNames.contains(STORE_CANVAS_PROJECTS)) {
+    db.createObjectStore(STORE_CANVAS_PROJECTS, { keyPath: 'id' })
+  }
+  if (!db.objectStoreNames.contains(STORE_CANVAS_META)) {
+    db.createObjectStore(STORE_CANVAS_META)
+  }
+}
+
+function openNamedDB(dbName: string): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION)
+    const req = indexedDB.open(dbName, DB_VERSION)
     req.onupgradeneeded = (e) => {
-      const db = (e.target as IDBOpenDBRequest).result
-      if (!db.objectStoreNames.contains(STORE_TASKS)) {
-        db.createObjectStore(STORE_TASKS, { keyPath: 'id' })
-      }
-      if (!db.objectStoreNames.contains(STORE_IMAGES)) {
-        db.createObjectStore(STORE_IMAGES, { keyPath: 'id' })
-      }
-      if (!db.objectStoreNames.contains(STORE_THUMBNAILS)) {
-        db.createObjectStore(STORE_THUMBNAILS, { keyPath: 'id' })
-      }
-      if (!db.objectStoreNames.contains(STORE_AGENT_CONVERSATIONS)) {
-        db.createObjectStore(STORE_AGENT_CONVERSATIONS, { keyPath: 'id' })
-      }
-      if (!db.objectStoreNames.contains(STORE_CANVAS_PROJECTS)) {
-        db.createObjectStore(STORE_CANVAS_PROJECTS, { keyPath: 'id' })
-      }
-      if (!db.objectStoreNames.contains(STORE_CANVAS_META)) {
-        db.createObjectStore(STORE_CANVAS_META)
-      }
+      createStoresOnUpgrade((e.target as IDBOpenDBRequest).result)
     }
     req.onsuccess = () => resolve(req.result)
     req.onerror = () => reject(req.error)
   })
+}
+
+function openDB(): Promise<IDBDatabase> {
+  return openNamedDB(getOwnerDbName())
+}
+
+const ALL_DB_STORES = [
+  STORE_TASKS,
+  STORE_IMAGES,
+  STORE_THUMBNAILS,
+  STORE_AGENT_CONVERSATIONS,
+  STORE_CANVAS_PROJECTS,
+  STORE_CANVAS_META,
+] as const
+
+function readAllStoreEntries(db: IDBDatabase, storeName: string): Promise<Array<{ key: IDBValidKey; value: unknown }>> {
+  return new Promise((resolve, reject) => {
+    if (!db.objectStoreNames.contains(storeName)) {
+      resolve([])
+      return
+    }
+    const tx = db.transaction(storeName, 'readonly')
+    const store = tx.objectStore(storeName)
+    const entries: Array<{ key: IDBValidKey; value: unknown }> = []
+    const cursorReq = store.openCursor()
+    cursorReq.onsuccess = () => {
+      const cursor = cursorReq.result
+      if (!cursor) {
+        resolve(entries)
+        return
+      }
+      entries.push({ key: cursor.key, value: cursor.value })
+      cursor.continue()
+    }
+    cursorReq.onerror = () => reject(cursorReq.error)
+  })
+}
+
+function countStoreRecords(db: IDBDatabase, storeName: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    if (!db.objectStoreNames.contains(storeName)) {
+      resolve(0)
+      return
+    }
+    const tx = db.transaction(storeName, 'readonly')
+    const req = tx.objectStore(storeName).count()
+    req.onsuccess = () => resolve(req.result)
+    req.onerror = () => reject(req.error)
+  })
+}
+
+function writeStoreEntries(db: IDBDatabase, storeName: string, entries: Array<{ key: IDBValidKey; value: unknown }>, outOfLineKeys: boolean): Promise<void> {
+  if (!entries.length || !db.objectStoreNames.contains(storeName)) return Promise.resolve()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readwrite')
+    const store = tx.objectStore(storeName)
+    for (const entry of entries) {
+      if (outOfLineKeys) store.put(entry.value, entry.key)
+      else store.put(entry.value)
+    }
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+    tx.onabort = () => reject(tx.error)
+  })
+}
+
+/**
+ * 首次启用按用户隔离时，若当前用户已认领旧版未分区本地数据，
+ * 把旧 `gpt-image-playground` IndexedDB 中的记录一次性复制到该用户的隔离库中。
+ */
+export async function migrateLegacyDbToOwner(owner = getWorkbenchOwner()): Promise<void> {
+  if (!owner || typeof indexedDB === 'undefined') return
+  if (!isLegacyOwnerClaimedBy(owner)) return
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem(LEGACY_DB_MIGRATED_KEY) === 'done') return
+    if (typeof indexedDB.databases === 'function') {
+      const dbs = await indexedDB.databases()
+      if (!dbs.some((item) => item.name === LEGACY_DB_NAME)) {
+        if (typeof localStorage !== 'undefined') localStorage.setItem(LEGACY_DB_MIGRATED_KEY, 'done')
+        return
+      }
+    }
+    const targetDbName = getOwnerDbName(owner)
+    if (targetDbName === LEGACY_DB_NAME) return
+
+    const [legacyDb, targetDb] = await Promise.all([
+      openNamedDB(LEGACY_DB_NAME),
+      openNamedDB(targetDbName),
+    ])
+    try {
+      for (const storeName of ALL_DB_STORES) {
+        const targetCount = await countStoreRecords(targetDb, storeName)
+        if (targetCount > 0) continue
+        const entries = await readAllStoreEntries(legacyDb, storeName)
+        if (entries.length > 0) {
+          await writeStoreEntries(targetDb, storeName, entries, storeName === STORE_CANVAS_META)
+        }
+      }
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(LEGACY_DB_MIGRATED_KEY, 'done')
+      }
+    } finally {
+      legacyDb.close()
+      targetDb.close()
+    }
+  } catch (err) {
+    console.warn('迁移旧版工作台 IndexedDB 数据失败', err)
+  }
 }
 
 function dbTransaction<T>(

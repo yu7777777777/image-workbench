@@ -1056,7 +1056,7 @@ async function checkImageWidgets(page) {
       0,
     );
     assert.equal(await page.getByRole("option").count(), 3);
-    await page.getByRole("option", { name: "GPT-5.6 Sol", exact: true }).click();
+    await page.getByRole("option", { name: "GPT-5.6", exact: true }).click();
     await send(page, "帮我梳理一个想法");
     await waitAnswer(page);
     assert.equal(requests.at(-1).model, "gpt-5-6-instant");
@@ -1073,23 +1073,25 @@ async function checkImageWidgets(page) {
       await page.locator(".chat-user-text").textContent(),
       "帮我梳理一个想法",
     );
+    await page.getByRole("button", { name: "对话历史", exact: true }).click();
     await page
       .getByRole("button", { name: "重命名 帮我梳理一个想法", exact: true })
       .click();
     await page.getByRole("textbox", { name: "对话名称" }).fill("历史保留测试");
     await page.getByRole("button", { name: "保存", exact: true }).click();
+    await page.getByRole("button", { name: "对话历史", exact: true }).click();
     await page.getByRole("textbox", { name: "搜索对话" }).fill("不存在");
     assert.equal(await page.getByText("没有找到相关对话").count(), 1);
     await page.getByRole("textbox", { name: "搜索对话" }).fill("");
+    await page.keyboard.press("Escape");
     await page.getByRole("combobox", { name: "选择思考程度" }).click();
-    assert.equal(await page.getByRole("option", { name: "Pro", exact: true }).getAttribute("aria-disabled"), "true");
+    assert.equal(await page.getByRole("option", { name: "Pro", exact: true }).count(), 0);
     await page.keyboard.press("Escape");
     await page.getByRole("combobox", { name: "选择对话模型" }).click();
     await page.getByRole("option", { name: "GPT-6", exact: true }).click();
     for (const [label, model, effort] of [
       ["中", "gpt-6-thinking", "standard"],
       ["高", "gpt-6-thinking", "extended"],
-      ["极高 · Pro 账号", "gpt-6-thinking", "max"],
       ["Pro", "gpt-6-pro", undefined],
       ["即时", "gpt-6-instant", undefined],
     ]) {
@@ -1100,12 +1102,12 @@ async function checkImageWidgets(page) {
       assert.equal(requests.at(-1).model, model);
       assert.equal(requests.at(-1).reasoning_effort, effort);
     }
-    await page.getByRole("combobox", { name: "选择对话模型" }).click();
-    await page.getByRole("option", { name: "GPT-5.6 Sol", exact: true }).click();
     await page
       .getByRole("button", { name: "新建对话", exact: true })
       .first()
       .click();
+    await page.getByRole("combobox", { name: "选择对话模型" }).click();
+    await page.getByRole("option", { name: "GPT-5.6", exact: true }).click();
     await page.getByRole("button", { name: "对话设置" }).click();
     await page
       .getByPlaceholder("例如：请用简洁的中文回答。")
@@ -1181,7 +1183,7 @@ async function checkImageWidgets(page) {
     );
     const composer = await page.locator(".chat-composer").boundingBox();
     assert(composer.y + composer.height <= 844);
-    await page.getByRole("button", { name: "打开对话历史" }).click();
+    await page.getByRole("button", { name: "对话历史", exact: true }).click();
     await page.getByRole("dialog").waitFor();
     await page.screenshot({ path: join(artifacts, "mobile-history.png") });
     await page.keyboard.press("Escape");
@@ -1190,15 +1192,18 @@ async function checkImageWidgets(page) {
     await page.reload();
     await waitReady(page);
     assert.equal(await page.locator(".chat-message").count(), 0);
+    await page.getByRole("button", { name: "对话历史", exact: true }).click();
     assert.equal(
       await page.getByRole("button", { name: /历史保留测试/ }).count(),
       0,
     );
+    await page.keyboard.press("Escape");
     await seed(page);
     await page.reload();
     await waitReady(page);
     assert((await page.locator(".chat-message").count()) > 0);
     await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.getByRole("button", { name: "对话历史", exact: true }).click();
     await page
       .getByRole("button", { name: "删除 历史保留测试", exact: true })
       .click();
@@ -1209,6 +1214,7 @@ async function checkImageWidgets(page) {
         .count(),
       0,
     );
+    await page.keyboard.press("Escape");
     await seed(page, "mock-admin");
     await page.reload();
     await waitReady(page);
@@ -1216,18 +1222,17 @@ async function checkImageWidgets(page) {
     await page.screenshot({ path: join(artifacts, "admin-tablet.png") });
     assert(
       await page
-        .getByRole("button", { name: "打开导航", exact: true })
+        .getByRole("button", { name: "打开详细导航", exact: true })
         .isVisible(),
     );
     await page.setViewportSize({ width: 1280, height: 800 });
-    const navBox = await page.locator("header nav").boundingBox();
-    const accountBox = await page
-      .getByRole("button", { name: /测试用户 管理员/ })
-      .boundingBox();
-    assert(navBox && accountBox && navBox.x + navBox.width < accountBox.x);
+    const railBox = await page.locator("header.workspace-nav-rail").boundingBox();
+    const chatMainBox = await page.locator(".chat-main").boundingBox();
+    assert(railBox && chatMainBox && railBox.x + railBox.width <= chatMainBox.x + 2);
+    assert(await page.getByRole("link", { name: "号池管理", exact: true }).isVisible());
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.screenshot({ path: join(artifacts, "admin-desktop.png") });
-    // Old raw-model threads remain readable, but require explicit selection.
+    // Old/unavailable raw-model threads remain readable, but require explicit selection.
     await page.evaluate(async () => {
       const db = await new Promise((resolve, reject) => {
         const req = indexedDB.open("chatgpt2api");
@@ -1236,8 +1241,8 @@ async function checkImageWidgets(page) {
       });
       const tx = db.transaction("chat_conversations", "readwrite");
       tx.objectStore("chat_conversations").put({
-        activeId: "legacy", lastModel: "gpt-5-6",
-        threads: [{ id: "legacy", title: "旧模型", updatedAt: Date.now(), model: "gpt-5-6", effort: "", system: "", messages: [{ id: "old", role: "assistant", text: "保留的历史", model: "gpt-5-6", status: "done" }] }],
+        activeId: "legacy", lastModel: "gpt-5.6-luna-wm",
+        threads: [{ id: "legacy", title: "旧模型", updatedAt: Date.now(), model: "gpt-5.6-luna-wm", effort: "", system: "", messages: [{ id: "old", role: "assistant", text: "保留的历史", model: "gpt-5.6-luna-wm", status: "done" }] }],
       }, "admin:user-a");
       await new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onerror = reject; });
       db.close();
@@ -1245,7 +1250,7 @@ async function checkImageWidgets(page) {
     await page.reload();
     await waitReady(page);
     await page.getByText("保留的历史", { exact: true }).waitFor();
-    await page.getByText(/历史模型设置已保留/).waitFor();
+    await page.getByText(/当前模型设置不可用/).waitFor();
     await page.getByRole("textbox", { name: "输入消息", exact: true }).fill("旧模型不应自动发送");
     assert(await page.getByRole("button", { name: "发送消息", exact: true }).isDisabled());
     assert(await page.getByRole("button", { name: "重新生成", exact: true }).isDisabled());

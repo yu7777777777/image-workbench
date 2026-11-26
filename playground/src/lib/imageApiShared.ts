@@ -36,9 +36,22 @@ export interface CallApiOptions {
   /** 透明笔迹图层 PNG 的 data URL 列表，对应 multipart 的 markup 文件字段（JSON 请求不支持） */
   markupOverlays?: string[]
   skipCodexCliSizePrompt?: boolean
+  signal?: AbortSignal
   onFalRequestEnqueued?: (request: { requestId: string; endpoint: string }) => void
   onCustomTaskEnqueued?: (task: { taskId: string }) => void
   onPartialImage?: (partial: { image: string; partialImageIndex?: number; requestIndex?: number }) => void
+}
+
+/** 将外部取消信号绑定到本地 AbortController，返回解绑函数以防监听泄漏。 */
+export function linkAbortSignal(controller: AbortController, externalSignal?: AbortSignal): () => void {
+  if (!externalSignal) return () => {}
+  if (externalSignal.aborted) {
+    controller.abort()
+    return () => {}
+  }
+  const onAbort = () => controller.abort()
+  externalSignal.addEventListener('abort', onAbort, { once: true })
+  return () => externalSignal.removeEventListener('abort', onAbort)
 }
 
 export interface CallApiResult {

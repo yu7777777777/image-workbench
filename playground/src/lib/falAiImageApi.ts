@@ -194,15 +194,19 @@ export async function getFalQueuedImageResult(
   endpoint: string,
   requestId: string,
   params: TaskParams,
+  signal?: AbortSignal,
 ): Promise<CallApiResult> {
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
   configureFal(profile)
   await fal.queue.subscribeToStatus(endpoint, { requestId, logs: true })
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
   const result = await fal.queue.result(endpoint, { requestId })
-  return parseFalResult(result.data as FalApiResponse, params, getFalCustomBaseUrlLabel(profile))
+  return parseFalResult(result.data as FalApiResponse, params, getFalCustomBaseUrlLabel(profile), signal)
 }
 
 export async function callFalAiImageApi(opts: CallApiOptions, profile: ApiProfile): Promise<CallApiResult> {
   try {
+    if (opts.signal?.aborted) throw new DOMException('Aborted', 'AbortError')
     if (opts.maskDataUrl) {
       assertMaskEditFileSize('遮罩主图文件', getDataUrlDecodedByteSize(opts.inputImageDataUrls[0] ?? ''))
       assertMaskEditFileSize('遮罩文件', getDataUrlDecodedByteSize(opts.maskDataUrl))
@@ -218,6 +222,7 @@ export async function callFalAiImageApi(opts: CallApiOptions, profile: ApiProfil
     const isEdit = opts.inputImageDataUrls.length > 0
     const endpoint = mapFalEndpoint(profile.model, isEdit)
     const input = await createFalRequestInput(opts, profile.model)
+    if (opts.signal?.aborted) throw new DOMException('Aborted', 'AbortError')
     const result = await fal.subscribe(endpoint, {
       input,
       logs: true,
@@ -225,9 +230,10 @@ export async function callFalAiImageApi(opts: CallApiOptions, profile: ApiProfil
         opts.onFalRequestEnqueued?.({ requestId, endpoint })
       },
     })
+    if (opts.signal?.aborted) throw new DOMException('Aborted', 'AbortError')
     const payload = result.data as FalApiResponse
     opts.onFalRequestEnqueued?.({ requestId: result.requestId, endpoint })
-    return parseFalResult(payload, opts.params, getFalCustomBaseUrlLabel(profile))
+    return parseFalResult(payload, opts.params, getFalCustomBaseUrlLabel(profile), opts.signal)
   } catch (err) {
     const falMessage = getFalErrorMessage(err)
     if (falMessage) throw new Error(falMessage)
