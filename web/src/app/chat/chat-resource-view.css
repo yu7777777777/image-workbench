@@ -241,15 +241,34 @@
 .chat-widget-image-missing {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  justify-content: center;
+  gap: 0.45rem;
+  min-width: 0;
   width: fit-content;
   max-width: 100%;
-  padding: 0.45rem 0.7rem;
-  border-radius: 0.55rem;
-  background: var(--muted);
+  min-height: 2.25rem;
+  padding: 0.5rem 0.8rem;
+  border: 1px dashed color-mix(in srgb, var(--chat-line, var(--border)) 95%, transparent);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--muted) 72%, transparent);
   color: var(--muted-foreground);
   font-size: 12px;
   line-height: 1.4;
+  box-sizing: border-box;
+}
+.chat-widget-image-missing svg {
+  flex-shrink: 0;
+  opacity: 0.78;
+}
+.chat-widget-image-missing > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.chat-widget-card > .chat-widget-image-missing,
+.chat-widget-carousel-item > .chat-widget-image-missing {
+  width: 100%;
+  min-height: 4.5rem;
+  padding: 0.75rem 1rem;
 }
 
 .chat-markdown .chat-widget-image-group .chat-resource-image img {
@@ -379,6 +398,9 @@
 }
 
 .chat-resource-tool {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 0.65rem;
   background: var(--card);
@@ -416,6 +438,8 @@
 
 .chat-resource-tool-content {
   display: grid;
+  min-width: 0;
+  max-width: 100%;
   gap: 0.5rem;
   padding: 0.2rem 0.65rem 0.65rem;
 }

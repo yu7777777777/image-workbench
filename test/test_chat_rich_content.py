@@ -281,3 +281,231 @@ def test_authenticated_stream_opt_in_is_separately_cached_per_owner(monkeypatch:
         assert bob[-1]["workbench"]["blocks"][0]["text"] == "run 3"
     finally:
         openai_v1_chat_complete.chat_completion_cache.clear()
+
+
+def test_content_references_image_v2_and_matched_text_preserve_queries_and_titles() -> None:
+    text = '<AsyncImage query="东京塔夜景"/>\n<AsyncImageGroup query={["京都神社", "大阪城"]} layout="bento"/>'
+    answer = _message(
+        "answer",
+        "assistant",
+        {"content_type": "text", "parts": [text]},
+        content_references=[
+            {
+                "type": "image_v2",
+                "matched_text": '<AsyncImage query="东京塔夜景"/>',
+                "alt": "东京塔夜景实拍",
+                "images": [
+                    {
+                        "content_url": "https://images.openai.com/static-rsc-4/tokyo-tower.jpg",
+                        "source_url": "https://travel.example.org/tokyo",
+                        "title": "Tokyo Tower Night View",
+                    },
+                ],
+            },
+            {
+                "type": "image_results",
+                "query": ["京都神社", "大阪城"],
+                "alt": "关西景点",
+                "items": [
+                    {"thumbnail_url": "https://images.openai.com/static-rsc-4/kyoto.jpg"},
+                    {"image_url": "https://images.openai.com/static-rsc-4/osaka.jpg", "alt": "大阪城天守阁"},
+                ],
+            },
+        ],
+    )
+    backend = Mock()
+    backend._get_editable_conversation_detail.return_value = {}
+    rich = ChatRichContent("owner-a")
+    rich.observe(backend, _event(answer, text))
+    rich.finish(backend)
+
+    images = [block for block in rich.blocks if block["type"] == "image"]
+    assert len(images) == 3
+    by_url = {block["imageUrl"]: block for block in images}
+    assert by_url["https://images.openai.com/static-rsc-4/tokyo-tower.jpg"]["queries"] == ["东京塔夜景"]
+    assert by_url["https://images.openai.com/static-rsc-4/tokyo-tower.jpg"]["title"] == "Tokyo Tower Night View"
+    assert by_url["https://images.openai.com/static-rsc-4/tokyo-tower.jpg"]["url"] == "https://travel.example.org/tokyo"
+    assert by_url["https://images.openai.com/static-rsc-4/kyoto.jpg"]["queries"] == ["京都神社", "大阪城"]
+    assert by_url["https://images.openai.com/static-rsc-4/kyoto.jpg"]["title"] == "关西景点"
+    assert by_url["https://images.openai.com/static-rsc-4/osaka.jpg"]["queries"] == ["京都神社", "大阪城"]
+    assert by_url["https://images.openai.com/static-rsc-4/osaka.jpg"]["title"] == "大阪城天守阁"
+
+
+def test_grouped_webpages_matched_text_and_utm_dedup_preserve_all_citation_refs() -> None:
+    text = (
+        '结论 A<Cite refs={["turn0search0", "turn0search1"]}/> '
+        '与结论 B<Cite refs={["turn0search2"]}/> '
+        '和结论 C<Cite refs={["turn0news4"]}/>。'
+    )
+    search = _message(
+        "search-1",
+        "tool",
+        {"content_type": "text", "text": "raw search"},
+        name="web.run",
+        search_result_groups=[
+            {
+                "type": "search_result_group",
+                "entries": [
+                    {
+                        "type": "search_result",
+                        "ref_id": {"turn_index": 0, "ref_type": "search", "ref_index": 0},
+                        "url": "https://docs.example.org/alpha",
+                        "title": "Alpha Doc",
+                    },
+                ],
+            }
+        ],
+    )
+    assistant = _message(
+        "answer",
+        "assistant",
+        {"content_type": "text", "parts": [text]},
+        content_references=[
+            {
+                "type": "grouped_webpages",
+                "matched_text": "\ue200cite\ue202turn0search0\ue202turn0search1\ue201",
+                "items": [
+                    {
+                        "title": "Alpha Doc (Official)",
+                        "url": "https://docs.example.org/alpha?utm_source=chatgpt.com",
+                        "snippet": "Alpha summary",
+                        "refs": [{"turn_index": 0, "ref_type": "search", "ref_index": 0}],
+                        "supporting_websites": [
+                            {
+                                "title": "Beta Supporting",
+                                "url": "https://docs.example.org/beta?utm_source=chatgpt.com",
+                                "refs": [{"turn_index": 0, "ref_type": "search", "ref_index": 1}],
+                            }
+                        ],
+                    }
+                ],
+            },
+            {
+                "type": "webpage",
+                "matched_text": "\ue200cite\ue202turn0search2\ue201",
+                "url": "https://docs.example.org/gamma?id=9&utm_source=chatgpt.com",
+                "title": "Gamma Page",
+            },
+            {
+                "type": "sources_footnote",
+                "refs": ["turn0news4"],
+                "safe_urls": ["https://news.example.org/story?utm_source=chatgpt.com"],
+                "title": "News Story",
+            },
+        ],
+    )
+    backend = Mock()
+    backend._get_editable_conversation_detail.return_value = {}
+    rich = ChatRichContent("owner-a")
+    rich.observe(backend, _event(search, ""))
+    rich.observe(backend, _event(assistant, text))
+    rich.finish(backend)
+
+    sources = [block for block in rich.blocks if block["type"] == "source"]
+    by_ref = [block for block in sources if block.get("ref") == "turn0search0"]
+    # Same ref across search_result_groups and content_references must never emit conflicting duplicate URLs
+    assert len(by_ref) == 1
+    assert by_ref[0]["url"] == "https://docs.example.org/alpha"
+    assert by_ref[0]["description"] == "Alpha summary"
+    refs_map = {block["ref"]: block["url"] for block in sources if block.get("ref")}
+    assert refs_map["turn0search0"] == "https://docs.example.org/alpha"
+    assert refs_map["turn0search1"] == "https://docs.example.org/beta"
+    assert refs_map["turn0search2"] == "https://docs.example.org/gamma?id=9"
+    assert refs_map["turn0news4"] == "https://news.example.org/story"
+
+
+def test_cited_sources_evict_uncited_results_when_over_source_limit() -> None:
+    text = '详见<Cite refs={["turn1search2"]}/>'
+    many_results = [
+        {
+            "type": "search_result",
+            "ref_id": {"turn_index": 0, "ref_type": "search", "ref_index": i},
+            "url": f"https://noise.example.org/page-{i}",
+            "title": f"Noise {i}",
+        }
+        for i in range(28)
+    ]
+    search1 = _message(
+        "search-1",
+        "tool",
+        {"content_type": "text", "text": "raw"},
+        name="web.run",
+        search_result_groups=[{"type": "search_result_group", "entries": many_results}],
+    )
+    search2 = _message(
+        "search-2",
+        "tool",
+        {"content_type": "text", "text": "raw"},
+        name="web.run",
+        search_result_groups=[
+            {
+                "type": "search_result_group",
+                "entries": [
+                    {
+                        "type": "search_result",
+                        "ref_id": {"turn_index": 1, "ref_type": "search", "ref_index": 2},
+                        "url": "https://cited.example.org/final",
+                        "title": "Cited Final Source",
+                    }
+                ],
+            }
+        ],
+    )
+    assistant = _message("answer", "assistant", {"content_type": "text", "parts": [text]})
+    backend = Mock()
+    backend._get_editable_conversation_detail.return_value = {}
+    rich = ChatRichContent("owner-a")
+    rich.observe(backend, _event(search1, ""))
+    rich.observe(backend, _event(search2, ""))
+    rich.observe(backend, _event(assistant, text))
+    rich.finish(backend)
+
+    sources = [block for block in rich.blocks if block["type"] == "source"]
+    assert len(sources) == 24
+    cited = [block for block in sources if block.get("ref") == "turn1search2"]
+    assert len(cited) == 1
+    assert cited[0]["url"] == "https://cited.example.org/final"
+
+
+def test_observe_captures_streamed_metadata_patches_when_detail_unavailable() -> None:
+    text = '参考<Cite refs={["turn0search5"]}/>\n<AsyncImage query="海边日落"/>'
+    assistant = _message("answer", "assistant", {"content_type": "text", "parts": [text]})
+    patch_event = {
+        "conversation_id": "conversation-1",
+        "text": text,
+        "raw": {
+            "o": "patch",
+            "v": [
+                {
+                    "p": "/message/metadata/content_references",
+                    "o": "append",
+                    "v": [
+                        {
+                            "type": "webpage",
+                            "matched_text": "\ue200cite\ue202turn0search5\ue201",
+                            "url": "https://patch.example.org/ref5",
+                            "title": "Patched Source",
+                        },
+                        {
+                            "type": "image_v2",
+                            "query": "海边日落",
+                            "images": [{"thumbnail_url": "https://images.openai.com/sunset.jpg", "alt": "日落"}],
+                        },
+                    ],
+                }
+            ],
+        },
+    }
+    backend = Mock()
+    backend._get_editable_conversation_detail.side_effect = RuntimeError("upstream unavailable")
+    rich = ChatRichContent("owner-a")
+    rich.observe(backend, _event(assistant, text))
+    rich.observe(backend, patch_event)
+    rich.finish(backend)
+
+    sources = {block.get("ref"): block for block in rich.blocks if block["type"] == "source"}
+    images = [block for block in rich.blocks if block["type"] == "image"]
+    assert sources["turn0search5"]["url"] == "https://patch.example.org/ref5"
+    assert len(images) == 1
+    assert images[0]["queries"] == ["海边日落"]
+    assert images[0]["imageUrl"] == "https://images.openai.com/sunset.jpg"

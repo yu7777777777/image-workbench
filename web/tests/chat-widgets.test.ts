@@ -3,7 +3,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { splitChatReply } from "../src/lib/chat-rich-reply";
 import { chatWidgetInlineImages, readChatWidget, widgetValue, type WidgetNode } from "../src/lib/chat-widget";
-import { ChatWidgetView, resolveIcon } from "../src/app/chat/chat-widget-view";
+import { ChatWidgetView, isLightHexColor, resolveIcon } from "../src/app/chat/chat-widget-view";
 import examples from "./fixtures/chat-widget-expansion.json";
 
 test("renders a radio group with an unmatched initial option and requires a visible choice", async () => {
@@ -434,4 +434,278 @@ test("classifies lightweight text follow-up pressables as link variant while kee
   }));
   expect(html).toContain('<button type="button" class="chat-widget-pressable" data-variant="link"');
   expect(html).toContain('<div class="chat-widget-pressable" data-border="true"');
+});
+
+test("supports inline text decoration tags, Entity and direct Link inside widgets without unsupported fallbacks", () => {
+  const markup = [
+    "<box>",
+    '  <text>支持 <underline>下划线</underline>、<strikethrough>删除线</strikethrough>、<b>粗体</b>、<strong>强调</strong>、<i>斜体</i>、<em>强调斜体</em>、<u>短下划线</u>、<s>短删除线</s>、<code>code()</code> 与 <span>行内文本</span></text>',
+    '  <text>官方：<Entity value="京都市官方旅游指南" category="organization"/> / <Entity category="place">清水寺</Entity></text>',
+    '  <Link url="https://kyoto.travel/en/" title="Kyoto Travel 官方网站"/>',
+    "</box>",
+  ].join("\n");
+  const widget = readChatWidget(markup)?.widget;
+  if (!widget || widget.root.kind !== "layout") throw new Error("缺少内联格式组件");
+  function hasUnsupported(node: WidgetNode): boolean {
+    if (node.kind === "unsupported") return true;
+    return "children" in node && node.children.some(hasUnsupported);
+  }
+  expect(hasUnsupported(widget.root)).toBe(false);
+
+  const html = renderToStaticMarkup(createElement(ChatWidgetView, {
+    widget,
+    streaming: false,
+    canSend: true,
+    onSend: () => {},
+    resolveImages: () => [],
+  }));
+  expect(html).toContain('<u class="chat-widget-underline">下划线</u>');
+  expect(html).toContain('<s class="chat-widget-strikethrough">删除线</s>');
+  expect(html).toContain("<strong>粗体</strong>");
+  expect(html).toContain("<em>斜体</em>");
+  expect(html).toContain("<code>code()</code>");
+  expect(html).toContain("<span>行内文本</span>");
+  expect(html).toContain("京都市官方旅游指南");
+  expect(html).toContain("清水寺");
+  expect(html).toContain('href="https://kyoto.travel/en/"');
+  expect(html).toContain("Kyoto Travel 官方网站");
+  expect(html).not.toContain("此组件暂无法显示");
+});
+
+test("supports switch checkbox shape, checkbox lineThrough, localized slider aria-label, and GenUI.copy action", () => {
+  const markup = [
+    '{@body const [toggle, setToggle] = DIL.useState(true)}',
+    '{@body const [done, setDone] = DIL.useState(false)}',
+    '{@body const [range, setRange] = DIL.useState(40)}',
+    '<box>',
+    '  <checkbox checked={toggle} onChange={setToggle} shape="switch"/>',
+    '  <checkbox checked={done} onChange={setDone} lineThrough={true}>已完成任务</checkbox>',
+    '  <slider value={range} onChange={setRange} min={0} max={100}/>',
+    '  <button onClick={() => GenUI.copy(`当前进度：${range}%`)}>复制结果</button>',
+    '</box>',
+  ].join("\n");
+  const widget = readChatWidget(markup)?.widget;
+  if (!widget || widget.root.kind !== "layout") throw new Error("缺少控件组件");
+  const [sw, cb, slider, copyBtn] = widget.root.children;
+  expect(sw).toMatchObject({ kind: "checkbox", name: "toggle", shape: "switch", switch: true, compact: true });
+  expect(cb).toMatchObject({ kind: "checkbox", name: "done", lineThrough: true, label: "已完成任务" });
+  expect(slider).toMatchObject({ kind: "slider", name: "range", min: 0, max: 100 });
+  if (copyBtn.kind !== "button" || !("copy" in copyBtn.action)) throw new Error("缺少 copy 动作");
+  expect(widgetValue(copyBtn.action.copy, widget.initial)).toBe("当前进度：40%");
+
+  const html = renderToStaticMarkup(createElement(ChatWidgetView, {
+    widget,
+    streaming: false,
+    canSend: true,
+    onSend: () => {},
+    resolveImages: () => [],
+  }));
+  expect(html).toContain('data-shape="switch"');
+  expect(html).toContain('role="switch"');
+  expect(html).toContain('data-line-through="true"');
+  expect(html).toContain('aria-label="调整滑块"');
+  expect(html).not.toContain("调整 RANGE");
+});
+
+test("evaluates allowlisted pure method calls and Math/Number/String globals safely in widget expressions", () => {
+  const markup = [
+    '{@body const [title, setTitle] = DIL.useState("  kyoto trip  ")}',
+    '{@body const [tags, setTags] = DIL.useState(["京都", "奈良", "大阪"])}',
+    '<box>',
+    '  {#each [{ name: "预算", v: 12000, b: 15000, rate: 3.14159 }] as item}',
+    '    <text>¥{item.v.toLocaleString()} / ¥{item.b.toLocaleString()} ({item.rate.toFixed(2)}%)</text>',
+    '  {/each}',
+    '  <text>{title.trim().toUpperCase()} | {title.trim().toLowerCase()} | {title.trim().slice(0, 5)}</text>',
+    '  <text>{title.includes("kyoto") ? "yes" : "no"} | {title.trim().startsWith("ky") ? "s" : "n"} | {title.trim().endsWith("trip") ? "e" : "n"}</text>',
+    '  <text>{tags.slice(0, 2).join("、")} ({tags.length})</text>',
+    '  <text>{Math.round(12.6)} / {Math.floor(12.9)} / {Math.ceil(12.1)} / {Math.abs(-7)} / {Math.min(9, 3, 5)} / {Math.max(9, 3, 5)} / {Number("42") + 8} / {String(99)}</text>',
+    '</box>',
+  ].join("\n");
+  const widget = readChatWidget(markup)?.widget;
+  if (!widget || widget.root.kind !== "layout") throw new Error("缺少表达式测试组件");
+  const renderText = (node: WidgetNode) => {
+    if (node.kind !== "layout" || node.children[0]?.kind !== "markdown") throw new Error("缺少文本节点");
+    return node.children[0].parts.map((part) => typeof part === "string" ? part : String(widgetValue(part.value, widget.initial))).join("");
+  };
+  const [budget, strings, checks, arr, math] = widget.root.children;
+  expect(renderText(budget)).toBe(`¥${(12000).toLocaleString()} / ¥${(15000).toLocaleString()} (3.14%)`);
+  expect(renderText(strings)).toBe("KYOTO TRIP | kyoto trip | kyoto");
+  expect(renderText(checks)).toBe("yes | s | e");
+  expect(renderText(arr)).toBe("京都、奈良 (3)");
+  expect(renderText(math)).toBe("13 / 12 / 13 / 7 / 3 / 9 / 50 / 99");
+});
+
+test("coerces finite numeric strings in scatter and bar charts without failing", () => {
+  const scatter = '<Chart content={{"chartType":"scatter","meta":{"title":"广告投入与转化关系"},"xKey":"investment","series":[{"dataKey":"conversion","label":"转化率","valueSuffix":"%"}],"data":[{"investment":"10","conversion":2},{"investment":"25.5","conversion":"4.8"}]}}/>';
+  const widget = readChatWidget(scatter)?.widget;
+  expect(widget?.root).toMatchObject({
+    kind: "chart",
+    chartType: "scatter",
+    label: "广告投入与转化关系",
+    series: ["转化率"],
+    rows: [
+      { name: "10", x: 10, values: [2] },
+      { name: "25.5", x: 25.5, values: [4.8] },
+    ],
+  });
+  const html = renderToStaticMarkup(createElement(ChatWidgetView, {
+    widget: widget!,
+    streaming: false,
+    canSend: true,
+    onSend: () => {},
+    resolveImages: () => [],
+  }));
+  expect(html).toContain("广告投入与转化关系");
+  expect(html).toContain("chat-widget-chart");
+});
+
+test("compiles complex tabs/popover lookup blocks and multi-state toggle-helper questionnaires cleanly", () => {
+  const tabsBlock = [
+    '{@body const [segment, setSegment] = DIL.useState("overview")}',
+    '{@body const tabContent = { overview: "整体指标稳步增长", detail: "分渠道转化率明细", "中文键": "支持中文键" }}',
+    '<box>',
+    '  <segmented-control block value={segment} onChange={setSegment} options={[{ value: "overview", label: "概览" }, { value: "detail", label: "明细" }]} />',
+    '  <divider color="subtle"/>',
+    '  <text>{tabContent[segment]}</text>',
+    '  <popover>',
+    '    <popover-trigger block><button>查看计算口径</button></popover-trigger>',
+    '    <popover-content><text>统计口径包含全部有效订单。</text></popover-content>',
+    '  </popover>',
+    '</box>',
+  ].join("\n");
+  const tabsWidget = readChatWidget(tabsBlock)?.widget;
+  if (!tabsWidget || tabsWidget.root.kind !== "layout") throw new Error("缺少 Tabs/Popover 组件");
+  const [seg, div, tabText, pop] = tabsWidget.root.children;
+  expect(seg).toMatchObject({ kind: "radio", segmented: true, block: true });
+  expect(div).toMatchObject({ kind: "divider", color: "subtle" });
+  expect(pop).toMatchObject({ kind: "popover", label: "查看计算口径", block: true });
+  if (tabText.kind !== "layout" || tabText.children[0]?.kind !== "markdown") throw new Error("缺少动态查表文本");
+  const evalTab = (key: string) => tabText.children[0].kind === "markdown"
+    ? tabText.children[0].parts.map((part) => typeof part === "string" ? part : String(widgetValue(part.value, new Map(tabsWidget.initial).set("segment", key)))).join("")
+    : "";
+  expect(evalTab("overview")).toBe("整体指标稳步增长");
+  expect(evalTab("detail")).toBe("分渠道转化率明细");
+
+  const tabsHtml = renderToStaticMarkup(createElement(ChatWidgetView, {
+    widget: tabsWidget,
+    streaming: false,
+    canSend: true,
+    onSend: () => {},
+    resolveImages: () => [],
+  }));
+  expect(tabsHtml).toContain('data-block="true"');
+  expect(tabsHtml).toContain('data-color="subtle"');
+
+  const questionnaire = [
+    '{@body const [days, setDays] = DIL.useState("3天")}',
+    '{@body const [pace, setPace] = DIL.useState("舒适")}',
+    '{@body const [spots, setSpots] = DIL.useState(["清水寺", "伏见稻荷大社"])}',
+    '{@body const [foods, setFoods] = DIL.useState(["抹茶甜品"])}',
+    '{@body const [budget, setBudget] = DIL.useState("中等")}',
+    '{@body const [notes, setNotes] = DIL.useState("")}',
+    '{@body const toggle = (arr, setArr, v) => setArr(arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v])}',
+    '{@body const toggleFood = (v) => setFoods(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v])}',
+    '<box>',
+    '  <title>京都行程偏好问卷</title>',
+    '  <segmented-control block value={days} onChange={setDays} options={["2天", "3天", "4天"]} />',
+    '  <segmented-control block value={pace} onChange={setPace} options={["紧凑", "舒适", "慢游"]} />',
+    '  <box>',
+    '    {#each ["清水寺", "伏见稻荷大社", "岚山", "金阁寺"] as v}',
+    '      <checkbox checked={spots.includes(v)} onChange={() => toggle(spots, setSpots, v)} lineThrough={false}>{v}</checkbox>',
+    '    {/each}',
+    '  </box>',
+    '  <box>',
+    '    {#each ["怀石料理", "抹茶甜品", "拉面"] as v}',
+    '      <checkbox checked={foods.includes(v)} onChange={() => toggleFood(v)} lineThrough={false}>{v}</checkbox>',
+    '    {/each}',
+    '  </box>',
+    '  <segmented-control block value={budget} onChange={setBudget} options={["经济", "中等", "奢华"]} />',
+    '  <textarea value={notes} onChange={setNotes} placeholder="其他需求..."/>',
+    '  <button block onClick={() => GenUI.issueNewTurn(`天数：${days}；景点：${spots.join("、")}；美食：${foods.join("、")}；预算：${budget}；备注：${notes}`)}>生成专属行程</button>',
+    '</box>',
+  ].join("\n");
+  const qBlocks = splitChatReply(questionnaire);
+  expect(qBlocks).toHaveLength(1);
+  expect(qBlocks[0].kind).toBe("widget");
+  if (qBlocks[0].kind !== "widget" || qBlocks[0].widget.root.kind !== "layout") throw new Error("缺少京都问卷");
+  function findUnsupported(node: WidgetNode): WidgetNode[] {
+    if (node.kind === "unsupported") return [node];
+    return "children" in node ? node.children.flatMap(findUnsupported) : [];
+  }
+  expect(findUnsupported(qBlocks[0].widget.root)).toEqual([]);
+  const submitBtn = qBlocks[0].widget.root.children.at(-1);
+  if (submitBtn?.kind !== "button" || !("submit" in submitBtn.action)) throw new Error("缺少提交按钮");
+  expect(widgetValue(submitBtn.action.submit, qBlocks[0].widget.initial)).toBe(
+    "天数：3天；景点：清水寺、伏见稻荷大社；美食：抹茶甜品；预算：中等；备注：",
+  );
+});
+
+test("emits data-theme and data-surface-tone=light for bright hex surfaces and resolves all live icons", () => {
+  expect(isLightHexColor("#fff")).toBe(true);
+  expect(isLightHexColor("#FFFFFF")).toBe(true);
+  expect(isLightHexColor("#F3F5F8")).toBe(true);
+  expect(isLightHexColor("#1E293B")).toBe(false);
+  expect(isLightHexColor("#2563EB")).toBe(false);
+  expect(isLightHexColor("surface-secondary")).toBe(false);
+
+  const widget = readChatWidget([
+    '<box theme="light" background="#F3F5F8">',
+    '  <card background="#FFFFFF"><text value="浅色卡片"/></card>',
+    '  <card background="#1E293B"><text value="深色卡片"/></card>',
+    '</box>',
+  ].join("\n"))?.widget;
+  if (!widget || widget.root.kind !== "layout") throw new Error("缺少主题卡片");
+  expect(widget.root.options?.theme).toBe("light");
+
+  const html = renderToStaticMarkup(createElement(ChatWidgetView, {
+    widget,
+    streaming: false,
+    canSend: true,
+    onSend: () => {},
+    resolveImages: () => [],
+  }));
+  expect(html).toContain('data-theme="light"');
+  expect(html).toContain('data-surface-tone="light"');
+
+  const requiredIcons = [
+    "type", "form-input", "chart-no-axes-combined", "panels-top-left", "workflow", "landmark",
+    "trending-down", "piggy-bank", "briefcase-business", "wallet", "receipt", "bar-chart",
+    "pie-chart", "map", "compass", "ticket", "train", "utensils", "camera", "building",
+    "building-2", "shopping-bag", "shopping-cart", "car", "bus", "bed", "coffee", "sparkles",
+    "layers", "sliders-horizontal", "toggle-right", "check-square", "circle-dot", "list",
+    "table", "code-2", "git-branch",
+  ];
+  for (const name of requiredIcons) {
+    expect(resolveIcon(name)).toBeDefined();
+  }
+});
+
+test("evaluates string.split()[index] inside calendar strips and keeps slim progress bar tracks unpadded", () => {
+  const widget = readChatWidget([
+    '{@body const days = ["Mon 23", "Tue 24", "Thu 26"]}',
+    "<box>",
+    '  <row gap={1}>',
+    '    {#each days as day}',
+    '      <box flex={1}><text>{day.split(" ")[0]}</text><text weight="bold">{day.split(" ")[1]}</text></box>',
+    '    {/each}',
+    '  </row>',
+    '  <box height={8} radius="full" background="surface-secondary"><box width="60%" height="100%" radius="full" background="#16A34A" /></box>',
+    "</box>",
+  ].join("\n"))?.widget;
+  if (!widget) throw new Error("缺少日历条与进度条");
+
+  const html = renderToStaticMarkup(createElement(ChatWidgetView, {
+    widget,
+    streaming: false,
+    canSend: true,
+    onSend: () => {},
+    resolveImages: () => [],
+  }));
+  expect(html).toContain(">Mon<");
+  expect(html).toContain(">23<");
+  expect(html).toContain(">Thu<");
+  expect(html).toContain(">26<");
+  expect(html).not.toContain("day.split");
+  expect(html).toContain("height:8px");
+  expect(html).toContain("padding-top:0");
 });

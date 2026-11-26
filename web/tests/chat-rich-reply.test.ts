@@ -167,3 +167,56 @@ test("groups multi-ref and adjacent Cite tags into a single grouped citation pil
   expect(singleHtml).toContain('class="chat-resource-cite-label">iana.org</span>');
   expect(singleHtml).not.toContain("lucide-external-link");
 });
+
+test("converts raw Entity and direct http(s) Link XML tags in Markdown while preserving Link ref citations and fenced code", () => {
+  const incoming = readChatResources([
+    { id: "s1", type: "source", ref: "turn0search0", title: "官方来源", url: "https://example.org/doc" },
+  ]);
+  const sample = [
+    '推荐参考 <Entity value="京都市官方旅游指南" category="organization"/> 和 <Entity category="place">清水寺</Entity>。',
+    '直达官网：<Link url="https://kyoto.travel/en/" title="Kyoto Travel 官方网站"/>，以及 <Link href="https://example.com/map" label="交通图"/>。',
+    '无标题链接：<Link url="https://kyoto.travel/en/"/>；不安全链接：<Link url="javascript:alert(1)" title="忽略脚本"/>。',
+    '保留引用：<Link ref="turn0search0" title="引用文档"/> 与 <Link ref="missing0" title="缺失引用"/>。',
+    '```xml\n<Entity value="代码块内原样保留"/>\n<Link url="https://kyoto.travel/en/" title="原文"/>\n```',
+  ].join("\n\n");
+  const ref = readReplyResources(sample, incoming);
+  const md = prepareReplyMarkdown(sample, ref.citations, ref.inlineSources);
+
+  expect(md).toContain("京都市官方旅游指南");
+  expect(md).toContain("清水寺");
+  expect(md).toContain("[Kyoto Travel 官方网站](<https://kyoto.travel/en/>)");
+  expect(md).toContain("[交通图](<https://example.com/map>)");
+  expect(md).toContain("[kyoto.travel](<https://kyoto.travel/en/>)");
+  expect(md).toContain("忽略脚本");
+  expect(md).not.toContain("javascript:alert");
+  expect(md).toContain("[引用文档](<workbench-cite:turn0search0>)");
+  expect(md).toContain("缺失引用（来源链接未返回）");
+  // Raw tags outside code fences must never leak.
+  const beforeFence = md.slice(0, md.indexOf("```xml"));
+  expect(beforeFence).not.toContain("<Entity");
+  expect(beforeFence).not.toContain("<Link");
+  // Inside code fences they stay verbatim.
+  expect(md).toContain('<Entity value="代码块内原样保留"/>');
+  expect(md).toContain('<Link url="https://kyoto.travel/en/" title="原文"/>');
+});
+
+test("splits MapWidgetV2 blocks cleanly into interactive map widgets", () => {
+  const reply = [
+    "以下是京都 3 日景点地图：",
+    '<MapWidgetV2 id="kyoto-three-day-map" title="京都 3 日必游地点地图" points={[{"title":"清水寺","lat":34.9949,"lng":135.785,"address":"京都市东山区清水1-294","description":"世界文化遗产木造舞台","group":"day1"},{"title":"伏见稻荷大社","latitude":"34.9671","longitude":"135.7727","subtitle":"千本鸟居","category":"day1"},{"name":"岚山竹林","address":"京都市右京区嵯峨天龙寺","group":"day2"}]} groups={[{"id":"day1","title":"第 1 天"},{"id":"day2","title":"第 2 天"}]} show_route={false} carousel={{"visibility":"hidden"}}/>',
+    "祝旅途愉快！",
+  ].join("\n\n");
+  const blocks = splitChatReply(reply);
+  expect(blocks.map((block) => block.kind)).toEqual(["markdown", "widget", "markdown"]);
+  const mapBlock = blocks[1];
+  if (mapBlock.kind !== "widget") throw new Error("缺少地图组件");
+  expect(mapBlock.widget.root).toMatchObject({
+    kind: "map",
+    label: "京都 3 日必游地点地图",
+    markers: [
+      { label: "第 1 天 · 清水寺", lat: 34.9949, lon: 135.785, description: "世界文化遗产木造舞台", group: "第 1 天" },
+      { label: "第 1 天 · 伏见稻荷大社", lat: 34.9671, lon: 135.7727, description: "千本鸟居", group: "第 1 天" },
+      { label: "第 2 天 · 岚山竹林", address: "京都市右京区嵯峨天龙寺", group: "第 2 天" },
+    ],
+  });
+});

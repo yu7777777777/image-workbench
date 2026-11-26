@@ -14,19 +14,36 @@ export type ReplyChartData = {
   min?: number;
 };
 
+function toFiniteNumber(value: unknown): number | undefined {
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
 function scale(min: number, max: number) {
   const magnitude = Math.max(1, Math.abs(min), Math.abs(max));
   const low = min / magnitude;
   const high = max / magnitude;
   return (value: number) => high > low ? (value / magnitude - low) / (high - low) : 0.5;
 }
-export function ReplyChart({ chartType, rows, series, label, description, min }: ReplyChartData) {
+export function ReplyChart({ chartType, rows: rawRows, series, label, description, min }: ReplyChartData) {
+  const rows = rawRows.map((row) => ({
+    name: row.name,
+    x: toFiniteNumber(row.x),
+    values: row.values.map((value) => toFiniteNumber(value) ?? 0),
+  }));
+  const minBound = toFiniteNumber(min);
   const [hidden, setHidden] = useState<number[]>([]);
   const [selected, setSelected] = useState<number>();
   const [hovered, setHovered] = useState<number>();
   const visible = series.map((_, index) => index).filter((index) => !hidden.includes(index));
   const values = rows.flatMap((row) => visible.map((index) => row.values[index]));
-  const low = Math.min(0, min ?? 0, ...values);
+  const low = Math.min(0, minBound ?? 0, ...values);
   const rawHigh = Math.max(1, ...values);
   const high = chartType === "bar" && rawHigh > 0 ? rawHigh * 1.12 : rawHigh;
   const percent = scale(low, high);
