@@ -72,3 +72,114 @@ export function isLegacyOwnerClaimedBy(owner = currentWorkbenchOwner): boolean {
     return false
   }
 }
+
+
+// 独立协调库只存旧数据的归属。读写事务让两个首次打开的标签页只能有一个认领者。
+export async function claimLegacyWorkbenchForSession(owner: string): Promise<void> {
+  if (typeof indexedDB === 'undefined' || typeof localStorage === 'undefined') return
+  const db = await new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open(LEGACY_DB_NAME + ':coordination', 1)
+    request.onupgradeneeded = () => request.result.createObjectStore('migration')
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+  try {
+    const claimed = await new Promise<string>((resolve, reject) => {
+      const tx = db.transaction('migration', 'readwrite')
+      const store = tx.objectStore('migration')
+      const current = store.get('legacyOwner')
+      let winner: string
+      current.onsuccess = () => {
+        winner = normalizeWorkbenchOwner(current.result)
+          || normalizeWorkbenchOwner(localStorage.getItem(LEGACY_OWNER_CLAIM_KEY)) || owner
+        if (!current.result) store.put(winner, 'legacyOwner')
+      }
+      tx.oncomplete = () => resolve(winner)
+      tx.onabort = () => reject(tx.error)
+    })
+    if (claimed === owner) claimLegacyWorkbenchLocalStorage(owner)
+  } finally {
+    db.close()
+  }
+}
+
+const tabId = globalThis.crypto?.randomUUID?.() ?? Date.now().toString(36) + Math.random().toString(36).slice(2)
+const tabLifetime = 180_000
+const getTabPrefix = () => getOwnerScopedKey(LEGACY_DB_NAME) + ':live-tab:'
+
+export function getWorkbenchTabId() {
+  return typeof window !== 'undefined' ? tabId : undefined
+}
+
+export function isAnotherWorkbenchTabActive(id?: string): boolean {
+  if (!id || id === tabId || typeof localStorage === 'undefined') return false
+  try {
+    return Number(localStorage.getItem(getTabPrefix() + id)) > Date.now() - tabLifetime
+  } catch {
+    return false
+  }
+}
+
+export function hasAnotherWorkbenchTab() {
+  if (typeof localStorage === 'undefined') return false
+  const prefix = getTabPrefix()
+  try {
+    for (let index = 0; index < localStorage.length; index++) {
+      const key = localStorage.key(index)
+      if (key?.startsWith(prefix) && isAnotherWorkbenchTabActive(key.slice(prefix.length))) return true
+    }
+  } catch {
+    return false
+  }
+  return false
+}
+
+export function startWorkbenchTabHeartbeat() {
+  const prefix = getTabPrefix()
+  const key = prefix + tabId
+  const pulse = () => {
+    try {
+      localStorage.setItem(key, String(Date.now()))
+      for (let index = localStorage.length - 1; index >= 0; index--) {
+        const entry = localStorage.key(index)
+        if (entry?.startsWith(prefix) && !isAnotherWorkbenchTabActive(entry.slice(prefix.length)) && entry !== key) {
+          localStorage.removeItem(entry)
+        }
+      }
+    } catch {
+      // IndexedDB 仍可独立保存记录。
+    }
+  }
+  pulse()
+  let heartbeat = setInterval(pulse, 30_000)
+  window.addEventListener('pageshow', (event) => {
+    if (!event.persisted) return
+    pulse()
+    heartbeat = setInterval(pulse, 30_000)
+  })
+  window.addEventListener('pagehide', () => {
+    clearInterval(heartbeat)
+    try { localStorage.removeItem(key) } catch { /* 存储不可用 */ }
+  })
+}
+
+type WorkbenchDeletion = { domain: 'tasks' | 'conversations'; ids: string[] }
+let deletionChannel: BroadcastChannel | undefined
+
+function getDeletionChannel() {
+  if (typeof window === 'undefined' || typeof window.BroadcastChannel !== 'function') return undefined
+  return deletionChannel ??= new window.BroadcastChannel(getOwnerScopedKey(LEGACY_DB_NAME) + ':deletions')
+}
+
+export function broadcastWorkbenchDeletion(domain: WorkbenchDeletion['domain'], ids: string[]) {
+  if (ids.length) getDeletionChannel()?.postMessage({ domain, ids })
+}
+
+export function onWorkbenchDeletion(onDelete: (event: WorkbenchDeletion) => void) {
+  const channel = getDeletionChannel()
+  const listener = ({ data }: MessageEvent<WorkbenchDeletion>) => {
+    if (data && (data.domain === 'tasks' || data.domain === 'conversations') && Array.isArray(data.ids)) onDelete(data)
+  }
+  channel?.addEventListener('message', listener)
+  return () => channel?.removeEventListener('message', listener)
+}

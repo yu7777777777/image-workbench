@@ -1,16 +1,29 @@
-import { DEFAULT_PARAMS, type AppSettings, type TaskParams } from '../types'
+import { DEFAULT_PARAMS, type ApiProfile, type AppSettings, type TaskParams } from '../types'
 import { getActiveApiProfile, isOpenAICompatibleProvider } from './apiProfiles'
 import { getImageGenerationModel, isGptImage25Model } from './imageModels'
 import { normalizeCodexCliImageSize, normalizeImageSize } from './size'
-import { POOL_KEY } from './accountPool'
+import { isPoolCredential } from './devProxy'
 
 export const DEFAULT_FAL_IMAGE_SIZE = '1360x1024'
 export const MAX_FAL_OUTPUT_IMAGES = 4
 export const MAX_OPENAI_OUTPUT_IMAGES = 10
 
+export function getImageCapabilities(profile: ApiProfile) {
+  const fal = profile.provider === 'fal'
+  const pool = isPoolCredential(profile.apiKey) && !profile.id.startsWith('shared-')
+  const extendedQuality = isGptImage25Model(getImageGenerationModel(profile))
+  return {
+    maxImages: pool ? 4 : fal ? MAX_FAL_OUTPUT_IMAGES : MAX_OPENAI_OUTPUT_IMAGES,
+    outputFormats: pool ? ['png'] : ['png', 'jpeg', 'webp'],
+    quality: [...(fal ? [] : ['auto']), 'low', 'medium', 'high', ...(extendedQuality ? ['xhigh', 'max'] : [])],
+    moderation: !fal,
+    compression: !fal && !pool,
+    autoSizeForGeneration: !fal,
+  }
+}
+
 export function getOutputImageLimitForSettings(settings: AppSettings) {
-  if (getActiveApiProfile(settings).apiKey === POOL_KEY) return 4
-  return getActiveApiProfile(settings).provider === 'fal' ? MAX_FAL_OUTPUT_IMAGES : MAX_OPENAI_OUTPUT_IMAGES
+  return getImageCapabilities(getActiveApiProfile(settings)).maxImages
 }
 
 export function normalizeParamsForSettings(
@@ -19,14 +32,14 @@ export function normalizeParamsForSettings(
   options: { hasInputImages?: boolean } = {},
 ): TaskParams {
   const activeProfile = getActiveApiProfile(settings)
-  const outputImageLimit = getOutputImageLimitForSettings(settings)
+  const capabilities = getImageCapabilities(activeProfile)
   const nextParams: TaskParams = {
     ...params,
     size: normalizeImageSize(params.size) || DEFAULT_PARAMS.size,
-    n: Math.min(outputImageLimit, Math.max(1, params.n || DEFAULT_PARAMS.n)),
+    n: Math.min(capabilities.maxImages, Math.max(1, params.n || DEFAULT_PARAMS.n)),
   }
 
-  if (activeProfile.apiKey === POOL_KEY) {
+  if (!capabilities.outputFormats.includes(nextParams.output_format)) {
     nextParams.output_format = 'png'
     nextParams.output_compression = null
   }
@@ -43,7 +56,7 @@ export function normalizeParamsForSettings(
     nextParams.output_compression = DEFAULT_PARAMS.output_compression
   }
 
-  if ((nextParams.quality === 'xhigh' || nextParams.quality === 'max') && !isGptImage25Model(getImageGenerationModel(activeProfile))) {
+  if (!capabilities.quality.includes(nextParams.quality)) {
     nextParams.quality = 'high'
   }
 

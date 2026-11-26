@@ -1,4 +1,4 @@
-import { fal } from '@fal-ai/client'
+import { createFalClient } from '@fal-ai/client'
 import type { ApiProfile, FalApiResponse, TaskParams } from '../types'
 import { DEFAULT_FAL_BASE_URL } from './apiProfiles'
 import { isGptImage25Model } from './imageModels'
@@ -43,14 +43,14 @@ function mapFalQuality(quality: TaskParams['quality'], model: string): 'low' | '
   return quality === 'low' || quality === 'medium' ? quality : 'high'
 }
 
-function configureFal(profile: ApiProfile) {
+function createProfileFalClient(profile: ApiProfile) {
   const baseUrl = profile.baseUrl.trim().replace(/\/+$/, '') || DEFAULT_FAL_BASE_URL
-  const config: Parameters<typeof fal.config>[0] = {
+  const config: Parameters<typeof createFalClient>[0] = {
     credentials: profile.apiKey,
     suppressLocalCredentialsWarning: true,
   }
   if (baseUrl !== DEFAULT_FAL_BASE_URL) config.proxyUrl = baseUrl
-  fal.config(config)
+  return createFalClient(config)
 }
 
 async function createFalRequestInput(opts: CallApiOptions, model: string): Promise<Record<string, unknown>> {
@@ -196,17 +196,23 @@ export async function getFalQueuedImageResult(
   params: TaskParams,
   signal?: AbortSignal,
 ): Promise<CallApiResult> {
-  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
-  configureFal(profile)
-  await fal.queue.subscribeToStatus(endpoint, { requestId, logs: true })
-  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
-  const result = await fal.queue.result(endpoint, { requestId })
+  const { queue } = createProfileFalClient(profile)
+  const options = { requestId, abortSignal: signal }
+  signal?.throwIfAborted()
+  await queue.subscribeToStatus(endpoint, { ...options, logs: true })
+  signal?.throwIfAborted()
+  const result = await queue.result(endpoint, options)
   return parseFalResult(result.data as FalApiResponse, params, getFalCustomBaseUrlLabel(profile), signal)
 }
 
 export async function callFalAiImageApi(opts: CallApiOptions, profile: ApiProfile): Promise<CallApiResult> {
+  const { signal } = opts
+  const { queue } = createProfileFalClient(profile)
+  const endpoint = mapFalEndpoint(profile.model, opts.inputImageDataUrls.length > 0)
+  let requestId: string | undefined
+
   try {
-    if (opts.signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+    signal?.throwIfAborted()
     if (opts.maskDataUrl) {
       assertMaskEditFileSize('遮罩主图文件', getDataUrlDecodedByteSize(opts.inputImageDataUrls[0] ?? ''))
       assertMaskEditFileSize('遮罩文件', getDataUrlDecodedByteSize(opts.maskDataUrl))
@@ -216,25 +222,23 @@ export async function callFalAiImageApi(opts: CallApiOptions, profile: ApiProfil
         (opts.maskDataUrl ? getDataUrlEncodedByteSize(opts.maskDataUrl) : 0),
     )
 
-    // 使用当前配置保存的 API Key，避免 fal SDK 额外输出前端凭据警告。
-    configureFal(profile)
-
-    const isEdit = opts.inputImageDataUrls.length > 0
-    const endpoint = mapFalEndpoint(profile.model, isEdit)
     const input = await createFalRequestInput(opts, profile.model)
-    if (opts.signal?.aborted) throw new DOMException('Aborted', 'AbortError')
-    const result = await fal.subscribe(endpoint, {
-      input,
-      logs: true,
-      onEnqueue: (requestId) => {
-        opts.onFalRequestEnqueued?.({ requestId, endpoint })
-      },
-    })
-    if (opts.signal?.aborted) throw new DOMException('Aborted', 'AbortError')
-    const payload = result.data as FalApiResponse
-    opts.onFalRequestEnqueued?.({ requestId: result.requestId, endpoint })
-    return parseFalResult(payload, opts.params, getFalCustomBaseUrlLabel(profile), opts.signal)
+    signal?.throwIfAborted()
+    const submitted = await queue.submit(endpoint, { input, abortSignal: signal })
+    requestId = submitted.request_id
+    signal?.throwIfAborted()
+    opts.onFalRequestEnqueued?.({ requestId, endpoint })
+
+    const options = { requestId, abortSignal: signal }
+    await queue.subscribeToStatus(endpoint, { ...options, logs: true })
+    signal?.throwIfAborted()
+    const result = await queue.result(endpoint, options)
+    return await parseFalResult(result.data as FalApiResponse, opts.params, getFalCustomBaseUrlLabel(profile), signal)
   } catch (err) {
+    if (signal?.aborted) {
+      if (requestId) void queue.cancel(endpoint, { requestId }).catch(() => undefined)
+      throw signal.reason
+    }
     const falMessage = getFalErrorMessage(err)
     if (falMessage) throw new Error(falMessage)
     throw err

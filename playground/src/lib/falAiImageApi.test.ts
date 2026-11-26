@@ -1,32 +1,49 @@
-import { fal } from '@fal-ai/client'
-import { afterEach, describe, expect, it, vi, type Mock } from 'vitest'
+import { createFalClient } from '@fal-ai/client'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_PARAMS } from '../types'
 import { createDefaultFalProfile, DEFAULT_FAL_BASE_URL, DEFAULT_SETTINGS } from './apiProfiles'
 import { callFalAiImageApi } from './falAiImageApi'
 
-vi.mock('@fal-ai/client', () => ({
-  fal: {
-    config: vi.fn(),
-    subscribe: vi.fn(),
-    queue: {
-      subscribeToStatus: vi.fn(),
-      result: vi.fn(),
-    },
-  },
-}))
+vi.mock('@fal-ai/client', () => ({ createFalClient: vi.fn() }))
 
-const falMock = fal as unknown as {
-  config: Mock
-  subscribe: Mock
+const queue = {
+  submit: vi.fn(),
+  subscribeToStatus: vi.fn(),
+  result: vi.fn(),
+  cancel: vi.fn(),
 }
 
 describe('callFalAiImageApi', () => {
+  beforeEach(() => {
+    vi.mocked(createFalClient).mockReturnValue({ queue } as unknown as ReturnType<typeof createFalClient>)
+    queue.submit.mockResolvedValue({ request_id: 'req-1' })
+    queue.subscribeToStatus.mockResolvedValue({ status: 'COMPLETED' })
+    queue.cancel.mockResolvedValue(undefined)
+  })
+
   afterEach(() => {
-    vi.clearAllMocks()
+    vi.resetAllMocks()
+  })
+
+  it('aborts the wait and requests cancellation of an enqueued job', async () => {
+    const controller = new AbortController()
+    queue.subscribeToStatus.mockImplementation(async (_endpoint, { abortSignal }) => {
+      controller.abort()
+      abortSignal.throwIfAborted()
+    })
+    await expect(callFalAiImageApi({
+      settings: DEFAULT_SETTINGS,
+      prompt: 'prompt',
+      params: { ...DEFAULT_PARAMS },
+      inputImageDataUrls: [],
+      signal: controller.signal,
+    }, createDefaultFalProfile({ apiKey: 'fal-key' }))).rejects.toMatchObject({ name: 'AbortError' })
+    expect(queue.cancel).toHaveBeenCalledWith('openai/gpt-image-2', { requestId: 'req-1' })
+    expect(queue.result).not.toHaveBeenCalled()
   })
 
   it('uses the default fal endpoint without proxyUrl', async () => {
-    falMock.subscribe.mockResolvedValue({
+    queue.result.mockResolvedValue({
       requestId: 'req-1',
       data: { images: [{ b64_json: 'aW1hZ2U=' }] },
     })
@@ -38,14 +55,14 @@ describe('callFalAiImageApi', () => {
       inputImageDataUrls: [],
     }, createDefaultFalProfile({ apiKey: 'fal-key', baseUrl: DEFAULT_FAL_BASE_URL }))
 
-    expect(falMock.config).toHaveBeenCalledWith({
+    expect(createFalClient).toHaveBeenCalledWith({
       credentials: 'fal-key',
       suppressLocalCredentialsWarning: true,
     })
   })
 
   it('passes custom fal API URL to the SDK proxyUrl option', async () => {
-    falMock.subscribe.mockResolvedValue({
+    queue.result.mockResolvedValue({
       requestId: 'req-1',
       data: { images: [{ b64_json: 'aW1hZ2U=' }] },
     })
@@ -60,7 +77,7 @@ describe('callFalAiImageApi', () => {
       baseUrl: 'https://fal-proxy.example.com/api/fal/',
     }))
 
-    expect(falMock.config).toHaveBeenCalledWith({
+    expect(createFalClient).toHaveBeenCalledWith({
       credentials: 'fal-key',
       suppressLocalCredentialsWarning: true,
       proxyUrl: 'https://fal-proxy.example.com/api/fal',
@@ -68,7 +85,7 @@ describe('callFalAiImageApi', () => {
   })
 
   it('uses the GPT Image 2.5 text-to-image endpoint and preserves max quality', async () => {
-    falMock.subscribe.mockResolvedValue({
+    queue.result.mockResolvedValue({
       requestId: 'req-1',
       data: { images: [{ b64_json: 'aW1hZ2U=' }] },
     })
@@ -80,13 +97,13 @@ describe('callFalAiImageApi', () => {
       inputImageDataUrls: [],
     }, createDefaultFalProfile({ model: 'openai/gpt-image-2.5/sunburst', apiKey: 'fal-key' }))
 
-    expect(falMock.subscribe).toHaveBeenCalledWith('openai/gpt-image-2.5/sunburst/text-to-image', expect.objectContaining({
+    expect(queue.submit).toHaveBeenCalledWith('openai/gpt-image-2.5/sunburst/text-to-image', expect.objectContaining({
       input: expect.objectContaining({ quality: 'max' }),
     }))
   })
 
   it('uses the GPT Image 2.5 edit endpoint', async () => {
-    falMock.subscribe.mockResolvedValue({
+    queue.result.mockResolvedValue({
       requestId: 'req-1',
       data: { images: [{ b64_json: 'aW1hZ2U=' }] },
     })
@@ -98,11 +115,11 @@ describe('callFalAiImageApi', () => {
       inputImageDataUrls: ['data:image/png;base64,aW1hZ2U='],
     }, createDefaultFalProfile({ model: 'openai/gpt-image-2.5/flare', apiKey: 'fal-key' }))
 
-    expect(falMock.subscribe).toHaveBeenCalledWith('openai/gpt-image-2.5/flare/edit', expect.anything())
+    expect(queue.submit).toHaveBeenCalledWith('openai/gpt-image-2.5/flare/edit', expect.anything())
   })
 
   it('requests a native transparent background', async () => {
-    falMock.subscribe.mockResolvedValue({
+    queue.result.mockResolvedValue({
       requestId: 'req-1',
       data: { images: [{ b64_json: 'aW1hZ2U=' }] },
     })
@@ -115,7 +132,7 @@ describe('callFalAiImageApi', () => {
       inputImageDataUrls: [],
     }, createDefaultFalProfile({ apiKey: 'fal-key' }))
 
-    expect(falMock.subscribe).toHaveBeenCalledWith('openai/gpt-image-2', expect.objectContaining({
+    expect(queue.submit).toHaveBeenCalledWith('openai/gpt-image-2', expect.objectContaining({
       input: expect.objectContaining({ background: 'transparent' }),
     }))
   })
