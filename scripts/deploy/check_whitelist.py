@@ -26,7 +26,7 @@ CODE_DIRS = ("api", "services", "utils")
 ENTRY_FILES = ("main.py",)
 
 COPY_RE = re.compile(r"^COPY\s+(.+?)\s+/app/", re.MULTILINE)
-TARGET_RE = re.compile(r"^(?:api|services|utils)/[A-Za-z0-9_/.-]+$")
+TARGET_RE = re.compile(r"^(?:main\.py|(?:api|services|utils)/[A-Za-z0-9_/.-]+)$")
 
 
 def tracked_py_files() -> set[str]:

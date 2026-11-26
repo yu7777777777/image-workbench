@@ -23,6 +23,7 @@ import SupportPromptModal from './components/SupportPromptModal'
 import { FavoriteCollectionPickerModal, FavoriteCollectionsView, ManageCollectionsModal } from './components/FavoriteCollections'
 import { useGlobalClickSuppression } from './lib/clickSuppression'
 import { ensureSharedProfilesLoaded, isPoolBuild, poolSettings } from './lib/accountPool'
+import { getWorkbenchOwner } from './lib/workbenchOwner'
 import { useHashRouter } from './hooks/useHashRouter'
 import ErrorBoundary from './components/ErrorBoundary'
 import { ToastProvider } from './components/ui/Toast'
@@ -173,6 +174,18 @@ export default function App() {
       // 否则常驻 iframe 会一直停留在旧列表上（普通用户因此看不到本站对话模型）。
       if (e.data?.type === 'sync-shared-profiles') {
         void ensureSharedProfilesLoaded()
+      }
+      // 设置页通过单写通道下发工作台字段补丁，由工作台 store 统一合并并持久化。
+      if (e.data?.type === 'patch-playground-settings' && e.data?.patch && typeof e.data.patch === 'object') {
+        const expectedOwner = typeof e.data.owner === 'string' ? e.data.owner.trim() : ''
+        const activeOwner = getWorkbenchOwner()
+        if (expectedOwner && activeOwner && expectedOwner !== activeOwner) return
+        useStore.getState().setSettings(e.data.patch as Partial<AppSettings>)
+        const source = e.source as Window | null
+        source?.postMessage(
+          { type: 'patch-playground-settings-ack', requestId: e.data.requestId, owner: activeOwner },
+          window.location.origin,
+        )
       }
     }
 

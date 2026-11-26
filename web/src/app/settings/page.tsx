@@ -40,7 +40,7 @@ function UserSettingsPageContent({ initialSession }: { initialSession: StoredAut
           <AccountSettingsCard session={session} onSessionChange={setSession} />
         </TabsContent>
         <TabsContent value="workspace">
-          <GallerySettingsCard showSharedProfiles={false} />
+          <GallerySettingsCard showSharedProfiles={false} owner={`${session.role}:${session.subjectId}`} />
         </TabsContent>
         <TabsContent value="chat">
           <StandaloneChatSettingsCard owner={`${session.role}:${session.subjectId}`} />
