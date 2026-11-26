@@ -1,10 +1,12 @@
 import axios, {AxiosError, type AxiosRequestConfig} from "axios";
 
 import webConfig from "@/constants/common-env";
+import { bearerAuthHeader } from "@/lib/auth-key";
 import {clearStoredAuthSession, getStoredAuthKey} from "@/store/auth";
 
 type RequestConfig = AxiosRequestConfig & {
     redirectOnUnauthorized?: boolean;
+    sendStoredAuth?: boolean;
 };
 
 type ErrorPayload = {
@@ -34,10 +36,10 @@ export const request = axios.create({
 
 request.interceptors.request.use(async (config) => {
     const nextConfig = {...config};
-    const authKey = await getStoredAuthKey();
     const headers = {...(nextConfig.headers || {})} as Record<string, string>;
-    if (authKey && !headers.Authorization) {
-        headers.Authorization = `Bearer ${authKey}`;
+    if (!headers.Authorization && (config as RequestConfig).sendStoredAuth !== false) {
+        const authKey = await getStoredAuthKey();
+        if (authKey) headers.Authorization = bearerAuthHeader(authKey);
     }
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-expect-error
@@ -77,17 +79,19 @@ type RequestOptions = {
     body?: unknown;
     headers?: Record<string, string>;
     redirectOnUnauthorized?: boolean;
+    sendStoredAuth?: boolean;
     timeoutMs?: number;
 };
 
 export async function httpRequest<T>(path: string, options: RequestOptions = {}) {
-    const {method = "GET", body, headers, redirectOnUnauthorized = true, timeoutMs} = options;
+    const {method = "GET", body, headers, redirectOnUnauthorized = true, sendStoredAuth, timeoutMs} = options;
     const config: RequestConfig = {
         url: path,
         method,
         data: body,
         headers,
         redirectOnUnauthorized,
+        sendStoredAuth,
         timeout: timeoutMs,
     };
     const response = await request.request<T>(config);

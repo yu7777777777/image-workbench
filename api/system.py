@@ -12,7 +12,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict
 
-from api.support import require_admin, require_identity, resolve_image_base_url
+from api.support import require_admin, require_identity, require_legacy_key_identity, resolve_image_base_url
 from services.backup_service import BackupError, backup_service
 from services.config import BASE_DIR, config
 from services.image_service import (
@@ -185,8 +185,17 @@ def create_router(app_version: str) -> APIRouter:
     router = APIRouter()
 
     @router.post("/auth/login")
-    async def login(authorization: str | None = Header(default=None)):
-        identity = require_identity(authorization)
+    async def login(request: Request, authorization: str | None = Header(default=None)):
+        content_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+        if authorization is None and content_type == "application/json":
+            try:
+                body = await request.json()
+            except (UnicodeDecodeError, ValueError):
+                body = None
+            key = body.get("key") if isinstance(body, dict) else None
+            identity = require_legacy_key_identity(key if isinstance(key, str) else "")
+        else:
+            identity = require_identity(authorization)
         return {
             "ok": True,
             "version": app_version,
