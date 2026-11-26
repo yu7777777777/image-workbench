@@ -6,9 +6,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { readReplyResources, splitChatReply } from "@/lib/chat-rich-reply";
 import type { ChatResource } from "@/lib/chat-resources";
 import { copyReplyText, ReplyMarkdown, type ReplyMarkdownResources } from "./chat-markdown";
-import { ChatResourceImage, ChatResourceLink, ReplyResourcePanel } from "./chat-resource-view";
+import { ChatResourceLink, ReplyResourcePanel } from "./chat-resource-view";
 import { ChatWidgetView } from "./chat-widget-view";
-import { chatWidgetResourceRefs } from "@/lib/chat-widget";
+import { chatWidgetInlineImages, type WidgetImage } from "@/lib/chat-widget";
 
 function WritingBlock({ text, streaming, onSave, markdownResources }: {
   text: string;
@@ -63,21 +63,46 @@ export function ChatReply({ text, writingDrafts, resources = emptyResources, own
   const { sources, inlineSources, sourceDetails, citations, filenames, attachments } = references;
   const markdownResources = { citations, inlineSources, filenames, attachments, owner };
   const inlineAssets = useMemo(() => {
-    const images = new Map<string, ChatResource>();
+    const images: ChatResource[] = [];
     const products = new Map<string, ChatResource>();
     for (const asset of resources) {
-      if (!asset.ref) continue;
-      if (asset.type === "image" && !images.has(asset.ref)) images.set(asset.ref, asset);
-      if (asset.type === "product" && !products.has(asset.ref)) products.set(asset.ref, asset);
+      if (asset.type === "image" && asset.imageUrl) images.push(asset);
+      if (asset.type === "product" && asset.ref && !products.has(asset.ref)) products.set(asset.ref, asset);
     }
     return { images, products };
   }, [resources]);
+
+  function resolveImages(node: WidgetImage): ChatResource[] {
+    const { images, products } = inlineAssets;
+    let matches = node.ref ? images.filter((image) => image.ref === node.ref) : [];
+    if (!matches.length && node.queries) {
+      const queries = node.queries;
+      matches = images.filter((image) => image.queries?.length === queries.length
+        && image.queries.every((query, index) => query === queries[index]));
+      if (!matches.length && node.group) {
+        matches = queries.flatMap((query) => images.find((image) => image.queries?.length === 1 && image.queries[0] === query) ?? []);
+      }
+    }
+    if (!matches.length && node.ref && !node.group) {
+      const product = products.get(node.ref);
+      if (product?.imageUrl) return [product];
+    }
+    if (!node.group) return matches.slice(0, 1);
+    const urls = new Set<string>();
+    return matches.filter(({ imageUrl }) => {
+      if (!imageUrl || urls.has(imageUrl)) return false;
+      urls.add(imageUrl);
+      return true;
+    });
+  }
+
   const renderedInline = new Set<string>();
   for (const block of blocks) {
     if (block.kind === "widget") {
-      for (const reference of chatWidgetResourceRefs(block.widget)) {
-        const image = reference.type === "image" ? inlineAssets.images.get(reference.ref) : undefined;
-        if (image) renderedInline.add(image.id);
+      for (const image of chatWidgetInlineImages(block.widget)) {
+        for (const asset of resolveImages(image)) {
+          if (asset.type === "image") renderedInline.add(asset.id);
+        }
       }
     } else if (attachments.size && (block.kind === "markdown" || block.kind === "writing")) {
       const markdown = block.kind === "writing" ? writingDrafts?.[block.offset] ?? block.text : block.text;
@@ -88,11 +113,7 @@ export function ChatReply({ text, writingDrafts, resources = emptyResources, own
     }
   }
 
-  function renderResource(type: "image" | "product" | "source", ref: string, fallback: string, key: string) {
-    if (type === "image") {
-      const asset = inlineAssets.images.get(ref) || inlineAssets.products.get(ref);
-      return asset?.imageUrl ? <ChatResourceImage key={key} resource={asset} /> : undefined;
-    }
+  function renderResource(type: "product" | "source", ref: string, fallback: string, key: string) {
     const source = type === "product" ? inlineAssets.products.get(ref) : inlineSources.get(ref);
     return source?.url ? <ChatResourceLink key={key} resource={source} label={fallback} /> : undefined;
   }
@@ -106,7 +127,7 @@ export function ChatReply({ text, writingDrafts, resources = emptyResources, own
           case "writing":
             return block.text && <WritingBlock key={block.offset} text={writingDrafts?.[block.offset] ?? block.text} streaming={streaming} markdownResources={markdownResources} onSave={(value) => onSaveWriting(block.offset, value)} />;
           case "widget":
-            return <ChatWidgetView key={block.offset} widget={block.widget} canSend={canSend} streaming={streaming} onSend={onSend} renderResource={renderResource} />;
+            return <ChatWidgetView key={block.offset} widget={block.widget} canSend={canSend} streaming={streaming} onSend={onSend} renderResource={renderResource} resolveImages={resolveImages} />;
           case "unsupported":
             return (
               <details key={block.offset} className="chat-reply-source">

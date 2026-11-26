@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { splitChatReply } from "../src/lib/chat-rich-reply";
-import { chatWidgetResourceRefs, readChatWidget, widgetValue } from "../src/lib/chat-widget";
+import { chatWidgetInlineImages, readChatWidget, widgetValue } from "../src/lib/chat-widget";
 import examples from "./fixtures/chat-widget-expansion.json";
 
 test("compiles declared form state, validation constraints and safe follow-ups", () => {
@@ -50,11 +50,63 @@ test("compiles media and links only from declared, bounded inputs", () => {
   expect(readChatWidget(examples.form.replace("onChange={setCourse}", "onChange={otherSetter}"))?.widget).toBeUndefined();
 });
 
-test("exposes in-message resource refs while preserving fallback for hidden content", () => {
+test("reserves inline images only in immediately visible components", () => {
   const widget = readChatWidget('<card><AsyncImage ref="img0"/><Cite refs={["c0", "c1"]}/><Link url={prod0.product_page.uri}/><popover><AsyncImage ref="hidden"/></popover></card>')?.widget;
   if (!widget) throw new Error("缺少资源卡");
-  expect(chatWidgetResourceRefs(widget)).toEqual([
-    { type: "image", ref: "img0" }, { type: "source", ref: "c0" },
-    { type: "source", ref: "c1" }, { type: "product", ref: "prod0" },
+  expect(chatWidgetInlineImages(widget)).toMatchObject([{ kind: "image", ref: "img0" }]);
+});
+
+test("renders route layouts with bare align and inline image queries plus a numbered itinerary", () => {
+  const reply = `<box gap={3}>
+  <row align=start gap={3}>
+    <AsyncImage query="监控室 游戏地图" aspectRatio="1:1" maxWidth="112px"/>
+    <box flex="1" gap={1}>
+      **路线 A**
+      <badge color="success">潜能优先</badge>
+      - 阅读地图
+    </box>
+  </row>
+  <list connector="solid" marker="number" gap={3}>
+    <list-item>**第一轮**</list-item>
+    <list-item>**第二轮**</list-item>
+  </list>
+  <caption>每天按资源需求安排。</caption>
+</box>`;
+  const block = splitChatReply(reply)[0];
+  if (block.kind !== "widget") throw new Error("路线组件解析失败");
+  expect(block.widget.root).toMatchObject({ children: [
+    { variant: "row", options: { align: "start" }, children: [
+      { kind: "image", queries: ["监控室 游戏地图"], aspectRatio: "1 / 1", maxWidth: 112 },
+      { variant: "box", options: { flex: 1 } },
+    ] },
+    { kind: "list", ordered: true, connected: true, children: [{ kind: "list-item" }, { kind: "list-item" }] },
+    { variant: "caption" },
+  ] });
+});
+
+test("recognizes standalone bento image groups without parsing query expressions as code", () => {
+  const markup = '<AsyncImageGroup query={["地图", "背包", "战斗"]} aspectRatio="5:4" layout="bento"/>';
+  const blocks = splitChatReply(`上文\n\n${markup}\n\n下文`);
+  expect(blocks.map((block) => block.kind)).toEqual(["markdown", "widget", "markdown"]);
+  expect(blocks[1]).toMatchObject({ widget: { root: { kind: "image", group: true, bento: true, queries: ["地图", "背包", "战斗"], aspectRatio: "5 / 4" } } });
+  expect(splitChatReply(markup.slice(0, -2), true)).toEqual([{ kind: "pending", offset: 0 }]);
+  expect(readChatWidget('<AsyncImageGroup query={[window.location.href]}/>')?.widget?.root).toMatchObject({ kind: "image", queries: undefined });
+});
+
+test("compiles the component playground without falling back to whole sections of source", async () => {
+  const fixture = await Bun.file(new URL("./fixtures/chat-component-playground.txt", import.meta.url)).text();
+  const blocks = splitChatReply(fixture);
+  expect(blocks.some((block) => block.kind === "unsupported")).toBe(false);
+  expect(blocks.filter((block) => block.kind === "widget")).toHaveLength(14);
+  const controls = blocks.find((block) => block.kind === "widget" && block.widget.initial.has("clicks"));
+  if (controls?.kind !== "widget" || controls.widget.root.kind !== "layout") throw new Error("缺少基础控件");
+  expect(controls.widget.initial.get("checks")).toEqual(["通知"]);
+  expect(controls.widget.root.children.filter((node) => node.kind === "checkbox")).toMatchObject([
+    { name: "checks", item: "通知" }, { name: "checks", item: "邮件" }, { name: "checks", item: "短信" },
   ]);
+  const svg = readChatWidget('<svg viewBox="0 0 10 10"><circle r="2" fill="url(https://example.org/x)" onclick="alert(1)"/></svg>')?.widget?.root;
+  expect(svg).toMatchObject({ kind: "svg", shapes: [{ attrs: { r: "2" } }] });
+  if (svg?.kind !== "svg") throw new Error("缺少矢量图");
+  expect(Object.keys(svg.shapes[0].attrs)).toEqual(["r"]);
+  expect(readChatWidget('<svg viewBox="0 0 10 10"><foreignObject/></svg>')?.widget?.root.kind).toBe("unsupported");
 });

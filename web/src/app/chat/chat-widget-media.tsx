@@ -2,23 +2,27 @@ import { useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight, MapPin } from "lucide-react";
 import type { WidgetMarker } from "@/lib/chat-widget";
 
-export function WidgetCarousel({ label, items }: { label: string; items: ReactNode[] }) {
+export function WidgetCarousel({ label, items, activeIndex, onChange, showArrows }: {
+  label: string; items: ReactNode[]; activeIndex?: number; onChange?: (index: number) => void; showArrows: boolean;
+}) {
   const [position, setPosition] = useState(0);
-  const index = Math.min(position, items.length - 1);
+  const selected = activeIndex === undefined || !Number.isFinite(activeIndex) ? position : Math.trunc(activeIndex);
+  const index = Math.max(0, Math.min(selected, items.length - 1));
+  const show = onChange ?? setPosition;
   return <section className="chat-widget-carousel" aria-label={label} aria-roledescription="轮播">
     <div>{items[index]}</div>
     {items.length > 1 && <div className="chat-widget-carousel-controls">
-      <button type="button" aria-label="上一项" disabled={!index} onClick={() => setPosition(index - 1)}><ChevronLeft size={16} /></button>
+      {showArrows && <button type="button" aria-label="上一项" disabled={!index} onClick={() => show(index - 1)}><ChevronLeft size={16} /></button>}
       <span aria-live="polite">{index + 1} / {items.length}</span>
-      <button type="button" aria-label="下一项" disabled={index === items.length - 1} onClick={() => setPosition(index + 1)}><ChevronRight size={16} /></button>
+      {showArrows && <button type="button" aria-label="下一项" disabled={index === items.length - 1} onClick={() => show(index + 1)}><ChevronRight size={16} /></button>}
     </div>}
   </section>;
 }
 
-export function WidgetMap({ label, markers }: { label: string; markers: WidgetMarker[] }) {
-  const [position, setPosition] = useState(0);
-  const [showMap, setShowMap] = useState(false);
-  const { lat, lon, label: pointName } = markers[Math.min(position, markers.length - 1)];
+function CoordinateMap({ point, showMap, toggle }: {
+  point: Extract<WidgetMarker, { lat: number }>; showMap: boolean; toggle: () => void;
+}) {
+  const { lat, lon, label: pointName } = point;
   const area = [
     Math.max(-180, lon - 0.035), Math.max(-85, Math.min(85, lat) - 0.02),
     Math.min(180, lon + 0.035), Math.min(85, Math.max(-85, lat) + 0.02),
@@ -26,14 +30,7 @@ export function WidgetMap({ label, markers }: { label: string; markers: WidgetMa
   const mapUrl = new URL("https://www.openstreetmap.org/export/embed.html");
   mapUrl.search = new URLSearchParams({ bbox: area, layer: "mapnik", marker: `${lat},${lon}` }).toString();
   const link = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=13/${lat}/${lon}`;
-  return <section className="chat-widget-map" aria-label={label}>
-    <div className="chat-widget-map-header"><MapPin size={17} aria-hidden="true" /><strong>{label}</strong></div>
-    {markers.length > 1 && <label className="chat-widget-select">
-      地图标记
-      <select value={position} onChange={(event) => setPosition(Number(event.currentTarget.value))}>
-        {markers.map((point, index) => <option key={index} value={index}>{point.label}</option>)}
-      </select>
-    </label>}
+  return <>
     <span>{pointName} · {lat.toFixed(5)}, {lon.toFixed(5)}</span>
     {showMap && <iframe
       title={`${pointName}的地图`}
@@ -42,9 +39,29 @@ export function WidgetMap({ label, markers }: { label: string; markers: WidgetMa
       referrerPolicy="no-referrer"
     />}
     <div className="chat-widget-map-actions">
-      <button type="button" aria-expanded={showMap} onClick={() => setShowMap(!showMap)}>{showMap ? "收起地图" : "查看地图"}</button>
+      <button type="button" aria-expanded={showMap} onClick={toggle}>{showMap ? "收起地图" : "查看地图"}</button>
       <a href={link} target="_blank" rel="noopener noreferrer">在 OpenStreetMap 中打开</a>
     </div>
+  </>;
+}
+
+export function WidgetMap({ label, markers }: { label: string; markers: WidgetMarker[] }) {
+  const [position, setPosition] = useState(0);
+  const [showMap, setShowMap] = useState(false);
+  const point = markers[Math.min(position, markers.length - 1)];
+  return <section className="chat-widget-map" aria-label={label}>
+    <div className="chat-widget-map-header"><MapPin size={17} aria-hidden="true" /><strong>{label}</strong></div>
+    {markers.length > 1 && <label className="chat-widget-select">
+      地图标记
+      <select value={position} onChange={(event) => setPosition(Number(event.currentTarget.value))}>
+        {markers.map((marker, index) => <option key={index} value={index}>{marker.label}</option>)}
+      </select>
+    </label>}
+    {"address" in point ? <>
+      <span>{point.address}</span>
+      <div className="chat-widget-map-actions"><a href={`https://www.openstreetmap.org/search?${new URLSearchParams({ query: point.address })}`}
+        target="_blank" rel="noopener noreferrer">在 OpenStreetMap 中查找地址</a></div>
+    </> : <CoordinateMap point={point} showMap={showMap} toggle={() => setShowMap((current) => !current)} />}
   </section>;
 }
 

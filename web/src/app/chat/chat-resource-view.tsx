@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight, Download, ExternalLink, FileText, ImageOff, Terminal } from "lucide-react";
 import { toast } from "sonner";
 import webConfig from "@/constants/common-env";
 import { getStoredAuthSession } from "@/store/auth";
 import type { ChatResource } from "@/lib/chat-resources";
+import type { WidgetImage } from "@/lib/chat-widget";
 import "./chat-resource-view.css";
 
 type ResourceProps = { resource: ChatResource };
@@ -84,6 +85,27 @@ export function ChatResourceImage({ resource }: ResourceProps) {
       <a href={destination} target="_blank" rel="noopener noreferrer" aria-label={`打开 ${title}`}>{image}</a>
       {resource.title && <figcaption>{resource.title}</figcaption>}
     </figure>
+  );
+}
+
+export function ChatWidgetImages({ node, images }: { node: WidgetImage; images: ChatResource[] }) {
+  const availableImages = images.filter((image): image is ChatResource & { imageUrl: string } => Boolean(image.imageUrl));
+  if (!availableImages.length) {
+    const message = node.group ? "图片组未返回" : "图片未返回";
+    return <span className="chat-widget-image-missing">{node.label ? `${node.label}（${message}）` : message}</span>;
+  }
+  return (
+    <div className={node.group ? "chat-widget-image-group" : "chat-widget-inline-image"}
+      data-bento={node.bento && availableImages.length === 3} data-sized={Boolean(node.maxWidth)}
+      style={{ width: node.maxWidth, "--chat-image-ratio": node.aspectRatio } as CSSProperties}>
+      {availableImages.map((image) => (
+        <figure key={image.id} className="chat-resource-image">
+          <a href={image.url || image.imageUrl} target="_blank" rel="noopener noreferrer">
+            <PublicImage key={image.imageUrl} src={image.imageUrl} alt={image.title || node.label || "回复图片"} />
+          </a>
+        </figure>
+      ))}
+    </div>
   );
 }
 
