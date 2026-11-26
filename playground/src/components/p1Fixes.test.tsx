@@ -5,8 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Select from './Select'
 import SizePickerModal from './SizePickerModal'
 import Toast from './Toast'
+import TaskCard from './TaskCard'
 import AgentWorkspace, { resetAgentScrollMemoryForTests } from './AgentWorkspace'
 import { useStore } from '../store'
+import { DEFAULT_PARAMS } from '../types'
 
 let container: HTMLDivElement
 let root: ReturnType<typeof createRoot>
@@ -191,5 +193,72 @@ describe('P1 UX and Escape dismissal fixes', () => {
     })
 
     expect(scrollToMock).toHaveBeenCalledWith({ top: 1200, behavior: 'smooth' })
+  })
+
+  it('renders minimal pure-image gallery TaskCard without footer metadata strip and shows subtle favorite star', async () => {
+    await act(async () => {
+      root.render(
+        <TaskCard
+          task={{
+            id: 'task-minimal-1',
+            prompt: '一只可爱的橘猫',
+            inputImageIds: [],
+            params: { ...DEFAULT_PARAMS, size: 'auto' },
+            status: 'done',
+            error: null,
+            outputImages: ['img-minimal-1'],
+            createdAt: 1,
+            finishedAt: 13000,
+            elapsed: 12000,
+            isFavorite: true,
+            apiProfileName: '本站账号池',
+            apiModel: 'gpt-image-2',
+          }}
+          onClick={vi.fn()}
+          onReuse={vi.fn()}
+          onEditOutputs={vi.fn()}
+          onDelete={vi.fn()}
+        />,
+      )
+    })
+
+    expect(container.querySelector('.studio-task-info')).toBeNull()
+    expect(container.textContent).not.toContain('本站账号池')
+    expect(container.textContent).not.toContain('gpt-image-2')
+    expect(container.querySelector('.studio-task-favorite-pill')).not.toBeNull()
+    expect(container.querySelector('.studio-task-actions')).not.toBeNull()
+  })
+
+  it('shows selection checkbox and hides hover action bar in batch selection mode', async () => {
+    await act(async () => {
+      root.render(
+        <TaskCard
+          task={{
+            id: 'task-batch-1',
+            prompt: '批量选择测试',
+            inputImageIds: [],
+            params: { ...DEFAULT_PARAMS, size: 'auto' },
+            status: 'done',
+            error: null,
+            outputImages: ['img-batch-1'],
+            createdAt: 1,
+            finishedAt: 13000,
+            elapsed: 12000,
+            isFavorite: true,
+          }}
+          selectionMode
+          isSelected={false}
+          onClick={vi.fn()}
+          onReuse={vi.fn()}
+          onEditOutputs={vi.fn()}
+          onDelete={vi.fn()}
+        />,
+      )
+    })
+
+    const checkbox = container.querySelector('button[aria-label="勾选此作品"]')
+    expect(checkbox).not.toBeNull()
+    expect(container.querySelector('.studio-task-actions')).toBeNull()
+    expect(container.querySelector('.studio-task-favorite-pill')).toBeNull()
   })
 })
