@@ -6,8 +6,10 @@ import remarkMath from "remark-math";
 import { Check, Copy, Download } from "lucide-react";
 import { toast } from "sonner";
 import { prepareReplyMarkdown } from "@/lib/chat-rich-reply";
+import { attachmentPath, type ChatResource } from "@/lib/chat-resources";
 import { ReplyChart } from "./chat-chart";
 import { StaticCodePreview, readVegaChart } from "./chat-code-preview";
+import { ChatAttachment, ChatResourceLink } from "./chat-resource-view";
 import "katex/dist/katex.min.css";
 
 export async function copyReplyText(text: string): Promise<boolean> {
@@ -127,20 +129,43 @@ function CodeBlock({ children, streaming, filenames }: { children?: ReactNode; s
   );
 }
 
-export const ReplyMarkdown = memo(function ReplyMarkdown({ text, streaming = false, filenames, citations }: { text: string; streaming?: boolean; filenames?: ReadonlyMap<string, string>; citations?: ReadonlyMap<string, string> }) {
+export type ReplyMarkdownResources = {
+  filenames?: ReadonlyMap<string, string>;
+  citations?: ReadonlyMap<string, string>;
+  inlineSources?: ReadonlyMap<string, ChatResource>;
+  attachments?: ReadonlyMap<string, ChatResource>;
+  owner?: string;
+};
+
+export const ReplyMarkdown = memo(function ReplyMarkdown({
+  text, streaming = false, filenames, citations, inlineSources, attachments, owner,
+}: { text: string; streaming?: boolean } & ReplyMarkdownResources) {
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: true }]]}
       rehypePlugins={[[rehypeKatex, { trust: false, strict: "ignore" }]]}
-      urlTransform={(url, key, node) => (node.tagName === "a" && key === "href" && url.startsWith("sandbox:")) ? url : defaultUrlTransform(url)}
+      urlTransform={(url, key, node) => (
+        node.tagName === "a" && key === "href" && (url.startsWith("sandbox:") || url.startsWith("workbench-cite:"))
+      ) ? url : defaultUrlTransform(url)}
       components={{
         pre: ({ children }) => <CodeBlock streaming={streaming} filenames={filenames}>{children}</CodeBlock>,
-        a: ({ node: _node, children, href, ...props }) => href?.startsWith("sandbox:") ? (
-          <span className="chat-unavailable-link" title="附件未随回复返回">{children}（附件未返回）</span>
-        ) : href ? <a {...props} href={href} target="_blank" rel="noopener noreferrer">{children}</a> : <span>{children}</span>,
+        a: ({ node: _node, children, href, ...props }) => {
+          if (href?.startsWith("sandbox:")) {
+            const path = attachmentPath(href);
+            const attachment = path && attachments?.get(path);
+            return attachment && owner
+              ? <ChatAttachment resource={attachment} owner={owner} inline>{children}</ChatAttachment>
+              : <span className="chat-unavailable-link" title="附件未随回复返回">{children}（附件未返回）</span>;
+          }
+          if (href?.startsWith("workbench-cite:")) {
+            const source = inlineSources?.get(href.slice("workbench-cite:".length));
+            return source ? <ChatResourceLink resource={source} label={children} /> : <span>{children}</span>;
+          }
+          return href ? <a {...props} href={href} target="_blank" rel="noopener noreferrer">{children}</a> : <span>{children}</span>;
+        },
       }}
     >
-      {prepareReplyMarkdown(text, citations)}
+      {prepareReplyMarkdown(text, citations, inlineSources)}
     </ReactMarkdown>
   );
 });

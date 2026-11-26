@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import time
 import uuid
 from typing import Any, Iterable, Iterator
@@ -7,6 +8,7 @@ from typing import Any, Iterable, Iterator
 from fastapi import HTTPException
 
 from services.protocol.chat_completion_cache import cache_key, chat_completion_cache, normalize_text_messages
+from services.protocol.chat_rich_content import ChatRichContent, source_block
 from services.protocol.conversation import (
     ConversationRequest,
     ImageOutput,
@@ -123,12 +125,16 @@ def stream_text_chat_completion(
     messages: list[dict[str, Any]],
     model: str,
     thinking_effort: str = "",
+    *,
+    rich_content: ChatRichContent | None = None,
 ) -> Iterator[dict[str, Any]]:
     completion_id = f"chatcmpl-{uuid.uuid4().hex}"
     created = int(time.time())
     sent_role = False
     request = ConversationRequest(model=model, messages=messages, thinking_effort=thinking_effort)
-    for delta_text in stream_text_deltas(backend, request):
+    callbacks = {"on_event": rich_content.observe, "on_complete": rich_content.finish} if rich_content else {}
+    deltas = stream_text_deltas(backend, request, **callbacks)
+    for delta_text in deltas:
         if not sent_role:
             sent_role = True
             yield completion_chunk(model, {"role": "assistant", "content": delta_text}, None, completion_id, created)
@@ -136,7 +142,20 @@ def stream_text_chat_completion(
             yield completion_chunk(model, {"content": delta_text}, None, completion_id, created)
     if not sent_role:
         yield completion_chunk(model, {"role": "assistant", "content": ""}, None, completion_id, created)
-    yield completion_chunk(model, {}, "stop", completion_id, created)
+    stop = completion_chunk(model, {}, "stop", completion_id, created)
+    if rich_content and rich_content.blocks:
+        stop["workbench"] = {"blocks": rich_content.blocks}
+    yield stop
+
+
+def stream_rich_text_chat_completion(
+    messages: list[dict[str, Any]], model: str, thinking_effort: str, owner_id: str,
+) -> Iterator[dict[str, Any]]:
+    backend = text_backend(model)
+    try:
+        yield from stream_text_chat_completion(backend, messages, model, thinking_effort, rich_content=ChatRichContent(owner_id))
+    finally:
+        backend.close()
 
 
 def collect_chat_content(chunks: Iterable[dict[str, Any]]) -> str:
@@ -211,15 +230,20 @@ def web_search_chat_response(messages: list[dict[str, Any]], model: str) -> dict
     )
 
 
-def stream_web_search_chat_completion(messages: list[dict[str, Any]], model: str) -> Iterator[dict[str, Any]]:
+def stream_web_search_chat_completion(messages: list[dict[str, Any]], model: str, *, rich_content: bool = False) -> Iterator[dict[str, Any]]:
     query = search_query_from_messages(messages)
     if not query:
         raise HTTPException(status_code=400, detail={"error": "messages or prompt is required for web search"})
-    text, _annotations = text_with_url_citations(run_web_search(query))
+    text, annotations = text_with_url_citations(run_web_search(query))
     completion_id = f"chatcmpl-{uuid.uuid4().hex}"
     created = int(time.time())
     yield completion_chunk(model, {"role": "assistant", "content": text}, None, completion_id, created)
-    yield completion_chunk(model, {}, "stop", completion_id, created)
+    stop = completion_chunk(model, {}, "stop", completion_id, created)
+    if rich_content:
+        blocks = {block["id"]: block for item in annotations[:64] if (block := source_block(item))}
+        if blocks:
+            stop["workbench"] = {"blocks": list(blocks.values())}
+    yield stop
 
 
 def image_result_content(result: dict[str, Any]) -> str:
@@ -286,15 +310,24 @@ def stream_image_chat_completion(image_outputs: Iterable[ImageOutput], model: st
     yield completion_chunk(model, {}, "stop", completion_id, created)
 
 
-def handle(body: dict[str, Any]) -> dict[str, Any] | Iterator[dict[str, Any]]:
+def handle(body: dict[str, Any], *, rich_owner_id: str = "") -> dict[str, Any] | Iterator[dict[str, Any]]:
     if body.get("stream"):
         if is_image_chat_request(body):
             return image_chat_events(body)
         model, messages = text_chat_parts(body)
         if is_web_search_chat_request(body) and not has_unsupported_tools(body, WEB_SEARCH_TOOL_TYPES):
+            if rich_owner_id:
+                return stream_web_search_chat_completion(messages, model, rich_content=True)
             return stream_web_search_chat_completion(messages, model)
         thinking_effort = thinking_effort_from_body(body)
         key = cache_key(body, messages, stream=True)
+        if rich_owner_id:
+            # Rich replies may contain private attachment ids. Keep existing stream caching within the authenticated owner.
+            owner_digest = hashlib.sha256(rich_owner_id.encode("utf-8")).hexdigest()
+            return chat_completion_cache.get_or_compute_stream(
+                f"workbench:{owner_digest}:{key}",
+                lambda: stream_rich_text_chat_completion(messages, model, thinking_effort, rich_owner_id),
+            )
         return chat_completion_cache.get_or_compute_stream(
             key,
             lambda: stream_text_chat_completion(text_backend(model), messages, model, thinking_effort),

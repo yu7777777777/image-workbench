@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { isChatModel, readChatResponse } from "../src/lib/chat-stream";
+import { mergeChatResources, type ChatResource } from "../src/lib/chat-resources";
 
 function streamResponse(text: string, slice = 1) {
   const bytes = new TextEncoder().encode(text);
@@ -43,6 +44,37 @@ describe("chat response stream", () => {
       ),
     ).rejects.toThrow("连接提前断开");
     expect(result).toBe("部分内容");
+  });
+  test("delivers rich blocks without exposing unknown fields or unsafe image addresses", async () => {
+    const first = { id: "image-1", type: "image", imageUrl: "https://cdn.example.com/photo.png", title: "图像" };
+    const second = { id: "image-1", type: "image", description: "后到的说明", imageUrl: first.imageUrl, upstreamKey: "ignored" };
+    const output = { id: "result-1", type: "python", text: "你好\n2", status: "success" };
+    const invalid = { id: "bad", type: "image", imageUrl: "https://127.0.0.1/image.png" };
+    const frame = (data: unknown) => `data: ${JSON.stringify(data)}\r\n\r\n`;
+    let text = "";
+    let resources: ChatResource[] = [];
+    await readChatResponse(
+      streamResponse(frame({ choices: [{ delta: { content: "执行中" } }] })
+        + frame({ workbench: { blocks: [first, invalid] } })
+        + frame({ workbench: { blocks: [second, output] }, choices: [{ finish_reason: "stop" }] })),
+      (delta) => { text += delta; },
+      (incoming) => { resources = mergeChatResources(resources, incoming); },
+    );
+    expect(text).toBe("执行中");
+    expect(resources).toEqual([{ ...first, description: second.description }, output]);
+  });
+  test("allows a successful resource-only response for opt-in callers", async () => {
+    const resource = { id: "attachment-1", type: "attachment", path: "sandbox:/mnt/data/a b.txt", title: "a b.txt" };
+    const responses: ChatResource[][] = [];
+    const data = { workbench: { blocks: [resource] } };
+    await readChatResponse(
+      streamResponse(`data: ${JSON.stringify(data)}\n\ndata: [DONE]\n\n`),
+      () => { throw new Error("没有文本"); },
+      (resources) => responses.push(resources),
+    );
+    await readChatResponse(Response.json(data), () => {}, (resources) => responses.push(resources));
+    expect(responses).toEqual([[{ ...resource, path: "sandbox:/mnt/data/a%20b.txt" }], [{ ...resource, path: "sandbox:/mnt/data/a%20b.txt" }]]);
+    await expect(readChatResponse(Response.json(data), () => {})).rejects.toThrow("没有返回内容");
   });
   test("reports HTTP and in-stream errors", async () => {
     await expect(

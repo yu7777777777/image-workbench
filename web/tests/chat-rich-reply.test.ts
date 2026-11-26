@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { prepareReplyMarkdown, readReplyResources, splitChatReply } from "../src/lib/chat-rich-reply";
+import { readChatResources } from "../src/lib/chat-resources";
 import { widgetValue } from "../src/lib/chat-widget";
 import observed from "./fixtures/chat-observed-replies.json";
 import extended from "./fixtures/chat-extended-replies.json";
@@ -74,6 +75,26 @@ test("uses explicit adjacent source links, leaving ambiguous and fenced referenc
   expect(readReplyResources(invalid).citations.size).toBe(0);
   expect(readReplyResources(invalid).sources.size).toBe(2);
   expect([...readReplyResources(extended.attachments).filenames]).toEqual([["csv", "example.csv"], ["txt", "example.txt"]]);
+});
+
+test("binds normalized attachments and authoritative sources without guessing from text", () => {
+  const text = '[旧链接](https://example.com/other) <Cite refs={["turn0search0", "turn0search1"]}/>\n\n'
+    + '[下载原件](sandbox:/mnt/data/order%20summary.txt)\n\n'
+    + '```md\n[示例](sandbox:/mnt/data/example.txt)\n```';
+  const incoming = readChatResources([
+    { id: "src-1", type: "source", ref: "turn0search0", title: "原始来源", url: "https://example.com/actual" },
+    { id: "src-2", type: "source", ref: "alias", title: "原始来源", url: "https://example.com/actual" },
+    { id: "file-1", type: "attachment", title: "order summary.txt", path: "sandbox:/mnt/data/order summary.txt" },
+  ]);
+  const reference = readReplyResources(text, incoming);
+  expect(reference.citations.get("turn0search0")).toBe("https://example.com/actual");
+  expect(reference.sourceDetails.size).toBe(1);
+  expect([...reference.attachmentPaths]).toEqual(["sandbox:/mnt/data/order%20summary.txt"]);
+  expect(reference.attachments.get("sandbox:/mnt/data/order%20summary.txt")?.id).toBe("file-1");
+  const markup = prepareReplyMarkdown(text, reference.citations, reference.inlineSources);
+  expect(markup).toContain("[来源](<workbench-cite:turn0search0>)〔来源链接未返回〕");
+  expect(markup).toContain("[示例](sandbox:/mnt/data/example.txt)");
+  expect(readChatResources(incoming)).toEqual(incoming);
 });
 
 test("compiles observed panels without executing their expressions", () => {

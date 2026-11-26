@@ -1,3 +1,5 @@
+import { readChatResources, recordValue, type ChatResource } from "./chat-resources";
+
 // randomUUID is unavailable on non-HTTPS deployments; getRandomValues also works there.
 export function createChatId(): string {
   return Array.from(crypto.getRandomValues(new Uint32Array(4)), (value) =>
@@ -33,18 +35,23 @@ function errorText(value: unknown): string {
 export async function readChatResponse(
   response: Response,
   onText: (text: string) => void,
+  onResources?: (resources: ChatResource[]) => void,
 ): Promise<void> {
   if (!response.ok) {
     const payload: unknown = await response.json().catch(() => null);
     throw new Error(errorText(payload) || `请求失败 (${response.status})`);
   }
   if (!response.headers.get("content-type")?.includes("text/event-stream")) {
-    const payload = await response.json();
-    if (payload.error) throw new Error(errorText(payload.error));
-    const text = payload.choices?.[0]?.message?.content;
-    if (typeof text !== "string" || !text)
+    const payload = recordValue(await response.json());
+    if (payload?.error) throw new Error(errorText(payload.error));
+    const choice = Array.isArray(payload?.choices) ? recordValue(payload.choices[0]) : undefined;
+    const text = recordValue(choice?.message)?.content;
+    const resources = onResources ? readChatResources(recordValue(payload?.workbench)?.blocks) : [];
+    const hasText = typeof text === "string" && Boolean(text);
+    if (!hasText && !resources.length)
       throw new Error("模型没有返回内容，请重试或更换模型");
-    onText(text);
+    if (hasText) onText(text);
+    if (resources.length) onResources?.(resources);
     return;
   }
   if (!response.body) throw new Error("无法读取回复流");
@@ -52,7 +59,7 @@ export async function readChatResponse(
   const decoder = new TextDecoder();
   let pending = "";
   let complete = false;
-  let hasText = false;
+  let hasContent = false;
   const frame = (raw: string) => {
     const data = raw
       .split("\n")
@@ -71,14 +78,22 @@ export async function readChatResponse(
       // 上游偶发返回非 JSON 的 data 行（网关错误页片段等），避免裸 SyntaxError 打断整个流
       throw new Error(`收到无法解析的回复帧：${data.slice(0, 120)}`);
     }
-    if (payload && typeof payload === "object" && (payload as { error?: unknown }).error) {
-      throw new Error(errorText((payload as { error: unknown }).error) || "生成失败");
+    const event = recordValue(payload);
+    if (event?.error) {
+      throw new Error(errorText(event.error) || "生成失败");
     }
-    const choice = (payload as { choices?: Array<{ delta?: { content?: unknown }; finish_reason?: unknown }> }).choices?.[0];
-    const text = choice?.delta?.content;
+    const choice = Array.isArray(event?.choices) ? recordValue(event.choices[0]) : undefined;
+    const text = recordValue(choice?.delta)?.content;
     if (typeof text === "string" && text) {
-      hasText = true;
+      hasContent = true;
       onText(text);
+    }
+    if (onResources) {
+      const resources = readChatResources(recordValue(event?.workbench)?.blocks);
+      if (resources.length) {
+        hasContent = true;
+        onResources(resources);
+      }
     }
     if (choice?.finish_reason) complete = true;
   };
@@ -96,7 +111,7 @@ export async function readChatResponse(
     }
     if (pending.trim()) frame(pending);
     if (!complete) throw new Error("连接提前断开，已保留收到的内容，请重试");
-    if (!hasText) throw new Error("模型没有返回内容，请重试或更换模型");
+    if (!hasContent) throw new Error("模型没有返回内容，请重试或更换模型");
   } finally {
     await reader.cancel().catch(() => {});
     reader.releaseLock();

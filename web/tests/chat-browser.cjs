@@ -16,12 +16,14 @@ const answer =
 const richReply = readFile(join(__dirname, "fixtures/chat-rich-reply.txt"), "utf8");
 const observedReplies = require("./fixtures/chat-observed-replies.json");
 const extendedReplies = require("./fixtures/chat-extended-replies.json");
+const expandedWidgets = require("./fixtures/chat-widget-expansion.json");
 const observedPrompts = new Map([
   ["检查公式和流程图", observedReplies.markdown_math_code],
   ["检查嵌套表单", observedReplies.writing_and_native_form],
   ["检查交互图表", observedReplies.visual_and_search],
   ["检查文件正文", observedReplies.downloadable_file],
   ...Object.entries(extendedReplies).map(([name, reply]) => [`检查 ${name}`, reply]),
+  ...Object.entries(expandedWidgets).map(([name, reply]) => [`检查组件 ${name}`, reply]),
 ]);
 const server = createServer(async (req, res) => {
   try {
@@ -373,6 +375,67 @@ async function checkExtendedReplies(page) {
   assert(!(await message().innerText()).includes("sampleproduct"));
 }
 
+async function checkExpandedWidgets(page) {
+  async function ask(name) {
+    await page.getByRole("button", { name: "新建对话", exact: true }).click();
+    await send(page, `检查组件 ${name}`);
+    await waitAnswer(page);
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await ask("form");
+  const form = page.getByRole("form", { name: "学习安排" });
+  await form.getByRole("button", { name: "提交学习安排" }).click();
+  assert.equal(await form.getByRole("textbox", { name: "课程名称" }).evaluate((input) => input.validity.valueMissing), true);
+  assert.equal(requests.at(-1).messages.at(-1).content, "检查组件 form");
+  await form.getByRole("textbox", { name: "课程名称" }).fill("微积分");
+  await form.getByLabel("学习日期").fill("2026-11-30");
+  await form.getByRole("textbox", { name: "备注" }).fill("练习两题");
+  await form.getByRole("radio", { name: "周", exact: true }).check();
+  await form.getByText("按周安排", { exact: true }).waitFor();
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await form.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: join(artifacts, "expanded-widget-form-mobile.png") });
+  const followUp = page.waitForRequest((request) => request.url().endsWith("/v1/chat/completions") && request.method() === "POST");
+  await form.getByRole("button", { name: "提交学习安排" }).click();
+  assert.equal((await followUp).postDataJSON().messages.at(-1).content, "学习 微积分，备注 练习两题，日期 2026-11-30，周期 周");
+
+  await page.getByRole("button", { name: "重新生成", exact: true }).last().waitFor();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await ask("dashboard");
+  const chart = page.getByRole("figure", { name: "金额与成交" });
+  assert.equal(await chart.locator("ellipse").count(), 4);
+  await chart.getByRole("button", { name: "退货", exact: true }).click();
+  assert.equal(await chart.locator("ellipse").count(), 2);
+  await page.getByRole("radio", { name: "上周", exact: true }).check();
+  assert.equal(await chart.locator("ellipse").count(), 1);
+  await chart.getByRole("button", { name: "展开图表", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "金额与成交" });
+  await dialog.getByRole("rowheader", { name: "丙" }).waitFor();
+  await dialog.getByRole("cell", { name: "3", exact: true }).waitFor();
+  await page.screenshot({ path: join(artifacts, "expanded-widget-scatter-desktop.png") });
+  await page.keyboard.press("Escape");
+  await page.getByText("查看说明", { exact: true }).click();
+  await page.getByText("金额以百元计。", { exact: true }).waitFor();
+
+  await ask("media");
+  const carousel = page.getByRole("region", { name: "参观要点" });
+  await carousel.getByText("展厅", { exact: true }).waitFor();
+  await carousel.getByRole("button", { name: "下一项" }).click();
+  await carousel.getByText("剧场", { exact: true }).waitFor();
+  const map = page.getByRole("region", { name: "参观地点" });
+  await page.route((url) => url.host === "www.openstreetmap.org" && url.pathname === "/export/embed.html",
+    (route) => route.fulfill({ contentType: "text/html; charset=utf-8", body: "<p>地图预览测试</p>" }));
+  assert.equal(await map.locator("iframe").count(), 0);
+  await map.getByLabel("地图标记").selectOption("1");
+  await map.getByRole("button", { name: "查看地图", exact: true }).click();
+  const mapFrame = map.locator("iframe");
+  assert.equal(new URL(await mapFrame.getAttribute("src")).searchParams.get("marker"), "39.9,116.4");
+  await mapFrame.scrollIntoViewIfNeeded();
+  await mapFrame.contentFrame().getByText("地图预览测试").waitFor();
+  await page.locator('video[aria-label="短片"][controls]').waitFor();
+}
+
 (async () => {
   await mkdir(artifacts, { recursive: true });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
@@ -407,6 +470,12 @@ async function checkExtendedReplies(page) {
       await checkExtendedReplies(page);
       assert.deepEqual(errors, []);
       console.log(JSON.stringify({ ok: true, cases: ["wide-layout", "citations", "attachments", "multi-series-and-interactive-pie", "checkbox-select-submit", "writing-edit-reload", "isolated-previews", "tool-card-fallbacks"], requests: requests.length, artifacts }));
+      return;
+    }
+    if (process.argv.includes("--expanded-widgets")) {
+      await checkExpandedWidgets(page);
+      assert.deepEqual(errors, []);
+      console.log(JSON.stringify({ ok: true, cases: ["form-validation", "conditional-state-and-follow-up", "scatter-filter-legend-dialog", "popover", "carousel", "map-inspector", "video-controls"], requests: requests.length, artifacts }));
       return;
     }
     await page.screenshot({ path: join(artifacts, "desktop-empty.png") });

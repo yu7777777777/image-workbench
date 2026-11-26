@@ -1592,9 +1592,12 @@ class OpenAIBackendAPI:
             time.sleep(poll_interval_secs)
         raise RuntimeError(f"timed out waiting for {primary_label}/zip outputs")
 
-    def _get_editable_conversation_detail(self, conversation_id: str) -> Dict[str, Any]:
+    def _get_editable_conversation_detail(
+        self, conversation_id: str, *, timeout: float = 60, allow_redirects: bool = True,
+    ) -> Dict[str, Any]:
         path = f"/backend-api/conversation/{conversation_id}"
-        response = self.session.get(self.base_url + path, headers=self._editable_conversation_document_headers(path, conversation_id), timeout=60)
+        response = self.session.get(self.base_url + path, headers=self._editable_conversation_document_headers(path, conversation_id),
+                                    timeout=timeout, allow_redirects=allow_redirects)
         ensure_ok(response, path)
         return response.json()
 
@@ -1711,7 +1714,9 @@ class OpenAIBackendAPI:
         target_path.write_bytes(response.content)
         return target_path
 
-    def _resolve_editable_download_url(self, conversation_id: str, artifact: EditableFileArtifact) -> str:
+    def _resolve_editable_download_url(
+        self, conversation_id: str, artifact: EditableFileArtifact, *, timeout: float = 60, allow_redirects: bool = True,
+    ) -> str:
         ids: list[str] = []
         for item in (artifact.attachment_id, artifact.file_id):
             if item and item not in ids:
@@ -1722,8 +1727,11 @@ class OpenAIBackendAPI:
                 self.base_url + path,
                 headers=self._editable_download_headers(path, conversation_id, "/backend-api/conversation/{conversation_id}/interpreter/download"),
                 params={"message_id": artifact.message_id, "sandbox_path": artifact.sandbox_path},
-                timeout=60,
+                timeout=timeout,
+                allow_redirects=allow_redirects,
             )
+            if not allow_redirects and response.status_code in {301, 302, 303, 307, 308}:
+                return str(response.headers.get("Location") or "")
             if 200 <= response.status_code < 300:
                 url = self._download_url_from_response(response)
                 if url:
@@ -1733,7 +1741,8 @@ class OpenAIBackendAPI:
             response = self.session.get(
                 self.base_url + path,
                 headers=self._editable_download_headers(path, conversation_id, "/backend-api/conversation/{conversation_id}/attachment/{attachment_id}/download"),
-                timeout=60,
+                timeout=timeout,
+                allow_redirects=allow_redirects,
             )
             if 200 <= response.status_code < 300:
                 url = self._download_url_from_response(response)
@@ -1745,7 +1754,8 @@ class OpenAIBackendAPI:
                 self.base_url + path,
                 headers=self._editable_download_headers(path, conversation_id, "/backend-api/files/download/{file_id}"),
                 params={"post_id": "", "inline": "false"},
-                timeout=60,
+                timeout=timeout,
+                allow_redirects=allow_redirects,
             )
             if 200 <= response.status_code < 300:
                 url = self._download_url_from_response(response)
@@ -1756,7 +1766,8 @@ class OpenAIBackendAPI:
             response = self.session.get(
                 self.base_url + path,
                 headers=self._editable_download_headers(path, conversation_id, "/backend-api/files/download/{file_id}"),
-                timeout=60,
+                timeout=timeout,
+                allow_redirects=allow_redirects,
             )
             if 200 <= response.status_code < 300:
                 url = self._download_url_from_response(response)

@@ -1,58 +1,179 @@
+import { useState } from "react";
+import { Expand } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+
 const colors = ["#315e72", "#bc6e43", "#62754a", "#7b6590", "#227b76", "#a45161", "#7a642b", "#556884"];
+const axisNumber = new Intl.NumberFormat("zh-CN", { notation: "compact", maximumFractionDigits: 2 });
 
 export type ReplyChartData = {
-  chartType: "bar" | "line" | "pie";
-  rows: { name: string; values: number[] }[];
+  chartType: "bar" | "line" | "pie" | "scatter";
+  rows: { name: string; values: number[]; x?: number }[];
   series: string[];
   label: string;
   description?: string;
   min?: number;
 };
 
-export function ReplyChart({ chartType, rows, series, label, description, min = 0 }: ReplyChartData) {
-  const values = rows.flatMap((row) => row.values);
-  const low = Math.min(0, min, ...values);
-  const high = Math.max(low + 1, ...values);
-  const percent = (number: number) => (number - low) / (high - low) * 100;
+function scale(min: number, max: number) {
+  const magnitude = Math.max(1, Math.abs(min), Math.abs(max));
+  const low = min / magnitude;
+  const high = max / magnitude;
+  return (value: number) => high > low ? (value / magnitude - low) / (high - low) : 0.5;
+}
+export function ReplyChart({ chartType, rows, series, label, description, min }: ReplyChartData) {
+  const [hidden, setHidden] = useState<number[]>([]);
+  const [selected, setSelected] = useState<number>();
+  const [hovered, setHovered] = useState<number>();
+  const visible = series.map((_, index) => index).filter((index) => !hidden.includes(index));
+  const values = rows.flatMap((row) => visible.map((index) => row.values[index]));
+  const low = Math.min(0, min ?? 0, ...values);
+  const high = Math.max(1, ...values);
+  const percent = scale(low, high);
+  const positions = rows.map((row, index) => row.x ?? index);
+  const xMin = Math.min(...positions);
+  const xMax = Math.max(...positions);
+  const xScale = scale(xMin, xMax);
+  const x = (index: number) => chartType === "scatter" ? 18 + xScale(positions[index]) * 444 : (index + 0.5) * 480 / rows.length;
+  const y = (number: number) => 132 - percent(number) * 112;
+  const active = hovered ?? selected;
+  const activeRow = active === undefined ? undefined : rows[active];
 
+  function toggleSeries(index: number) {
+    setHidden((current) => current.includes(index)
+      ? current.filter((item) => item !== index)
+      : current.length + 1 < series.length ? [...current, index] : current);
+  }
+
+  function select(index: number) {
+    setSelected((current) => current === index ? undefined : index);
+  }
+
+  function focusPoint(index: number) {
+    return {
+      onPointerEnter: () => setHovered(index),
+      onPointerLeave: () => setHovered(undefined),
+      onFocus: () => setHovered(index),
+      onBlur: () => setHovered(undefined),
+    };
+  }
+
+  const pieUnit = Math.max(1, ...values);
   let total = 0;
-  const slices = chartType === "pie" ? rows.filter(({ values }) => values[0] > 0).map((row, index) => {
+  const slices = chartType === "pie" ? rows.flatMap((row, index) => {
+    if (!(row.values[0] > 0)) return [];
     const start = total;
-    total += row.values[0];
-    return { ...row, start, end: total, color: colors[index % colors.length] };
+    total += row.values[0] / pieUnit;
+    return [{ ...row, index, start, end: total, color: colors[index % colors.length] }];
   }) : [];
+
+  const legend = chartType !== "pie" && series.length > 1 && (
+    <div className="chat-chart-legend" aria-label="图例">
+      {series.map((name, index) => <button type="button" key={index} onClick={() => toggleSeries(index)}
+        aria-pressed={visible.includes(index)} disabled={visible.length === 1 && visible[0] === index}>
+        <i style={{ background: colors[index] }} />{name}
+      </button>)}
+    </div>
+  );
+
+  function plot() {
+    if (!rows.length) return <p className="chat-chart-empty">暂无符合条件的数据</p>;
+    if (chartType === "pie") return total > 0 ? <div className="chat-chart-pie">
+      <div className="chat-chart-disk" aria-hidden="true" style={{
+        background: `conic-gradient(${slices.map((slice) => {
+          const color = active === undefined || active === slice.index ? slice.color : `color-mix(in srgb, ${slice.color} 42%, var(--background))`;
+          return `${color} ${slice.start / total * 100}% ${slice.end / total * 100}%`;
+        }).join(",")})`,
+      }} />
+      <ul>{slices.map(({ name, values, color, index }) => <li key={index}>
+        <button type="button" aria-pressed={selected === index} onClick={() => select(index)} {...focusPoint(index)}>
+          <i style={{ background: color }} />{name} <strong>{values[0]}</strong>
+        </button>
+      </li>)}</ul>
+    </div> : <p className="chat-chart-empty">暂无饼图数据</p>;
+    const xy = chartType === "line" || chartType === "scatter";
+    return (
+      <div className={xy ? "chat-chart-line" : undefined}>
+        {xy && <div className="chat-chart-axes">
+          <div className="chat-chart-y-axis" aria-hidden="true">
+            {[high, low / 2 + high / 2, low].map((tick, index) => <span key={index} style={{ top: `${y(tick) / 144 * 100}%` }}>{axisNumber.format(tick)}</span>)}
+          </div>
+          <div className="chat-chart-xy">
+          <svg viewBox="0 0 480 144" preserveAspectRatio="none" aria-hidden="true">
+          {[high, low / 2 + high / 2, low].map((tick, index) =>
+            <line key={index} x1="0" x2="480" y1={y(tick)} y2={y(tick)} stroke="currentColor" opacity=".12" />)}
+          {low < 0 && <line x1="0" x2="480" y1={y(0)} y2={y(0)} stroke="currentColor" opacity=".24" />}
+          {chartType === "line" && visible.map((seriesIndex) => (
+            <polyline key={seriesIndex} points={rows.map((row, index) => `${x(index)},${y(row.values[seriesIndex])}`).join(" ")}
+              fill="none" stroke={colors[seriesIndex]} strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+          ))}
+          {visible.flatMap((seriesIndex) => rows.map((row, index) => (
+            <ellipse key={`${seriesIndex}-${index}`} cx={x(index)} cy={y(row.values[seriesIndex])}
+              rx={active === index ? 5 : chartType === "scatter" ? 3.8 : 2.2}
+              ry={active === index ? 4.5 : chartType === "scatter" ? 3.4 : 2}
+              fill={colors[seriesIndex]} stroke="var(--background)" strokeWidth="1"
+              vectorEffect="non-scaling-stroke" onPointerEnter={() => setHovered(index)}
+              onPointerLeave={() => setHovered(undefined)} onClick={() => select(index)} />
+          )))}
+          </svg>
+          {chartType === "scatter" && <div className="chat-chart-x-axis" aria-hidden="true">
+            {xMin === xMax ? <span>{axisNumber.format(xMin)}</span>
+              : [xMin, xMin / 2 + xMax / 2, xMax].map((tick, index) => <span key={index}>{axisNumber.format(tick)}</span>)}
+          </div>}
+          </div>
+        </div>}
+        <div className="chat-chart-bars">{rows.map((row, index) => (
+          <div className="chat-chart-column" key={index} data-active={active === index} {...focusPoint(index)}>
+            {!xy && <div className="chat-chart-track" aria-hidden="true">
+              <span style={{ bottom: `${percent(0) * 100}%` }} />
+              {visible.map((seriesIndex, order) => {
+                const value = row.values[seriesIndex];
+                return <i key={seriesIndex} style={{
+                  left: `${12 + order * 76 / visible.length}%`, width: `${70 / visible.length}%`,
+                  background: colors[seriesIndex],
+                  bottom: `${percent(Math.min(0, value)) * 100}%`,
+                  height: `${Math.abs(percent(value) - percent(0)) * 100}%`,
+                }} />;
+              })}
+            </div>}
+            <button className="chat-chart-point" type="button" aria-pressed={selected === index} onClick={() => select(index)}>
+              {visible.map((seriesIndex) => <strong key={seriesIndex} title={series[seriesIndex]} style={xy ? { color: colors[seriesIndex] } : undefined}>{row.values[seriesIndex]}</strong>)}
+              <span>{row.name}</span>
+            </button>
+          </div>
+        ))}</div>
+      </div>
+    );
+  }
+
+  const detail = activeRow && <p className="chat-chart-detail" role="status">
+    <strong>{activeRow.name}</strong>{chartType === "scatter" && activeRow.x !== undefined && ` · X = ${activeRow.x}`}
+    {visible.map((index) => ` · ${series[index]} ${activeRow.values[index]}`).join("")}
+  </p>;
 
   return (
     <figure className="chat-widget-chart" aria-label={label}>
-      {chartType === "pie" ? (
-        total > 0 ? <div className="chat-chart-pie">
-          <div className="chat-chart-disk" aria-hidden="true" style={{ background: `conic-gradient(${slices.map((slice) => `${slice.color} ${slice.start / total * 100}% ${slice.end / total * 100}%`).join(",")})` }} />
-          <ul>{slices.map(({ name, values, color }, index) => <li key={index}><i style={{ background: color }} />{name} <strong>{values[0]}</strong></li>)}</ul>
-        </div> : <p>暂无饼图数据</p>
-      ) : chartType === "line" ? (
-        <div className="chat-chart-line">
-          <svg viewBox="0 0 480 144" preserveAspectRatio="none" aria-hidden="true">
-            <line x1="0" x2="480" y1={132 - percent(0) * 1.2} y2={132 - percent(0) * 1.2} stroke="currentColor" opacity=".2" />
-            {series.map((_, seriesIndex) => (
-              <polyline key={seriesIndex} points={rows.map((row, index) => `${(index + 0.5) * 480 / rows.length},${132 - percent(row.values[seriesIndex]) * 1.2}`).join(" ")} fill="none" stroke={colors[seriesIndex]} strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
-            ))}
-          </svg>
-          <div className="chat-chart-bars">{rows.map(({ name, values }, index) => (
-            <div key={index} className="chat-chart-column"><span>{name}</span><div>{values.map((value, seriesIndex) => <strong key={seriesIndex} title={series[seriesIndex]} style={{ color: colors[seriesIndex] }}>{value}</strong>)}</div></div>
-          ))}</div>
-        </div>
-      ) : (
-        <div className="chat-chart-bars">
-          {rows.map(({ name, values }, index) => <div className="chat-chart-column" key={index}>
-            <div className="chat-chart-track" aria-hidden="true">
-              <span style={{ bottom: `${percent(0)}%` }} />
-              {values.map((value, seriesIndex) => <i key={seriesIndex} style={{ left: `${12 + seriesIndex * 76 / series.length}%`, width: `${70 / series.length}%`, background: colors[seriesIndex], bottom: `${percent(Math.min(0, value))}%`, height: `${percent(Math.abs(value)) - percent(0)}%` }} />)}
-            </div>
-            <div>{values.map((value, seriesIndex) => <strong key={seriesIndex} title={series[seriesIndex]}>{value}</strong>)}<span>{name}</span></div>
-          </div>)}
-        </div>
-      )}
-      {chartType !== "pie" && series.length > 1 && <div className="chat-chart-legend">{series.map((name, index) => <span key={index}><i style={{ background: colors[index] }} />{name}</span>)}</div>}
+      <div className="chat-chart-heading">
+        <strong>{label}</strong>
+        <Dialog>
+          <DialogTrigger asChild>
+            <button type="button" className="chat-chart-expand"><Expand size={14} aria-hidden="true" />展开图表</button>
+          </DialogTrigger>
+          <DialogContent className="chat-chart-dialog">
+            <DialogTitle>{label}</DialogTitle>
+            <DialogDescription>{description ?? "图表与数据"}</DialogDescription>
+            {plot()}
+            {legend}
+            {detail}
+            {!!rows.length && <div className="chat-chart-table"><table>
+              <thead><tr><th scope="col">项目</th>{chartType === "scatter" && <th scope="col">X</th>}{visible.map((index) => <th scope="col" key={index}>{series[index]}</th>)}</tr></thead>
+              <tbody>{rows.map((row, index) => <tr key={index}><th scope="row">{row.name}</th>{chartType === "scatter" && <td>{row.x}</td>}{visible.map((seriesIndex) => <td key={seriesIndex}>{row.values[seriesIndex]}</td>)}</tr>)}</tbody>
+            </table></div>}
+          </DialogContent>
+        </Dialog>
+      </div>
+      {plot()}
+      {legend}
+      {detail}
       {description && <figcaption>{description}</figcaption>}
     </figure>
   );
