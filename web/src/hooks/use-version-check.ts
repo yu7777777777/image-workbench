@@ -75,6 +75,8 @@ export function useVersionCheck(canUpgrade: boolean) {
               error: status.last_result.error,
               elapsed_secs: status.last_result.elapsed_secs,
             });
+          } else {
+            setUpgradeResult(null);
           }
           if (status.request_pending) setUpgrading(true);
           else if (status.last_result?.status === "success") setUpgrading(false);
@@ -98,6 +100,7 @@ export function useVersionCheck(canUpgrade: boolean) {
     async (version: string) => {
       if (!canUpgrade) return false;
       setUpgrading(true);
+      setUpgradeResult(null);
       try {
         await triggerUpgrade(version);
         toast.success(`升级请求已受理（${version}），宿主机升级器将在一分钟内执行`);
@@ -105,7 +108,7 @@ export function useVersionCheck(canUpgrade: boolean) {
         for (let attempt = 0; attempt < 60; attempt++) {
           await new Promise((resolve) => setTimeout(resolve, 8000));
           const status = await fetchUpgradeStatus();
-          if (status.last_result && status.last_result.version === version) {
+          if (!status.request_pending && status.last_result && status.last_result.version === version) {
             const ok = status.last_result.status === "success";
             setUpgrading(false);
             setUpgradeResult({

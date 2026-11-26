@@ -52,6 +52,7 @@ class Host:
         self.image_prefix = cfg.get("image_prefix", "chatgpt2api")
         self.disk_min_gb = int(cfg.get("disk_min_gb", 4))
         self.keep_images = int(cfg.get("keep_images", 3))
+        self.keep_releases = max(1, int(cfg.get("keep_releases", 1)))
         self.health_url = cfg.get("health_url", "http://127.0.0.1:3000/health?format=json")
         self.allow_degraded_health = bool(cfg.get("allow_degraded_health", False))
 
@@ -322,6 +323,51 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as tar:
                 pass
         return removed
 
+    def prune_releases(self, keep: int) -> dict[str, list[str]]:
+        """部署成功后清理本次临时构建目录并只保留最近 keep 份版本目录（默认 1 份，避免旧库快照无限堆积）。"""
+        cleaned_temp_dirs: list[str] = []
+        for temp_name in ("payload", "build"):
+            temp_dir = self.release / temp_name
+            if temp_dir.is_dir():
+                try:
+                    shutil.rmtree(temp_dir)
+                    cleaned_temp_dirs.append(temp_name)
+                except Exception:
+                    pass
+
+        removed_releases: list[str] = []
+        releases_root = self.release.parent.resolve()
+        current_release = self.release.resolve()
+        if releases_root.is_dir():
+            siblings = [
+                entry for entry in releases_root.iterdir()
+                if entry.is_dir() and entry.resolve() != current_release
+            ]
+            siblings.sort(key=lambda entry: entry.stat().st_mtime, reverse=True)
+            keep_older = max(0, keep - 1)
+            for candidate in siblings[keep_older:]:
+                resolved = candidate.resolve()
+                if resolved.parent != releases_root or resolved == current_release:
+                    continue
+                try:
+                    shutil.rmtree(resolved)
+                    removed_releases.append(candidate.name)
+                except Exception:
+                    pass
+
+        return {
+            "removed_releases": removed_releases,
+            "cleaned_temp_dirs": cleaned_temp_dirs,
+        }
+
+    def prune_build_cache(self) -> bool:
+        """部署成功后清理 Docker 构建缓存，防止反复派生镜像占满系统盘。"""
+        try:
+            result = subprocess.run(["docker", "builder", "prune", "-af"], capture_output=True)
+            return result.returncode == 0
+        except Exception:
+            return False
+
     # ===== 主流程 =====
 
     def deploy(self) -> dict:
@@ -359,6 +405,8 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as tar:
             fingerprint = self.run(["docker", "exec", self.container, "/bin/sh", "-c", "cat /app/VERSION"]).decode().strip()
             assert fingerprint == metadata_version, "容器内版本不符"
             removed_images = self.prune_images(current["Image"], self.keep_images)
+            release_cleanup = self.prune_releases(self.keep_releases)
+            pruned_build_cache = self.prune_build_cache()
             result = {
                 "deployed": True,
                 "version": metadata_version,
@@ -370,6 +418,9 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as tar:
                 "directory_inodes_preserved": True,
                 "config_unchanged": True,
                 "removed_old_images": removed_images,
+                "removed_old_releases": release_cleanup["removed_releases"],
+                "cleaned_temp_dirs": release_cleanup["cleaned_temp_dirs"],
+                "pruned_build_cache": pruned_build_cache,
             }
             (self.release / "deployment-result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
             print(json.dumps(result, ensure_ascii=False), flush=True)
