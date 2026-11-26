@@ -1,12 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArrowDown,
   ArrowRight,
-  Check,
   Copy,
   ImagePlus,
   LoaderCircle,
@@ -51,38 +48,10 @@ import {
   chatModelLabel,
 } from "@/lib/chat-models";
 import { useChatStore, type ChatImage, type ChatThread } from "@/store/chat";
+import { ChatReply } from "./chat-reply";
+import { copyReplyText } from "./chat-markdown";
 import "./chat.css";
 
-async function copy(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    toast.error("复制失败，请手动选择文字复制");
-    return false;
-  }
-}
-function CodeBlock({ children, ...props }: ComponentProps<"pre">) {
-  const ref = useRef<HTMLPreElement>(null);
-  const [copied, setCopied] = useState(false);
-  return (
-    <div className="chat-code">
-      <button
-        type="button"
-        aria-label="复制代码"
-        onClick={async () => {
-          if (await copy(ref.current?.textContent || "")) setCopied(true);
-        }}
-      >
-        {copied ? <Check size={13} /> : <Copy size={13} />}
-        {copied ? "已复制" : "复制代码"}
-      </button>
-      <pre ref={ref} {...props}>
-        {children}
-      </pre>
-    </div>
-  );
-}
 function readImage(file: File): Promise<ChatImage> {
   return new Promise((resolve, reject) => {
     if (
@@ -381,25 +350,12 @@ export default function ChatPage() {
                   {message.role === "user" ? (
                     <div className="chat-user-text">{message.text}</div>
                   ) : (
-                    <div className="chat-markdown">
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        components={{
-                          pre: CodeBlock,
-                          a: ({ children, ...props }) => (
-                            <a
-                              {...props}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              {children}
-                            </a>
-                          ),
-                        }}
-                      >
-                        {message.text}
-                      </ReactMarkdown>
-                    </div>
+                    <ChatReply
+                      text={message.text}
+                      streaming={message.status === "streaming"}
+                      canSend={canSend && !chat.busyId}
+                      onSend={(text) => { void chat.send(text, []); }}
+                    />
                   )}
                   {message.status === "streaming" && (
                     <div className="chat-generating" role="status">
@@ -423,7 +379,7 @@ export default function ChatPage() {
                         <button
                           disabled={!message.text}
                           onClick={async () => {
-                            if (await copy(message.text))
+                            if (await copyReplyText(message.text))
                               toast.success("已复制回答");
                           }}
                         >

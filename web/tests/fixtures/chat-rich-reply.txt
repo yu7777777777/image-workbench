@@ -1,0 +1,42 @@
+## 二、万能提示词模板
+
+<WritingBlock id="62841" variant="standard">你现在是一位专业的 **【角色】**。
+
+我的目标是 **【具体目标】**。
+
+具体要求：
+
+1. 【要求一】
+2. 【要求二】
+
+如果信息不足，请先向我提问。</WritingBlock>
+
+## 三、你想学习哪一种提示词？
+
+{@body const [kind,setKind] = DIL.useState("通用型 AI 提示词")} {@body const [level,setLevel] = DIL.useState("从零开始学习")}
+<box border radius="lg" padding={3} gap={3}>
+  **你主要想用提示词做什么？**
+  <radio-group direction="col" value={kind} onChange={setKind}>
+    {#each ["通用型 AI 提示词","AI 绘画与图片生成","短视频与文案创作","商业分析与赚钱","编程与自动化","深度研究与专业分析","打造个人专属 AI 助手"] as v}
+      <radio value={v}>{v}</radio>
+    {/each}
+  </radio-group>
+  <divider color="subtle"/>
+  **你目前的水平？**
+  <radio-group direction="col" value={level} onChange={setLevel}>
+    <radio value="从零开始学习">从零开始学习</radio>
+    <radio value="会基础使用，想进阶">会基础使用，想进阶</radio>
+    <radio value="已经熟练，想掌握高级技巧">已经熟练，想掌握高级技巧</radio>
+  </radio-group>
+  <button block onClick={()=>GenUI.issueNewTurn("我想学习："+kind+"；我的水平："+level+"。请系统教我写高质量提示词，并提供实战案例和可复制模板。")}>开始学习</button>
+</box>
+
+也可以直接输入你想学习的方向。
+
+| 项目 | 状态 |
+| --- | --- |
+| 普通 Markdown | 可用 |
+
+```xml
+<WritingBlock>代码示例</WritingBlock>
+```

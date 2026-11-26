@@ -13,6 +13,14 @@ const artifacts = resolve(
 const requests = [];
 const answer =
   '这是一段测试回答。\n\n## 计划\n\n- 分析问题\n- 整理思路\n\n| 项目 | 状态 |\n| --- | --- |\n| 流式聊天 | 可用 |\n\n```js\nconsole.log("你好");\n```';
+const richReply = readFile(join(__dirname, "fixtures/chat-rich-reply.txt"), "utf8");
+const observedReplies = require("./fixtures/chat-observed-replies.json");
+const observedPrompts = new Map([
+  ["检查公式和流程图", observedReplies.markdown_math_code],
+  ["检查嵌套表单", observedReplies.writing_and_native_form],
+  ["检查交互图表", observedReplies.visual_and_search],
+  ["检查文件正文", observedReplies.downloadable_file],
+]);
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, "http://localhost");
@@ -44,6 +52,9 @@ const server = createServer(async (req, res) => {
       const data = JSON.parse(body);
       requests.push(data);
       const last = data.messages.at(-1).content;
+      const rich = last === "展示写作模板" || last === "展示其他表单" || observedPrompts.has(last);
+      const reply = observedPrompts.get(last) ?? (rich ? await richReply : answer);
+      const contentText = last === "展示其他表单" ? reply.replace("+kind+", "+window.location.href+") : reply;
       if (
         last === "失败测试" &&
         requests.filter((r) => r.messages.at(-1).content === "失败测试")
@@ -58,21 +69,22 @@ const server = createServer(async (req, res) => {
       });
       let index = 0;
       const slow = last === "停止测试" || last === "切换测试";
+      const chunkSize = slow ? 2 : rich ? 17 : 12;
       const timer = setInterval(
         () => {
-          const content = answer.slice(index, index + (slow ? 2 : 12));
-          index += slow ? 2 : 12;
+          const content = contentText.slice(index, index + chunkSize);
+          index += chunkSize;
           res.write(
             `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\n`,
           );
-          if (index >= answer.length) {
+          if (index >= contentText.length) {
             clearInterval(timer);
             res.end(
               'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n',
             );
           }
         },
-        slow ? 180 : 35,
+        slow ? 180 : rich ? 15 : 35,
       );
       res.on("close", () => clearInterval(timer));
       return;
@@ -139,6 +151,116 @@ async function waitAnswer(page) {
   await page.getByRole("button", { name: "重新生成", exact: true }).waitFor();
 }
 
+async function checkRichReplies(page, context) {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await send(page, "展示写作模板");
+  const writing = page.getByRole("region", { name: "写作块" });
+  await writing.waitFor();
+  assert(await writing.getByRole("button", { name: "复制正文" }).isDisabled());
+  await waitAnswer(page);
+
+  await page.getByRole("heading", { name: /你想学习哪一种提示词/ }).waitFor();
+  await page.getByRole("cell", { name: "普通 Markdown" }).waitFor();
+  assert.equal(await page.locator(".chat-code code").textContent(), "<WritingBlock>代码示例</WritingBlock>\n");
+  assert(!(await page.locator(".chat-markdown").textContent()).includes("DIL.useState"));
+  await page.locator(".chat-scroll").evaluate((el) => { el.scrollTop = 0; });
+  await page.screenshot({ path: join(artifacts, "rich-reply-desktop.png") });
+  await writing.getByRole("button", { name: "复制正文" }).click();
+  await page.getByText("已复制正文", { exact: true }).waitFor();
+  const clipboard = await page.evaluate(() => navigator.clipboard.readText());
+  assert(clipboard.startsWith("你现在是一位专业的"));
+  assert(!clipboard.includes("<WritingBlock"));
+
+  await page.reload();
+  await waitReady(page);
+  await writing.waitFor();
+  assert(await page.getByRole("radio", { name: "通用型 AI 提示词", exact: true }).isChecked());
+  assert(await page.getByRole("radio", { name: "从零开始学习", exact: true }).isChecked());
+  await page.setViewportSize({ width: 390, height: 844 });
+  const form = page.locator(".chat-reply-form");
+  await form.scrollIntoViewIfNeeded();
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await page.screenshot({ path: join(artifacts, "rich-reply-mobile.png") });
+
+  await page.getByRole("radio", { name: "AI 绘画与图片生成", exact: true }).check();
+  await page.getByRole("radio", { name: "会基础使用，想进阶", exact: true }).check();
+  const followUp = "我想学习：AI 绘画与图片生成；我的水平：会基础使用，想进阶。请系统教我写高质量提示词，并提供实战案例和可复制模板。";
+  await page.getByRole("button", { name: "开始学习" }).click();
+  await page.getByText(followUp, { exact: true }).waitFor();
+  await waitAnswer(page);
+  assert.equal(requests.at(-1).messages.at(-1).content, followUp);
+
+  await page.getByRole("button", { name: "新建对话", exact: true }).click();
+  await send(page, "展示其他表单");
+  await waitAnswer(page);
+  const source = page.locator(".chat-reply-source");
+  assert.equal(await source.getAttribute("open"), null);
+  assert.equal(await page.getByRole("button", { name: "开始学习" }).count(), 0);
+  await source.locator("summary").click();
+  assert((await source.locator("pre").textContent()).includes("window.location.href"));
+  await page.getByText("也可以直接输入你想学习的方向。", { exact: true }).waitFor();
+}
+
+async function checkObservedReplies(page) {
+  async function ask(prompt) {
+    await page.getByRole("button", { name: "新建对话", exact: true }).click();
+    await send(page, prompt);
+    await waitAnswer(page);
+    assert.equal(await page.locator(".chat-reply-source").count(), 0);
+  }
+
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await ask("检查公式和流程图");
+  assert.equal(await page.locator(".chat-markdown .katex").count(), 2);
+  const diagram = page.getByRole("img", { name: "Mermaid 图表" });
+  await diagram.waitFor();
+  await page.waitForFunction(() => {
+    const image = document.querySelector(".chat-diagram img");
+    return image?.complete && image.naturalWidth > 0;
+  });
+  assert((await diagram.boundingBox()).height < 300);
+  await diagram.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: join(artifacts, "observed-math-mermaid.png") });
+
+  await ask("检查嵌套表单");
+  await page.getByRole("radio", { name: /AI 编程提示词/ }).check();
+  await page.getByRole("radio", { name: /进阶：/ }).check();
+  await page.getByText("当前选择", { exact: true }).waitFor();
+  assert.match(await page.locator(".chat-reply-form .chat-widget-box .chat-widget-box").innerText(), /学习方向：\s*编程[\s\S]*当前水平：\s*进阶/);
+  await page.getByRole("button", { name: "开始学习" }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: join(artifacts, "observed-nested-form.png") });
+  const followUp = page.waitForRequest((request) => request.url().endsWith("/v1/chat/completions") && request.method() === "POST");
+  await page.getByRole("button", { name: "开始学习" }).click();
+  assert.match((await followUp).postDataJSON().messages.at(-1).content, /学习方向：编程。\n当前水平：进阶。/);
+  await waitAnswer(page);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await ask("检查交互图表");
+  const figure = page.getByRole("figure", { name: "数值" });
+  await figure.waitFor();
+  assert.equal(await figure.locator(".chat-chart-column strong").allTextContents().then((values) => values.join(",")), "1,2,3");
+  await page.getByRole("slider", { name: "调整 A" }).fill("7");
+  assert.equal(await figure.locator(".chat-chart-column strong").first().textContent(), "7");
+  assert.match(await page.locator(".chat-widget").innerText(), /当前总和\s*12/);
+  await page.getByRole("button", { name: "恢复初始数据" }).click();
+  assert.equal(await figure.locator(".chat-chart-column strong").first().textContent(), "1");
+  assert.equal(await page.getByRole("link", { name: /Example Domains —/ }).getAttribute("href"), "https://www.iana.org/help/example-domains");
+  assert.equal(await page.getByRole("link", { name: "IANA — Example Domains 官方说明" }).count(), 0);
+  assert((await page.getByText(/来源链接未返回/).count()) > 0);
+  await page.locator(".chat-widget-chart").scrollIntoViewIfNeeded();
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await page.screenshot({ path: join(artifacts, "observed-chart-mobile.png") });
+
+  await ask("检查文件正文");
+  assert.equal(await page.getByRole("link", { name: /format-check.csv/ }).count(), 0);
+  await page.getByText(/附件未返回/).waitFor();
+  const pending = page.waitForEvent("download");
+  await page.getByRole("button", { name: "下载 CSV 正文" }).click();
+  const download = await pending;
+  assert.equal(download.suggestedFilename(), "reply.csv");
+  assert.match(await readFile(await download.path(), "utf8"), /^\uFEFFitem,count\napple,1\npear,2\n$/);
+}
+
 (async () => {
   await mkdir(artifacts, { recursive: true });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
@@ -162,6 +284,13 @@ async function waitAnswer(page) {
     await page.goto(base + "/chat/");
     await waitReady(page);
     await page.emulateMedia({ reducedMotion: "reduce" });
+    if (process.argv.includes("--rich-replies")) {
+      await checkRichReplies(page, context);
+      await checkObservedReplies(page);
+      assert.deepEqual(errors, []);
+      console.log(JSON.stringify({ ok: true, cases: ["streamed-rich-reply", "reload-form", "radio-follow-up", "source-fallback", "observed-math-mermaid", "observed-nested-form", "observed-chart-references", "observed-csv"], requests: requests.length, artifacts }));
+      return;
+    }
     await page.screenshot({ path: join(artifacts, "desktop-empty.png") });
     await page.getByRole("combobox", { name: "选择对话模型" }).click();
     assert.equal(
