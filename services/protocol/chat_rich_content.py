@@ -20,7 +20,7 @@ _MARKUP = re.compile(r"<(?:Cite|AsyncImage(?:Group)?|Entity|Link)\b")
 _REFERENCE = re.compile(r"[A-Za-z0-9_.:-]{1,128}")
 _OBJECT_ID = re.compile(r"[A-Za-z0-9_-]{1,128}")
 _MARKUP_REF = re.compile(r"\bref\s*=\s*[\"']([A-Za-z0-9_.:-]{1,128})[\"']")
-_MARKUP_IMAGE_QUERY = re.compile(r"<AsyncImage(?:Group)?\b[^<>]*?\squery\s*=\s*(\{\s*)?(?=[\[\"'])")
+_MARKUP_IMAGE_QUERY = re.compile(r"<AsyncImage(?:Group)?\b[^<>]*?\s(?:query|queries)\s*=\s*(\{\s*)?(?=[\[\"'])")
 _SANDBOX_LINK = re.compile(r"(?:<sandbox:(/mnt/data/[^>\r\n]+)>|(?<=\]\()sandbox:(/mnt/data/[^)\s<>]+))")
 _MAX_MESSAGES = 128
 _MAX_ATTACHMENTS = 3
@@ -206,11 +206,27 @@ def _component_bindings(metadata: dict[str, Any], text: str) -> dict[str, tuple[
 
 def _resource_blocks(message: dict[str, Any], visible_assistant: bool) -> Iterator[RichBlock]:
     metadata = _obj(message.get("metadata"))
+    bindings = _component_bindings(metadata, assistant_message_text(message)) if visible_assistant else {}
     for name in ("search_result_groups", "citations", "content_references", "inline_cot_expandable_content"):
         for item in _objects(metadata.get(name)):
             item_type = item.get("type")
             if name == "inline_cot_expandable_content" and item_type != "search_result":
                 continue
+            if name == "content_references" and item_type in ("async_image", "async_image_group"):
+                attrs = _obj(item.get("genui_attributes"))
+                component_id = _ref(item.get("component_resolution_id"))
+                alias, bound_queries = bindings.get(component_id, ("", []))
+                ref = alias or _ref(attrs.get("ref")) or component_id
+                queries = _image_queries(attrs.get("query") or attrs.get("queries") or item.get("query") or item.get("queries")) or bound_queries
+                for nested in _objects(item):
+                    image = _image_block(nested, ref, queries)
+                    if image:
+                        yield image
+                    if queries:
+                        for value in _items(nested.get("image_urls"))[:8]:
+                            image = _image_block({**nested, "image_url": value, "thumbnail_url": None}, ref, queries)
+                            if image:
+                                yield image
             if item_type in ("search_result", "webpage", "url_citation", "web_result", "web") or name == "citations" or "ref_id" in item:
                 source = source_block(item)
                 if source:
@@ -222,11 +238,11 @@ def _resource_blocks(message: dict[str, Any], visible_assistant: bool) -> Iterat
         return
     app_data = _obj(_obj(metadata.get("model_dil_v2")).get("appData"))
     components = _obj(_obj(app_data.get("opGenui")).get("componentResults"))
-    bindings = _component_bindings(metadata, assistant_message_text(message))
     for component, result in list(components.items())[:64]:
         alias, queries = bindings.get(component, ("", []))
         ref = alias or _ref(component)
-        state = _obj(_obj(result).get("state"))
+        result_obj = _obj(result)
+        state = _obj(result_obj.get("state") or result_obj.get("data") or result_obj)
         queries = queries or _image_queries(state.get("query") or state.get("queries"))
         products = [product for item in _objects(state) if (product := _product_block(item, ref))]
         if products:

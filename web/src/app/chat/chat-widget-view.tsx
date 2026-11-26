@@ -1,10 +1,18 @@
 import { createElement, useId, useMemo, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import {
-  Activity, Bell, BookOpen, Calendar, Camera, ChartColumn, ChartLine, Check, CheckCircle,
-  ChevronDown, ChevronRight, ChevronUp, Circle, Cloud, Code, CornerDownRight, FileText,
-  Folder, Globe, Heart, House, Image as ImageIcon, Info, LayoutDashboard, LoaderCircle,
-  Mail, Minus, MousePointerClick, Plus, Power, RotateCcw, Search, Settings, ShoppingBag,
-  Trash2, User, Users,
+  Activity, AlarmClock, AlertCircle, AlertTriangle, Archive, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ArrowUpRight,
+  Award, Bell, Book, Bookmark, BookOpen, Box, Briefcase, Calendar, CalendarCheck, CalendarClock, CalendarDays,
+  CalendarPlus, CalendarRange, Camera, Car, ChartColumn, ChartLine, ChartPie, Check, CheckCircle, CheckSquare,
+  ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, CirclePlus, ClipboardCheck, ClipboardList, Clock,
+  Cloud, Code, Coffee, Compass, Copy, CornerDownRight, Cpu, CreditCard, Database, Download, Dumbbell, Ellipsis,
+  EllipsisVertical, ExternalLink, Eye, File, FileSpreadsheet, FileText, Filter, Flag, Flame, Folder, Globe,
+  GraduationCap, Grid2x2, Heart, HelpCircle, History, Home, House, Image as ImageIcon, Inbox, Info, Layers,
+  LayoutDashboard, Leaf, Lightbulb, Link, List, ListChecks, ListTodo, LoaderCircle, Lock, Mail, MapPin, Menu,
+  MessageSquare, Mic, Minus, Moon, MousePointerClick, Package, Palette, PanelLeft, Paperclip, Pause, Pencil,
+  PenTool, Phone, Pin, Plane, Play, Plus, Power, RefreshCw, Repeat, Rocket, RotateCcw, Search, Send, Server,
+  Settings, Share2, Shield, ShoppingBag, SlidersHorizontal, Sparkles, Star, Sun, Table, Tag, Target, Terminal,
+  ThumbsDown, ThumbsUp, Timer, Trash2, TrendingUp, Trophy, Unlock, Upload, User, Users, Utensils, Video, Volume2,
+  Wallet, X, XCircle, Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -25,37 +33,153 @@ const icons = new Map([
   ["globe", Globe],
   ["minus", Minus],
   ["plus", Plus],
-  ["activity", Activity], ["bell", Bell], ["calendar", Calendar], ["camera", Camera], ["chart-line", ChartLine],
-  ["cloud", Cloud], ["code", Code], ["folder", Folder], ["heart", Heart], ["home", House], ["image", ImageIcon],
+  ["activity", Activity], ["bell", Bell], ["calendar", Calendar],
+  ["calendar-days", CalendarDays], ["calendar-range", CalendarRange], ["calendar-check", CalendarCheck],
+  ["calendar-clock", CalendarClock], ["calendar-plus", CalendarPlus],
+  ["camera", Camera], ["chart-line", ChartLine],
+  ["cloud", Cloud], ["code", Code], ["folder", Folder], ["heart", Heart], ["home", Home], ["house", House], ["image", ImageIcon],
   ["info", Info], ["mail", Mail], ["mouse-pointer-click", MousePointerClick], ["search", Search], ["settings", Settings],
   ["user", User], ["users", Users],
-  ["check", Check], ["chevron-down", ChevronDown], ["chevron-right", ChevronRight], ["chevron-up", ChevronUp],
-  ["circle", Circle], ["corner-down-right", CornerDownRight], ["file-text", FileText], ["chart-column", ChartColumn],
+  ["check", Check], ["chevron-down", ChevronDown], ["chevron-left", ChevronLeft], ["chevron-right", ChevronRight], ["chevron-up", ChevronUp],
+  ["circle", Circle], ["circle-plus", CirclePlus], ["corner-down-right", CornerDownRight], ["file-text", FileText], ["chart-column", ChartColumn],
   ["layout-dashboard", LayoutDashboard],
   ["power", Power], ["shopping-bag", ShoppingBag], ["trash-2", Trash2],
+  ["download", Download], ["palette", Palette], ["pen-tool", PenTool], ["file-spreadsheet", FileSpreadsheet],
+  ["file", File], ["sparkles", Sparkles], ["cpu", Cpu], ["zap", Zap], ["shield", Shield], ["star", Star],
+  ["arrow-right", ArrowRight], ["arrow-left", ArrowLeft], ["arrow-up", ArrowUp], ["arrow-down", ArrowDown], ["arrow-up-right", ArrowUpRight],
+  ["external-link", ExternalLink],
+  ["play", Play], ["pause", Pause], ["volume-2", Volume2], ["map-pin", MapPin],
+  ["sliders-horizontal", SlidersHorizontal], ["check-square", CheckSquare], ["layers", Layers],
+  ["bar-chart", ChartColumn], ["bar-chart-2", ChartColumn], ["bar-chart-3", ChartColumn], ["chart", ChartColumn],
+  ["pie-chart", ChartPie], ["chart-pie", ChartPie], ["trending-up", TrendingUp],
+  ["alert-triangle", AlertTriangle], ["alert-circle", AlertCircle], ["circle-alert", AlertCircle],
+  ["x", X], ["x-circle", XCircle], ["copy", Copy], ["pencil", Pencil], ["edit", Pencil], ["eye", Eye],
+  ["filter", Filter], ["refresh-cw", RefreshCw], ["database", Database], ["server", Server],
+  ["terminal", Terminal], ["box", Box], ["grid", Grid2x2], ["list", List], ["table", Table],
+  ["clock", Clock], ["tag", Tag], ["bookmark", Bookmark], ["share", Share2], ["share-2", Share2],
+  ["send", Send], ["message-square", MessageSquare], ["thumbs-up", ThumbsUp], ["thumbs-down", ThumbsDown],
+  ["help-circle", HelpCircle], ["circle-help", HelpCircle],
+  ["inbox", Inbox], ["list-todo", ListTodo], ["list-checks", ListChecks],
+  ["clipboard-list", ClipboardList], ["clipboard-check", ClipboardCheck],
+  ["briefcase", Briefcase], ["compass", Compass], ["menu", Menu],
+  ["ellipsis", Ellipsis], ["ellipsis-vertical", EllipsisVertical], ["panel-left", PanelLeft],
+  ["target", Target], ["flag", Flag], ["pin", Pin], ["archive", Archive],
+  ["flame", Flame], ["award", Award], ["trophy", Trophy], ["coffee", Coffee],
+  ["sun", Sun], ["moon", Moon], ["timer", Timer], ["alarm-clock", AlarmClock],
+  ["repeat", Repeat], ["history", History],
+  ["lock", Lock], ["unlock", Unlock], ["link", Link], ["paperclip", Paperclip], ["upload", Upload],
+  ["lightbulb", Lightbulb], ["rocket", Rocket], ["graduation-cap", GraduationCap], ["book", Book],
+  ["phone", Phone], ["video", Video], ["mic", Mic], ["credit-card", CreditCard], ["wallet", Wallet],
+  ["package", Package], ["plane", Plane], ["car", Car], ["utensils", Utensils], ["dumbbell", Dumbbell], ["leaf", Leaf],
 ]);
+
+const iconAliases = new Map([
+  ["warning", "alert-triangle"],
+  ["error", "alert-circle"],
+  ["close", "x"],
+  ["delete", "trash-2"],
+  ["house", "home"],
+  ["sliders", "sliders-horizontal"],
+  ["design", "palette"],
+  ["refresh", "refresh-cw"],
+  ["more-horizontal", "ellipsis"],
+  ["more-vertical", "ellipsis-vertical"],
+  ["plus-circle", "circle-plus"],
+  ["gear", "settings"],
+  ["cog", "settings"],
+  ["link-2", "link"],
+]);
+
+export function resolveIcon(raw: string) {
+  const stripped = raw.trim().replace(/^(?:lucide-react|lucide|icon):/i, "");
+  const normalized = stripped.replace(/([a-z0-9])([A-Z])/g, "$1-$2").replace(/[_\s]+/g, "-").toLowerCase();
+  return icons.get(normalized) ?? icons.get(iconAliases.get(normalized) ?? "");
+}
 
 const iconLabels = new Map([
   ["plus", "添加"], ["search", "搜索"], ["settings", "设置"], ["trash-2", "删除"], ["heart", "收藏"],
 ]);
 
-const iconSizes = new Map([["xs", 13], ["sm", 15], ["lg", 19], ["xl", 22], ["2xl", 26], ["3xl", 32]]);
-const layoutRadii = { md: 7, lg: 10, xl: 14, "2xl": 18, full: 999 };
+const iconSizes = new Map([["xs", 13], ["sm", 15], ["md", 16], ["lg", 19], ["xl", 22], ["2xl", 26], ["3xl", 32]]);
+
+function resolveIconSize(size?: string): number {
+  if (!size) return 15;
+  const trimmed = size.trim().toLowerCase();
+  const mapped = iconSizes.get(trimmed);
+  if (mapped !== undefined) return mapped;
+  const numeric = /^(\d+(?:\.\d+)?)(?:px)?$/.exec(trimmed);
+  if (numeric) {
+    const px = Math.round(Number(numeric[1]));
+    if (Number.isFinite(px)) return Math.min(32, Math.max(12, px));
+  }
+  return 15;
+}
+
+const layoutRadii = { none: 0, sm: 6, md: 7, lg: 10, xl: 14, "2xl": 18, "3xl": 24, full: 999 };
 type WidgetLayoutOptions = Extract<WidgetNode, { kind: "layout" }>["options"];
 
-function layoutStyle(options: WidgetLayoutOptions, verticalGrid = false): CSSProperties & { "--chat-widget-columns"?: number } {
+const safeColorPattern = /^(?:#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|(?:rgb|hsl)a?\([^;{}()]{1,48}\))$/;
+const surfaceTokens: Record<string, string> = {
+  surface: "var(--background)",
+  "surface-secondary": "var(--muted)",
+  "surface-tertiary": "var(--accent)",
+  "surface-elevated": "var(--card)",
+  "alpha-05": "color-mix(in srgb, var(--foreground) 4%, transparent)",
+  transparent: "transparent",
+};
+const semanticColors = new Set([
+  "primary", "emphasis", "secondary", "tertiary", "muted",
+  "success", "danger", "error", "warning", "info", "discovery", "neutral",
+]);
+
+function resolveBackground(options: WidgetLayoutOptions, values?: ReadonlyMap<string, WidgetStateValue>) {
+  const raw = options?.background !== undefined && values ? widgetValue(options.background, values) : options?.background;
+  const text = typeof raw === "string" ? raw.trim() : "";
+  const isToken = Boolean(text && text in surfaceTokens);
+  const cssValue = isToken ? surfaceTokens[text] : (text && safeColorPattern.test(text) ? text : undefined);
+  const hasBackground = Boolean(cssValue && cssValue !== "transparent");
+  const hasSurface = options?.surface === true || (options?.surface !== false && isToken && text !== "transparent");
+  return { cssValue, hasBackground, hasSurface };
+}
+
+function safeLayoutWidth(value: WidgetStateValue | undefined): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  const percent = /^(\d+(?:\.\d+)?)%$/.exec(trimmed);
+  if (percent) {
+    const amount = Number(percent[1]);
+    return Number.isFinite(amount) && amount >= 0 && amount <= 100 ? `${amount}%` : undefined;
+  }
+  const pixels = /^([1-9]\d{0,2})px$/.exec(trimmed);
+  if (pixels && Number(pixels[1]) <= 960) return trimmed;
+  return undefined;
+}
+
+function layoutStyle(
+  options: WidgetLayoutOptions,
+  verticalGrid = false,
+  values?: ReadonlyMap<string, WidgetStateValue>,
+  isTextBlock = false,
+  cssColor?: string,
+): CSSProperties & { "--chat-widget-columns"?: number } {
   const padding = options?.padding;
   const inset = typeof padding === "object" || options?.square !== undefined ? 0 : undefined;
   const justify = options?.justify === "between" ? "space-between" : options?.justify;
-  const flexBasis = options?.border || options?.surface || options?.background ? "12rem" : "0px";
+  const { cssValue: customBg } = resolveBackground(options, values);
+  const width = options?.width !== undefined && values ? safeLayoutWidth(widgetValue(options.width, values)) : undefined;
+  const textAlign: CSSProperties["textAlign"] = isTextBlock
+    ? (options?.align === "start" ? "left" : options?.align === "center" ? "center" : options?.align === "end" ? "right" : undefined)
+    : undefined;
   return {
     gap: options?.gap,
     "--chat-widget-columns": options?.columns,
-    flex: options?.flex === undefined ? undefined : `${options.flex} 1 ${flexBasis}`,
-    alignItems: verticalGrid ? undefined : options?.align,
-    justifyItems: verticalGrid ? options?.align : undefined,
+    flex: options?.flex === undefined ? undefined : `${options.flex} 1 0px`,
+    alignItems: verticalGrid || isTextBlock ? undefined : options?.align,
+    justifyItems: verticalGrid && !isTextBlock ? options?.align : undefined,
     alignContent: verticalGrid ? justify : undefined,
     justifyContent: verticalGrid ? undefined : justify,
+    textAlign,
+    color: cssColor,
     paddingTop: (typeof padding === "object" ? padding.top : padding) ?? inset,
     paddingRight: (typeof padding === "object" ? padding.right : padding) ?? inset,
     paddingBottom: (typeof padding === "object" ? padding.bottom : padding) ?? inset,
@@ -63,19 +187,23 @@ function layoutStyle(options: WidgetLayoutOptions, verticalGrid = false): CSSPro
     borderRadius: options?.radius === undefined ? undefined : layoutRadii[options.radius],
     inlineSize: options?.square,
     blockSize: options?.square,
+    width,
+    minWidth: width ? 0 : undefined,
+    background: customBg,
     minHeight: options?.height === "100%" ? undefined : options?.height,
     height: options?.height === "100%" ? "100%" : undefined,
     aspectRatio: options?.aspectRatio,
-    flexWrap: options?.wrap ? "wrap" : undefined,
+    flexWrap: options?.wrap,
     fontVariantNumeric: options?.numeric ? "tabular-nums" : undefined,
   };
 }
 
-export function ChatWidgetView({ widget, streaming, canSend, onSend, renderResource, resolveImages }: {
+export function ChatWidgetView({ widget, streaming, canSend, onSend, onOpenUrl, renderResource, resolveImages }: {
   widget: ChatWidget;
   streaming: boolean;
   canSend: boolean;
   onSend: (text: string) => void;
+  onOpenUrl?: (url: string) => void;
   renderResource?: (type: WidgetResourceType, ref: string, fallback: string, key: string) => ReactNode;
   resolveImages: (node: WidgetImage) => ChatResource[];
 }) {
@@ -113,7 +241,10 @@ export function ChatWidgetView({ widget, streaming, canSend, onSend, renderResou
 
   const applyAction = (action: WidgetAction) => {
     if ("submit" in action) submit(action.submit);
-    else if ("set" in action) setValues((current) => applyUpdates(current, [action.set]));
+    else if ("openUrl" in action) {
+      const target = String(widgetValue(action.openUrl, values)).trim();
+      if (target) onOpenUrl?.(target);
+    } else if ("set" in action) setValues((current) => applyUpdates(current, [action.set]));
     else if ("updates" in action && action.updates.length) setValues((current) => applyUpdates(current, action.updates));
     else if ("array" in action) {
       setValues((current) => {
@@ -141,7 +272,18 @@ export function ChatWidgetView({ widget, streaming, canSend, onSend, renderResou
   function resolveText(value: Parameters<typeof widgetValue>[0] | undefined): string | undefined {
     if (value === undefined) return undefined;
     const result = widgetValue(value, values);
-    return typeof result === "string" ? result.slice(0, 24) : undefined;
+    if (typeof result !== "string") return undefined;
+    const trimmed = result.trim();
+    return trimmed ? trimmed.slice(0, 48) : undefined;
+  }
+
+  function resolveColor(value: Parameters<typeof widgetValue>[0] | undefined): { dataColor?: string; cssColor?: string } {
+    const raw = resolveText(value);
+    if (!raw) return {};
+    const lower = raw.toLowerCase();
+    if (semanticColors.has(lower)) return { dataColor: lower };
+    if (safeColorPattern.test(raw)) return { cssColor: raw };
+    return {};
   }
 
   function renderNode(node: WidgetNode, key: string): ReactNode {
@@ -152,12 +294,32 @@ export function ChatWidgetView({ widget, streaming, canSend, onSend, renderResou
       }
       case "layout": {
         const options = node.options;
-        const verticalGrid = node.variant === "box" || node.variant === "col" || node.variant === "card" || node.variant === "callout";
-        const style = layoutStyle(options, verticalGrid);
+        const isTextBlock = node.variant === "title" || node.variant === "text" || node.variant === "caption";
+        const verticalGrid = (node.variant === "box" && options?.direction !== "row") || node.variant === "col" || node.variant === "card" || node.variant === "callout";
+        const { hasBackground, hasSurface } = resolveBackground(options, values);
+        const { dataColor, cssColor } = resolveColor(options?.color);
+        const style = layoutStyle(options, verticalGrid, values, isTextBlock, cssColor);
+        const hasFlex = node.variant === "row" && node.children.length > 0 && node.children.every(
+          (child) => (child.kind === "layout" || child.kind === "pressable") && child.options?.flex !== undefined,
+        );
         const Container = node.variant === "blockquote" ? "blockquote" : "div";
-        return <Container className={`chat-widget-${node.variant}`} data-border={options?.border} data-surface={options?.surface}
-          data-background={resolveText(options?.background)} data-color={resolveText(options?.color)} data-size={options?.size}
-          data-flex={options?.flex !== undefined || undefined} data-square={options?.square !== undefined || undefined} style={style} key={key}>
+        return <Container
+          className={`chat-widget-${node.variant}`}
+          data-border={options?.border === true ? "true" : options?.border === false ? "false" : undefined}
+          data-surface={hasSurface ? "true" : undefined}
+          data-background={hasBackground ? "true" : undefined}
+          data-color={dataColor}
+          data-size={options?.size}
+          data-weight={options?.weight}
+          data-variant={options?.variant}
+          data-direction={node.variant === "box" && options?.direction === "row" ? "row" : undefined}
+          data-wrap={node.variant === "row" ? options?.wrap : undefined}
+          data-has-flex={hasFlex ? "true" : undefined}
+          data-flex={options?.flex !== undefined ? "true" : undefined}
+          data-square={options?.square !== undefined ? "true" : undefined}
+          style={style}
+          key={key}
+        >
           {node.children.map((child, index) => renderNode(child, `${key}-${index}`))}
         </Container>;
       }
@@ -166,7 +328,7 @@ export function ChatWidgetView({ widget, streaming, canSend, onSend, renderResou
           {node.children.map((child, index) => renderNode(child, `${key}-${index}`))}
         </form>;
       case "popover": {
-        const Icon = node.icon ? icons.get(node.icon) : ChevronDown;
+        const Icon = node.icon ? resolveIcon(node.icon) : ChevronDown;
         const trailing = !node.icon || node.icon === "chevron-down";
         const glyph = Icon && <Icon size={15} aria-hidden="true" className={trailing ? "chat-widget-popover-chevron" : undefined} />;
         return <Popover key={key}>
@@ -189,11 +351,41 @@ export function ChatWidgetView({ widget, streaming, canSend, onSend, renderResou
         const { action, options } = node;
         const value = node.pressed !== undefined ? widgetValue(node.pressed, values) : "set" in action ? values.get(action.set.name) : undefined;
         const expanded = node.expanded === undefined ? undefined : Boolean(widgetValue(node.expanded, values));
-        return <div key={key} className="chat-widget-pressable" data-border={options.border} data-background={resolveText(options.background)}
-          style={layoutStyle(options, true)}>
+        const { hasBackground, hasSurface } = resolveBackground(options, values);
+        const style = layoutStyle(options, true, values);
+        const disabled = streaming || ("submit" in action && !canSend);
+        const ariaPressed = expanded === undefined && typeof value === "boolean" ? value : undefined;
+        if (node.variant === "link" && !hasBackground && !hasSurface) {
+          return (
+            <button
+              key={key}
+              type="button"
+              className="chat-widget-pressable"
+              data-variant="link"
+              data-flex={options.flex !== undefined ? "true" : undefined}
+              disabled={disabled}
+              aria-label={node.label}
+              aria-expanded={expanded}
+              aria-pressed={ariaPressed}
+              style={style}
+              onClick={() => applyAction(action)}
+            >
+              {node.children.map((child, index) => renderNode(child, `${key}-${index}`))}
+            </button>
+          );
+        }
+        return <div
+          key={key}
+          className="chat-widget-pressable"
+          data-border={options.border === true ? "true" : options.border === false ? "false" : undefined}
+          data-surface={hasSurface ? "true" : undefined}
+          data-background={hasBackground ? "true" : undefined}
+          data-flex={options.flex !== undefined ? "true" : undefined}
+          style={style}
+        >
           {node.children.map((child, index) => renderNode(child, `${key}-${index}`))}
-          <button type="button" disabled={streaming || ("submit" in action && !canSend)} aria-label={node.label}
-            aria-expanded={expanded} aria-pressed={expanded === undefined && typeof value === "boolean" ? value : undefined}
+          <button type="button" disabled={disabled} aria-label={node.label}
+            aria-expanded={expanded} aria-pressed={ariaPressed}
             onClick={() => applyAction(action)} />
         </div>;
       }
@@ -202,11 +394,26 @@ export function ChatWidgetView({ widget, streaming, canSend, onSend, renderResou
       case "video":
         return <WidgetVideo label={node.label} src={node.src} key={key} />;
       case "icon": {
-        const Icon = icons.get(String(widgetValue(node.name, values)));
-        return Icon ? <Icon key={key} size={iconSizes.get(node.size ?? "") ?? 15} aria-hidden="true" data-color={resolveText(node.color)} /> : null;
+        const Icon = resolveIcon(String(widgetValue(node.name, values)));
+        const { dataColor, cssColor } = resolveColor(node.color);
+        return Icon ? <Icon key={key} size={resolveIconSize(node.size)} aria-hidden="true" data-color={dataColor} style={cssColor ? { color: cssColor } : undefined} /> : null;
       }
-      case "divider":
-        return <hr key={key} />;
+      case "divider": {
+        const spacingToken = typeof node.spacing === "string" ? node.spacing : node.spacing === 0 ? "none" : undefined;
+        const spacingStyle = typeof node.spacing === "number"
+          ? (node.orientation === "vertical" ? { marginInline: node.spacing } : { marginBlock: node.spacing })
+          : undefined;
+        return (
+          <hr
+            key={key}
+            className="chat-widget-divider"
+            data-spacing={spacingToken}
+            data-flush={node.flush === true ? "true" : node.flush === false ? "false" : undefined}
+            data-orientation={node.orientation}
+            style={spacingStyle}
+          />
+        );
+      }
       case "spacer":
         return <span className="chat-widget-spacer" key={key} aria-hidden="true" />;
       case "unsupported":

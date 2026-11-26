@@ -131,7 +131,7 @@ export function prepareReplyMarkdown(
   inlineSources?: ReadonlyMap<string, ChatResource>,
 ): string {
   const parts: string[] = [];
-  const tokens = /^ {0,3}(`{3,}|~{3,})[^\r\n]*|(`+)|(?<!\\)\\\(([^\r\n]+?)\\\)|(?<!\\)\\\[([\s\S]+?)\\\]|<Cite\s+refs=\{\s*\[(\s*(?:"[^"<>]*"\s*,?\s*)+)\]\s*\}\s*\/\s*>|<Link\s+ref="([\w.:-]{1,160})"\s+title="([^"<>]+)"\s*\/\s*>|<icon\s+[^<>]*\/\s*>|<badge(?:\s[^<>]*)?>([^<>]*)<\/badge>|(<divider(?:\s+color=(?:"[a-z]+"|'[a-z]+'))?\s*\/\s*>)/gm;
+  const tokens = /^ {0,3}(`{3,}|~{3,})[^\r\n]*|(`+)|(?<!\\)\\\(([^\r\n]+?)\\\)|(?<!\\)\\\[([\s\S]+?)\\\]|<LearningViz\b[^<>]*>([\s\S]*?)<\/LearningViz\s*>|(<Cite\s+refs=\{\s*\[\s*(?:"[^"<>]*"\s*,?\s*)+\]\s*\}\s*\/\s*>(?:[ \t]*<Cite\s+refs=\{\s*\[\s*(?:"[^"<>]*"\s*,?\s*)+\]\s*\}\s*\/\s*>)*)|<Link\s+ref="([\w.:-]{1,160})"\s+title="([^"<>]+)"\s*\/\s*>|<icon\s+[^<>]*\/\s*>|<badge(?:\s[^<>]*)?>([^<>]*)<\/badge>|(<divider(?:\s+color=(?:"[a-z]+"|'[a-z]+'))?\s*\/\s*>)/gm;
   let cursor = 0;
   for (let token = tokens.exec(text); token; token = tokens.exec(text)) {
     if (token[1]) {
@@ -147,21 +147,47 @@ export function prepareReplyMarkdown(
     parts.push(text.slice(cursor, token.index));
     if (token[3] !== undefined) parts.push(`$${token[3].trim()}$`);
     else if (token[4] !== undefined) parts.push(`\n\n$$\n${token[4].trim()}\n$$\n\n`);
-    else if (token[9]) parts.push("\n\n---\n\n");
-    else if (token[8] !== undefined) parts.push(token[8]);
-    else if (token[7] || token[5]) {
-      const title = token[7] ? escapeReplyMarkdown(token[7]) : "来源";
-      const refs = token[6] ? [token[6]] : [...(token[5] ?? "").matchAll(/"([\w.:-]{1,160})"/g)].map((item) => item[1]);
-      const urls = new Map<string, string>();
+    else if (token[5] !== undefined) {
+      const latex = token[5].trim();
+      if (latex) parts.push(latex.includes("\n") ? `\n\n$$\n${latex}\n$$\n\n` : `$${latex}$`);
+    } else if (token[10]) parts.push("\n\n---\n\n");
+    else if (token[9] !== undefined) parts.push(token[9]);
+    else if (token[7] && token[8]) {
+      const title = escapeReplyMarkdown(token[8]);
+      const url = citations?.get(token[7]);
+      if (url) {
+        const target = inlineSources?.has(token[7]) ? `workbench-cite:${encodeURIComponent(token[7])}` : url;
+        parts.push(`[${title}](<${target}>)`);
+      } else {
+        parts.push(`${title}（来源链接未返回）`);
+      }
+    } else if (token[6]) {
+      const refs = [...token[6].matchAll(/"([\w.:-]{1,160})"/g)].map((item) => item[1]);
+      const seenUrls = new Set<string>();
+      const inlineRefs: string[] = [];
+      const plainUrls: string[] = [];
       let unresolved = false;
       for (const ref of refs) {
         const url = citations?.get(ref);
         if (!url) unresolved = true;
-        else if (!urls.has(url)) urls.set(url, inlineSources?.has(ref) ? `workbench-cite:${ref}` : url);
+        else if (!seenUrls.has(url)) {
+          seenUrls.add(url);
+          if (inlineSources?.has(ref)) inlineRefs.push(ref);
+          else plainUrls.push(url);
+        }
       }
-      const links = [...urls.values()];
-      if (links.length) parts.push(links.map((url, index) => `[${title}${links.length > 1 ? ` ${index + 1}` : ""}](<${url}>)`).join(" · "));
-      if (!links.length || unresolved) parts.push(token[7] ? `${title}（来源链接未返回）` : "〔来源链接未返回〕");
+      const emitted: string[] = [];
+      if (inlineRefs.length) {
+        const encoded = inlineRefs.map((ref) => encodeURIComponent(ref)).join(",");
+        emitted.push(`[来源](<workbench-cite:${encoded}>)`);
+      }
+      if (plainUrls.length) {
+        emitted.push(
+          ...plainUrls.map((url, index) => `[来源${plainUrls.length > 1 && !inlineRefs.length ? ` ${index + 1}` : ""}](<${url}>)`),
+        );
+      }
+      if (emitted.length) parts.push(emitted.join(" · "));
+      if (!emitted.length || unresolved) parts.push("〔来源链接未返回〕");
     }
     cursor = tokens.lastIndex;
   }

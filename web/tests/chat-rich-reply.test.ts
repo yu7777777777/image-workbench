@@ -1,7 +1,10 @@
 import { expect, test } from "bun:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { prepareReplyMarkdown, readReplyResources, splitChatReply } from "../src/lib/chat-rich-reply";
 import { readChatResources } from "../src/lib/chat-resources";
 import { widgetValue } from "../src/lib/chat-widget";
+import { ReplyMarkdown } from "../src/app/chat/chat-markdown";
 import observed from "./fixtures/chat-observed-replies.json";
 import extended from "./fixtures/chat-extended-replies.json";
 
@@ -122,4 +125,45 @@ test("normalizes observed formula delimiters and gives unavailable references a 
   expect(references).toContain("来源链接未返回");
   expect(references).toContain("https://www.iana.org/help/example-domains");
   expect(references).not.toContain("sampleSearch");
+  expect(prepareReplyMarkdown('<LearningViz type_id="INTEGRAL"> \\int_0^4 x^2\\,dx </LearningViz>')).toBe('$\\int_0^4 x^2\\,dx$');
+});
+
+test("groups multi-ref and adjacent Cite tags into a single grouped citation pill and wraps Markdown tables", () => {
+  const incoming = readChatResources([
+    { id: "s1", type: "source", ref: "r1", title: "IANA Example Domains", url: "https://www.iana.org/help/example-domains" },
+    { id: "s2", type: "source", ref: "r2", title: "RFC 2606", url: "https://www.rfc-editor.org/info/rfc2606/" },
+    { id: "s3", type: "source", ref: "r3", title: "MDN Docs", url: "https://developer.mozilla.org/en-US/" },
+  ]);
+  const multiText = '结论来自官方文档。<Cite refs={["r1", "r2"]} />';
+  const multiRef = readReplyResources(multiText, incoming);
+  const multiMd = prepareReplyMarkdown(multiText, multiRef.citations, multiRef.inlineSources);
+  expect(multiMd).toBe("结论来自官方文档。[来源](<workbench-cite:r1,r2>)");
+  expect(multiMd).not.toContain("来源 1");
+
+  const adjacentText = '多个紧邻引用。<Cite refs={["r1"]}/> <Cite refs={["r2", "r3"]}/>';
+  const adjacentRef = readReplyResources(adjacentText, incoming);
+  const adjacentMd = prepareReplyMarkdown(adjacentText, adjacentRef.citations, adjacentRef.inlineSources);
+  expect(adjacentMd).toBe("多个紧邻引用。[来源](<workbench-cite:r1,r2,r3>)");
+
+  const groupedHtml = renderToStaticMarkup(createElement(ReplyMarkdown, {
+    text: multiText + "\n\n| 列 A | 列 B |\n|---|---|\n| 1 | 2 |",
+    citations: multiRef.citations,
+    inlineSources: multiRef.inlineSources,
+  }));
+  expect(groupedHtml).toContain('class="chat-resource-cite-group"');
+  expect(groupedHtml).toContain('class="chat-resource-cite-label">iana.org</span>');
+  expect(groupedHtml).toContain('class="chat-resource-cite-more">+1</span>');
+  expect(groupedHtml).toContain('<div class="chat-table-wrap"><table>');
+
+  const singleText = '单条引用。<Cite refs={["r1"]} />';
+  const singleRef = readReplyResources(singleText, incoming);
+  const singleHtml = renderToStaticMarkup(createElement(ReplyMarkdown, {
+    text: singleText,
+    citations: singleRef.citations,
+    inlineSources: singleRef.inlineSources,
+  }));
+  expect(singleHtml).not.toContain('class="chat-resource-cite-group"');
+  expect(singleHtml).toContain('<a class="chat-resource-cite"');
+  expect(singleHtml).toContain('class="chat-resource-cite-label">iana.org</span>');
+  expect(singleHtml).not.toContain("lucide-external-link");
 });

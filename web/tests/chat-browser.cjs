@@ -455,7 +455,7 @@ async function checkExtendedReplies(page) {
   const messages = await page.locator(".chat-messages").boundingBox();
   const composer = await page.locator(".chat-composer").boundingBox();
   const contents = await message().boundingBox();
-  assert(contents.width >= 1080 && messages.width >= 1100);
+  assert(contents.width >= 740 && contents.width <= 820 && messages.width >= 760);
   assert(Math.abs(contents.x - composer.x) < 12);
   assert(Math.abs(contents.width - composer.width) < 12);
   const citations = message().getByRole("link", { name: "来源", exact: true });

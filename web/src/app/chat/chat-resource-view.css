@@ -5,8 +5,7 @@
 }
 
 .chat-resource-attachment,
-.chat-resource-attachment-inline,
-.chat-markdown .chat-resource-cite {
+.chat-resource-attachment-inline {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -25,14 +24,164 @@
   background: var(--card);
 }
 
-.chat-resource-attachment-inline,
-.chat-markdown .chat-resource-cite {
+.chat-resource-attachment-inline {
   min-height: 1.45rem;
-  padding: 0.05rem 0.45rem;
-  border-radius: 0.45rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 9999px;
   background: var(--muted);
-  font-size: 0.82em;
+  font-size: 0.8em;
   line-height: 1.35;
+}
+
+.chat-resource-cite,
+.chat-markdown .chat-resource-cite {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0 7px 0 5px;
+  border: 0;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--foreground) 6%, transparent);
+  color: var(--muted-foreground);
+  font-size: 11.5px;
+  line-height: 1;
+  font-weight: 500;
+  text-decoration: none;
+  vertical-align: 1px;
+  cursor: pointer;
+  transition: background 0.14s, color 0.14s;
+}
+
+.dark .chat-resource-cite,
+.dark .chat-markdown .chat-resource-cite {
+  background: color-mix(in srgb, var(--foreground) 11%, transparent);
+}
+
+.chat-resource-cite:hover,
+.chat-markdown .chat-resource-cite:hover {
+  background: color-mix(in srgb, var(--foreground) 11%, transparent);
+  color: var(--foreground);
+}
+
+.dark .chat-resource-cite:hover,
+.dark .chat-markdown .chat-resource-cite:hover {
+  background: color-mix(in srgb, var(--foreground) 18%, transparent);
+  color: var(--foreground);
+}
+
+.chat-resource-cite-favicon,
+.chat-markdown .chat-resource-cite-favicon {
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  object-fit: cover;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.chat-resource-cite-label,
+.chat-markdown .chat-resource-cite-label {
+  max-width: 9.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-resource-cite-more {
+  color: color-mix(in srgb, var(--muted-foreground) 80%, transparent);
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.chat-resource-cite-group {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: baseline;
+}
+
+.chat-resource-cite-popover {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  z-index: 30;
+  min-width: 220px;
+  max-width: min(300px, calc(100vw - 32px));
+  padding: 6px;
+  border: 1px solid var(--chat-line, var(--border));
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  display: grid;
+  gap: 2px;
+}
+
+.dark .chat-resource-cite-popover {
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.38);
+}
+
+.chat-resource-cite-popover-item,
+.chat-markdown .chat-resource-cite-popover-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 7px 9px;
+  border-radius: 8px;
+  color: var(--foreground);
+  text-decoration: none;
+  font-size: 12.5px;
+  line-height: 1.35;
+  transition: background 0.14s, color 0.14s;
+}
+
+.chat-resource-cite-popover-item:hover,
+.chat-markdown .chat-resource-cite-popover-item:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+.chat-resource-cite-popover-item > span:not(.chat-resource-cite-popover-copy) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-resource-cite-popover-copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.chat-resource-cite-popover-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+.chat-resource-cite-popover-host {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+.chat-resource-cite-popover-item svg {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+}
+
+.chat-resource-cite-popover-item > svg:last-child:not(:first-child) {
+  margin-inline-start: auto;
 }
 
 .chat-resource-attachment span,
@@ -58,7 +207,6 @@
 
 .chat-resource-attachment:hover:not(:disabled),
 .chat-resource-attachment-inline:hover:not(:disabled),
-.chat-markdown .chat-resource-cite:hover,
 .chat-resource-gallery-controls button:hover {
   border-color: var(--primary);
 }
@@ -83,13 +231,26 @@
 .chat-widget-image-group { width: min(100%, 42rem); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .chat-widget-image-group > figure:only-child { grid-column: 1 / -1; }
 .chat-widget-inline-image .chat-resource-image, .chat-widget-image-group .chat-resource-image { width: 100%; min-width: 0; }
-.chat-widget-inline-image .chat-resource-image > a { aspect-ratio: var(--chat-image-ratio, auto); }
+.chat-widget-inline-image .chat-resource-image > a { aspect-ratio: var(--chat-image-ratio, auto); border-radius: 12px; overflow: hidden; }
 .chat-widget-image-group .chat-resource-image > a {
   position: relative; width: 100%; aspect-ratio: var(--chat-image-ratio, 4 / 3);
-  overflow: hidden; border-radius: 8px; background: var(--muted);
+  overflow: hidden; border-radius: 12px; background: var(--muted);
 }
-.chat-markdown .chat-widget-inline-image[data-sized="true"] img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
-.chat-widget-image-missing { color: var(--muted-foreground); font-size: 12px; }
+.chat-markdown .chat-widget-inline-image[data-sized="true"] img { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
+.chat-widget-row > .chat-widget-inline-image { flex-shrink: 0; }
+.chat-widget-image-missing {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.45rem 0.7rem;
+  border-radius: 0.55rem;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.4;
+}
 
 .chat-markdown .chat-widget-image-group .chat-resource-image img {
   position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; object-fit: cover;

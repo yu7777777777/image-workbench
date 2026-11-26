@@ -107,18 +107,29 @@ export function readVegaChart(source: string): ReplyChartData | undefined {
   }
 }
 
+function sanitizePreviewHtml(html: string): string {
+  const cleaned = DOMPurify.sanitize(html, {
+    USE_PROFILES: { html: true, svg: true },
+    FORCE_BODY: true,
+    FORBID_TAGS: ["base", "form", "iframe", "link", "meta", "object", "embed", "script", "foreignObject"],
+    FORBID_ATTR: ["href", "xlink:href", "src", "srcset", "action", "formaction", "target", "ping"],
+  });
+  return cleaned.replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gi, (_, css: string) => {
+    const safeCss = css
+      .replace(/@import\b[^;]*;?/gi, "")
+      .replace(/(?:expression|javascript|vbscript|url)\s*\([^)]*\)/gi, "none");
+    return `<style>${safeCss}</style>`;
+  });
+}
+
 export function StaticCodePreview({ source, language }: { source: string; language: string }) {
   const markup = useMemo(() => {
     const html = language === "jsx" || language === "tsx" ? staticJsx(source) : source;
     if (!html || html.length > 30000) return "";
-    return DOMPurify.sanitize(html, {
-      USE_PROFILES: { html: true, svg: true },
-      FORBID_TAGS: ["base", "form", "iframe", "link", "meta", "object", "embed", "script", "style", "foreignObject"],
-      FORBID_ATTR: ["href", "xlink:href", "src", "srcset", "action", "formaction", "target", "ping"],
-    });
+    return sanitizePreviewHtml(html);
   }, [source, language]);
   if (!markup) return <p className="chat-code-status">此代码超出静态预览支持范围。</p>;
   const policy = "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'";
-  return <iframe className="chat-static-preview" title={`${language.toUpperCase()} 静态预览`} sandbox="" loading="lazy"
-    srcDoc={`<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${policy}"><style>body{margin:16px;font:14px system-ui;overflow-wrap:anywhere}svg{max-width:100%;max-height:176px}</style>${markup}`} />;
+  return <iframe className="chat-static-preview" title={`${language.toUpperCase()} 静态预览`} sandbox=""
+    srcDoc={`<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${policy}"><style>body{margin:16px;font:14px/1.6 system-ui,-apple-system,sans-serif;color:#1f2937;overflow-wrap:anywhere}svg{max-width:100%;max-height:176px}</style>${markup}`} />;
 }

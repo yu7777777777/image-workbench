@@ -414,22 +414,6 @@ export default function ChatPage() {
             </div>
           )}
         </div>
-        {!atBottom && (
-          <button
-            className="chat-jump"
-            aria-label="回到最新消息"
-            onClick={() => {
-              following.current = true;
-              setAtBottom(true);
-              scroller.current?.scrollTo({
-                top: scroller.current.scrollHeight,
-                behavior: "smooth",
-              });
-            }}
-          >
-            <ArrowDown size={16} />
-          </button>
-        )}
         {chat.busyId && !busy && (
           <p className="chat-other-busy">
             另一段对话正在回复。
@@ -447,6 +431,22 @@ export default function ChatPage() {
           conversationActions={conversationActions}
           modelControls={modelControls}
           notices={notices}
+          jumpButton={!atBottom ? (
+            <button
+              className="chat-jump"
+              aria-label="回到最新消息"
+              onClick={() => {
+                following.current = true;
+                setAtBottom(true);
+                scroller.current?.scrollTo({
+                  top: scroller.current.scrollHeight,
+                  behavior: "smooth",
+                });
+              }}
+            >
+              <ArrowDown size={16} />
+            </button>
+          ) : null}
         />
       </section>
       <Dialog open={settings} onOpenChange={setSettings}>
@@ -572,6 +572,7 @@ function Composer({
   conversationActions,
   modelControls,
   notices,
+  jumpButton,
 }: {
   busy: boolean;
   disabled: boolean;
@@ -581,6 +582,7 @@ function Composer({
   conversationActions: ReactNode;
   modelControls: ReactNode;
   notices: ReactNode;
+  jumpButton: ReactNode;
 }) {
   const [text, setText] = useState("");
   const [images, setImages] = useState<ChatImage[]>([]);
@@ -636,6 +638,7 @@ function Composer({
   };
   return (
     <div className="chat-composer-wrap">
+      {jumpButton}
       {notices}
       {conversationActions}
       <div
