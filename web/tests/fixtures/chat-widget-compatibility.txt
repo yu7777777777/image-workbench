@@ -1,0 +1,119 @@
+## 按钮类
+
+{@body const [n,setN]=DIL.useState(0)}
+{@body const [loading,setLoading]=DIL.useState(false)}
+{@body const [toggle,setToggle]=DIL.useState(false)}
+<box border radius="xl" padding={3} gap={3}>
+  <row align="center" wrap="wrap">
+    <button onClick={()=>setN(n+1)}>主要按钮</button>
+    <button color="secondary" variant="outline" onClick={()=>setN(0)}>次要按钮</button>
+    <button color="danger" variant="soft" onClick={()=>setN(0)}>危险按钮</button>
+  </row>
+  <text color="secondary" size="xs">点击次数：{n}</text>
+  <row align="center" gap={3}>
+    <button uniform variant="outline" color="secondary"><icon name="search"/></button>
+    <button uniform variant="outline" color="secondary"><icon name="trash-2"/></button>
+  </row>
+  <button block loading={loading} onClick={()=>setLoading(!loading)}>{loading?"加载中（点击停止）":"点击演示加载状态"}</button>
+  <button block color={toggle?"success":"secondary"} variant={toggle?"solid":"outline"} onClick={()=>setToggle(!toggle)}>
+    <icon name={toggle?"check":"power"}/> {toggle?"已开启":"已关闭"}
+  </button>
+  <button disabled>不可点击</button>
+</box>
+
+## 选择类控件
+
+{@body const [checks,setChecks]=DIL.useState([true,false,false])}
+{@body const [multi,setMulti]=DIL.useState(["UI"])}
+{@body const [page,setPage]=DIL.useState(0)}
+<box border padding={3} gap={3}>
+  {#each ["选项一","选项二","选项三"] as x,i}
+    <checkbox checked={checks[i]} onChange={v=>setChecks(old=>old.map((a,j)=>i===j?v:a))}>{x}</checkbox>
+  {/each}
+  {#each ["UI","UX"] as x}
+    <checkbox checked={multi.includes(x)} onChange={v=>setMulti(old=>v?[...old,x]:old.filter(y=>y!==x))}>{x}</checkbox>
+  {/each}
+  <text>选择：{multi.join("、")}</text>
+  <segmented-control block options={[{"label":"概览","value":"0"},{"label":"数据","value":"1"},{"label":"设置","value":"2"}]} value={String(page)} onChange={v=>setPage(Number(v))}/>
+  <box background="surface-secondary" padding={3}>当前标签：{["概览页面","数据页面","设置页面"][page]}</box>
+</box>
+
+## 输入类控件
+
+{@body const [input,setInput]=DIL.useState("")}
+{@body const [date,setDate]=DIL.useState("2026-11-26")}
+{@body const [range,setRange]=DIL.useState(50)}
+<box padding={3} gap={2}>
+  **单行输入**
+  <input value={input} onChange={setInput} placeholder="输入文字..."/>
+  **日期**
+  <date-picker block value={date} onChange={setDate}/>
+  <slider value={range} onChange={setRange} min={0} max={100}/>
+  <progress value={range} max={100} label="音量"/>
+  **下拉选择**
+  {@body const [mode,setMode]=DIL.useState("普通")}
+  <select block value={mode} onChange={setMode} options={[{"label":"普通模式","value":"普通"},{"label":"高级模式","value":"高级"}]}/>
+  <text>当前：{mode}</text>
+</box>
+
+## 导航、弹层与表单
+
+{@body const [pop,setPop] = DIL.useState(0)}
+{@body const [slide,setSlide] = DIL.useState(0)}
+{@body const [formName,setFormName] = DIL.useState("")}
+{@body const [formEmail,setFormEmail] = DIL.useState("")}
+{@body const [submitted,setSubmitted] = DIL.useState(false)}
+<box border radius="xl" padding={3} gap={3}>
+  <popover>
+    <popover-trigger><button color="secondary" variant="outline"><icon name="info"/>点击打开弹层</button></popover-trigger>
+    <popover-content>
+      **这是一个浮动窗口**
+      <button size="sm" onClick={()=>setPop(pop+1)}>弹层内点击 {pop}</button>
+    </popover-content>
+  </popover>
+  <carousel activeIndex={slide} onChange={setSlide} showArrows>
+    {#each ["第一页","第二页","第三页"] as x}
+      <carousel-item><box background="surface-secondary" minHeight="90px" padding={3}>**{x}**</box></carousel-item>
+    {/each}
+  </carousel>
+  <caption>当前轮播页：{slide+1} / 3</caption>
+  <form gap={2} onSubmit={()=>setSubmitted(true)}>
+    <label>姓名</label>
+    <input value={formName} onChange={v=>{setFormName(v);setSubmitted(false)}} placeholder="你的姓名"/>
+    <label>邮箱</label>
+    <input value={formEmail} onChange={v=>{setFormEmail(v);setSubmitted(false)}} placeholder="name@example.test" inputType="email"/>
+    <button submit block disabled={!formName.trim() || !formEmail.trim()}>提交表单</button>
+  </form>
+  {#if submitted}
+    <badge color="success">提交成功</badge>
+    <text>姓名：{formName}；邮箱：{formEmail}</text>
+  {/if}
+</box>
+
+## 表格、公式和媒体
+
+<box border padding={3} gap={3}>
+  <table label="产品状态表">
+    <table-row>
+      <table-cell width="35%">**产品**</table-cell>
+      <table-cell>**状态**</table-cell>
+      <table-cell align="end">**数量**</table-cell>
+    </table-row>
+    <chat-repeat values={[["产品 A","正常","120"],["产品 B","处理中","86"],["产品 C","已完成","245"]]} alias="r">
+      <table-row>
+        <table-cell>{r[0]}</table-cell>
+        <table-cell><badge color={r[1]==="正常"?"success":r[1]==="处理中"?"warning":"info"}>{r[1]}</badge></table-cell>
+        <table-cell align="end">{r[2]}</table-cell>
+      </table-row>
+    </chat-repeat>
+  </table>
+  <Math latex="\int_0^1 x^2\,dx=\frac{1}{3}"/>
+  <CodeBlock language="javascript">
+const greeting = "你好";
+console.log(greeting);
+  </CodeBlock>
+  <AsyncImage ref="demo-image" alt="单图示例"/>
+  <AsyncImageGroup query={["桌面示例","卡片示例"]} alt="多图示例" layout="bento"/>
+  <AsyncImage query="未返回的图" alt="缺图示例"/>
+  <callout><title>提示与说明</title><text>仍可阅读相邻内容。</text></callout>
+</box>

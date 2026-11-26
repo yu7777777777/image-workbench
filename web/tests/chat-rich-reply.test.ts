@@ -45,13 +45,16 @@ test("preserves plain Markdown and component examples in code", () => {
   expect(splitChatReply(`<WritingBlock>\n${writing}\n</WritingBlock>`)).toEqual([{ kind: "writing", offset: 0, text: writing }]);
 });
 
-test("keeps unsupported forms as source and accepts only the supported follow-up expression", () => {
+test("keeps an unsupported follow-up as source while rendering the surrounding controls", () => {
   const raw = answer.replace('+kind+', '+window.location.href+').replace('<divider color="subtle"/>', '<box>额外布局</box>');
   const blocks = splitChatReply(raw);
-  expect(blocks[3]).toMatchObject({ kind: "unsupported", text: expect.stringContaining("<box>额外布局</box>") });
+  expect(blocks[3]).toMatchObject({ kind: "widget", widget: { root: { children: [
+    { kind: "radio" },
+    { kind: "layout", children: [{ parts: ["额外布局"] }] },
+    { kind: "radio" },
+    { kind: "unsupported", source: expect.stringContaining("window.location.href") },
+  ] } } });
   expect(blocks[4]).toMatchObject({ kind: "markdown", text: expect.stringContaining("也可以直接输入") });
-  const invalidAction = answer.replace('+kind+', '+window.location.href+');
-  expect(splitChatReply(invalidAction)[3]).toMatchObject({ kind: "unsupported", text: expect.stringContaining("window.location.href") });
 });
 
 test("accepts the observed nested form and chart with range controls and reset", () => {

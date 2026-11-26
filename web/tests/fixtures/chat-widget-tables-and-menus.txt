@@ -1,0 +1,270 @@
+## 表格布局
+
+<table>
+  <table-row>
+    <table-cell>**名称**</table-cell>
+    <table-cell>**状态**</table-cell>
+    <table-cell align="end">**数量**</table-cell>
+  </table-row>
+  <table-row>
+    <table-cell>项目 A</table-cell>
+    <table-cell><badge color="success">完成</badge></table-cell>
+    <table-cell align="end">100</table-cell>
+  </table-row>
+  <table-row>
+    <table-cell>项目 B</table-cell>
+    <table-cell><badge color="warning">进行中</badge></table-cell>
+    <table-cell align="end">50</table-cell>
+  </table-row>
+</table>
+
+## 可点击布局容器
+
+{@body const [active,setActive] = DIL.useState("A")}
+<box border radius="lg" padding={3} gap={2}>
+  {#each ["A","B","C"] as x}
+    <pressable padding={3} radius="md" background={active===x?"surface-tertiary":"surface-secondary"} onClick={()=>setActive(x)}>
+      <row align="center" justify="between">
+        **模块 {x}**
+        {#if active===x}
+          <badge color="success">当前选中</badge>
+        {:else}
+          <icon name="chevron-right"/>
+        {/if}
+      </row>
+    </pressable>
+  {/each}
+</box>
+
+## 浮层布局
+
+<popover>
+  <popover-trigger>
+    <button color="secondary" variant="outline">打开浮层布局 <icon name="chevron-down"/></button>
+  </popover-trigger>
+  <popover-content>
+    <box gap={2}>
+      **浮层内容区域**
+      <text color="secondary" size="sm">可以放置菜单、说明和按钮。</text>
+      <button size="sm" block>执行操作</button>
+    </box>
+  </popover-content>
+</popover>
+
+## 功能菜单
+
+<grid columns={3} gap={2}>
+  <each values={[["folder","文档"],["settings","设置"],["chart-line","报表"]]} alias="item">
+    <grid-item>
+      <box background="surface-secondary" radius="md" padding={3} align="center" gap={2}>
+        <icon name={item[0]} size="xl"/>
+        <text size="sm">{item[1]}</text>
+      </box>
+    </grid-item>
+  </each>
+</grid>
+
+## 可选择列表
+
+{@body const [selectedList,setSelectedList] = DIL.useState(["设计"])}
+<box border radius="lg" padding={3} gap={2}>
+  **选择你需要的功能**
+  {#each ["设计","开发","测试","部署","维护"] as x}
+    <pressable padding={2} radius="md" background={selectedList.includes(x)?"surface-secondary":"surface"} onClick={()=>setSelectedList(old=>old.includes(x)?old.filter(v=>v!==x):[...old,x])}>
+      <row align="center">
+        <icon name={selectedList.includes(x)?"check-circle-2":"circle"} color={selectedList.includes(x)?"success":"secondary"}/>
+        <box flex="1">{x}</box>
+        {#if selectedList.includes(x)}
+          <badge color="success">已选择</badge>
+        {/if}
+      </row>
+    </pressable>
+  {/each}
+  <divider color="subtle"/>
+  <text size="sm">已选 {selectedList.length} 项：{selectedList.join("、")||"暂无"}</text>
+</box>
+
+## 可展开列表
+
+{@body const [expandedList,setExpandedList] = DIL.useState("用户管理")}
+<box border radius="lg" padding={2} gap={1}>
+  {#each [{name:"用户管理",items:["用户列表","角色管理","权限设置"]},{name:"订单管理",items:["全部订单","待处理订单","历史订单"]},{name:"系统设置",items:["基本设置","通知设置","安全设置"]}] as group}
+    <pressable padding={3} radius="md" onClick={()=>setExpandedList(expandedList===group.name?"":group.name)}>
+      <row align="center" justify="between">
+        **{group.name}**
+        <icon name={expandedList===group.name?"chevron-up":"chevron-down"}/>
+      </row>
+    </pressable>
+    {#if expandedList===group.name}
+      <box padding={{left:4,bottom:2}} gap={2}>
+        {#each group.items as item}
+          <row align="center" gap={2}>
+            <icon name="corner-down-right" color="secondary" size="sm"/>
+            <text size="sm">{item}</text>
+          </row>
+        {/each}
+      </box>
+    {/if}
+  {/each}
+</box>
+
+## 卡片式列表
+
+<box gap={2}>
+  <each values={[{icon:"users",name:"张三",desc:"项目负责人",status:"在线"},{icon:"settings",name:"李四",desc:"开发工程师",status:"离线"}]} alias="item">
+    <box border radius="lg" padding={3}>
+      <row align="center" gap={3}>
+        <box background="surface-secondary" radius="full" size="42px" align="center" justify="center">
+          <icon name={item.icon} size="xl"/>
+        </box>
+        <box flex="1" gap={1}>
+          **{item.name}**
+          <caption>{item.desc}</caption>
+        </box>
+        <badge color={item.status==="在线"?"success":"secondary"}>{item.status}</badge>
+      </row>
+    </box>
+  </each>
+</box>
+
+## 带复选框的表格
+
+{@body const [rows,setRows] = DIL.useState(["P001"])}
+{@body const products = [{id:"P001",name:"产品 A",price:"¥199"},{id:"P002",name:"产品 B",price:"¥299"},{id:"P003",name:"产品 C",price:"¥399"}]}
+<box border radius="lg" padding={2} gap={2}>
+  <row align="center" justify="between">
+    **商品选择表**
+    <badge>{rows.length} 项已选</badge>
+  </row>
+  {#each products as p}
+    <row align="center" padding={2}>
+      <checkbox checked={rows.includes(p.id)} onChange={v=>setRows(old=>v?[...old,p.id]:old.filter(x=>x!==p.id))}/>
+      <box flex="1" gap={1}>
+        **{p.name}**
+        <caption>{p.id}</caption>
+      </box>
+      <text tabularNums>{p.price}</text>
+    </row>
+    <divider color="subtle"/>
+  {/each}
+  <button block color="secondary" variant="outline" onClick={()=>setRows(products.map(p=>p.id))}>全选</button>
+</box>
+
+## 可编辑表格
+
+{@body const [name,setName] = DIL.useState("张三")}
+<box border padding={3} gap={2}>
+  **编辑用户信息**
+  <table label="编辑用户信息">
+    <table-row><table-cell>**姓名**</table-cell><table-cell>**职位**</table-cell></table-row>
+    <table-row><table-cell>{name}</table-cell><table-cell>经理</table-cell></table-row>
+  </table>
+  <input value={name} onChange={setName} label="输入内容"/>
+</box>
+
+## 带操作按钮的表格
+
+{@body const [actionRows,setActionRows] = DIL.useState(["待处理","待处理","待处理"])}
+<box border radius="lg" padding={2}>
+  <table>
+    <table-row>
+      <table-cell>**订单**</table-cell>
+      <table-cell>**状态**</table-cell>
+      <table-cell align="end">**操作**</table-cell>
+    </table-row>
+    {#each actionRows as status,i}
+      <table-row>
+        <table-cell>订单 {i+1}</table-cell>
+        <table-cell><badge color={status==="已完成"?"success":"warning"}>{status}</badge></table-cell>
+        <table-cell align="end"><button size="xs" disabled={status==="已完成"} onClick={()=>setActionRows(old=>old.map((v,j)=>i===j?"已完成":v))}>完成</button></table-cell>
+      </table-row>
+    {/each}
+  </table>
+</box>
+
+## 下拉菜单
+
+{@body const [action,setAction] = DIL.useState("尚未选择")}
+<box border padding={3} gap={2}>
+  <popover>
+    <popover-trigger><button>选择操作</button></popover-trigger>
+    <popover-content>
+      <box gap={1}>
+        <each values={["查看","修改","归档"]} alias="item">
+          <pressable padding={2} onClick={()=>setAction(item)}><text>{item}</text></pressable>
+        </each>
+      </box>
+    </popover-content>
+  </popover>
+  <caption>当前操作：{action}</caption>
+</box>
+
+## 上下文菜单
+
+{@body const [context,setContext] = DIL.useState(false)}
+{@body const [contextAction,setContextAction] = DIL.useState("暂无操作")}
+<box border radius="lg" padding={3} gap={2}>
+  <pressable border radius="md" padding={4} align="center" onClick={()=>setContext(!context)}>
+    <icon name="file-text" size="2xl"/>
+    **项目文件.txt**
+    <caption>点击打开上下文菜单</caption>
+  </pressable>
+  {#if context}
+    <box background="surface-secondary" radius="lg" padding={2} gap={1}>
+      {#each ["打开","重命名","复制","删除"] as item}
+        <pressable padding={2} radius="md" onClick={()=>{setContextAction(item);setContext(false)}}>
+          <text size="sm">{item}</text>
+        </pressable>
+      {/each}
+    </box>
+  {/if}
+  <caption>执行结果：{contextAction}</caption>
+</box>
+
+## 菜单列表
+
+{@body const [menu,setMenu] = DIL.useState("首页")}
+<box border padding={3} gap={2}>
+  <each values={[{name:"首页",icon:"house"},{name:"设置",icon:"settings"}]} alias="item">
+    <pressable padding={3} radius="md" background={menu===item.name?"surface-tertiary":"surface"} onClick={()=>setMenu(item.name)}>
+      <row align="center" gap={3}>
+        <icon name={item.icon}/>
+        <box flex="1">{item.name}</box>
+        <chat-condition test={menu===item.name}><icon name="check" color="success"/></chat-condition>
+      </row>
+    </pressable>
+  </each>
+  <caption>当前菜单：{menu}</caption>
+</box>
+
+## 多级菜单
+
+{@body const [level1,setLevel1] = DIL.useState("文件")}
+{@body const [level2,setLevel2] = DIL.useState("新建")}
+<box border radius="lg" padding={3} gap={2}>
+  **一级菜单**
+  <radio-group direction="row" value={level1} onChange={v=>{setLevel1(v);setLevel2("")}}>
+    <radio value="文件">文件</radio>
+    <radio value="编辑">编辑</radio>
+    <radio value="视图">视图</radio>
+  </radio-group>
+  <divider color="subtle"/>
+  **二级菜单**
+  {#each (level1==="文件"?["新建","打开","保存"]:level1==="编辑"?["撤销","重做","复制"]:["放大","缩小","全屏"]) as item}
+    <pressable padding={2} radius="md" background={level2===item?"surface-tertiary":"surface"} onClick={()=>setLevel2(item)}>
+      <row justify="between">
+        {item}
+        {#if level2===item}<icon name="check" color="success"/>{/if}
+      </row>
+    </pressable>
+  {/each}
+  <caption>当前路径：{level1} / {level2||"未选择"}</caption>
+</box>
+
+## 局部降级
+
+<box border>
+  <text>前面的内容仍可阅读。</text>
+  <UnknownWidget option="sample">截图未识别的组件</UnknownWidget>
+  <text>后面的内容仍可阅读。</text>
+</box>

@@ -1,19 +1,46 @@
-import { parseExpressionAt, type Expression, type ObjectExpression } from "acorn";
+import { parseExpressionAt, type BlockStatement, type Expression, type ObjectExpression } from "acorn";
 import { chatImageQueries } from "./chat-resources";
 
 type Scalar = string | number | boolean;
-export type WidgetStateValue = Scalar | readonly string[];
+export type WidgetStateValue = Scalar | readonly Scalar[];
+type WidgetData = Scalar | readonly WidgetData[] | ReadonlyMap<string, WidgetData>;
 type Comparison = "===" | "!==" | ">" | "<" | ">=" | "<=";
 type Value = Scalar | { variable: string } | { add: [Value, Value] } | { compare: [Comparison, Value, Value] } | { choose: [Value, Value, Value] } | { fallback: [Value, Value] } | { join: Value[]; separator: string }
-  | { not: Value } | { length: Value } | { includes: [Value, Value] } | { joinState: Value; separator: string };
+  | { not: Value } | { length: Value } | { trim: Value } | { includes: [Value, Value] } | { joinState: Value; separator: string }
+  | { array: readonly Value[] } | { record: ReadonlyMap<string, Value> } | { index: [Value, Value] } | { field: [Value, string] };
 type Attribute = string | true | { expression: string };
-type Element = { tag: string; attributes: Map<string, Attribute>; children: (Element | string)[]; inner: string; end: number };
+type Element = { tag: string; attributes: Map<string, Attribute>; children: (Element | string)[]; inner: string; start: number; contentStart: number; end: number; source: string };
 type State = { setter: string; initial: WidgetStateValue; derived?: Value; loop?: true };
+type CompileContext = { values?: ReadonlyMap<string, WidgetStateValue>; remaining: number; dynamic: boolean };
+
+class WidgetScope extends Map<string, State> {
+  constructor(initial: ReadonlyMap<string, State>, readonly context: CompileContext, readonly repeatDepth = 0) {
+    super(initial);
+  }
+
+  snapshot(): ReadonlyMap<string, WidgetStateValue> {
+    const values = new Map([...this].map(([name, state]) => [name, state.initial]));
+    for (const [name, value] of this.context.values ?? []) {
+      if (this.get(name)?.setter) values.set(name, value);
+    }
+    return values;
+  }
+}
 type Option = { value: string; label: string };
-type Action = { submit: Value } | { submitForm: true } | { reset: string[] } | { adjust: { name: string; change: number; bound: number } } | { set: { name: string; value: Value } };
+type StateUpdate = { name: string; value: Value };
+type WidgetArrayAction = { name: string } & (
+  { kind: "toggle"; item: string } |
+  { kind: "replace"; index: number; value: Value } |
+  { kind: "select"; list: Value; field: string }
+);
+type Action = { submit: Value } | { submitForm: true } | { reset: string[] } | { adjust: { name: string; change: number; bound: number } }
+  | { set: StateUpdate } | { updates: StateUpdate[] } | { array: WidgetArrayAction };
+type FieldBinding = { name: string; updates?: StateUpdate[] };
 type AstNode = Expression | { type: "PrivateIdentifier"; name: string } | { type: "SpreadElement"; argument: Expression } | { type: "Super" };
-type Layout = "box" | "row" | "col" | "grid" | "card" | "title" | "text" | "badge" | "caption" | "grid-item" | "flow-item" | "carousel-item";
-type LayoutOptions = { gap?: number; columns?: number; flex?: number; align?: "start" | "center" | "end" | "stretch"; justify?: "start" | "center" | "end" | "between"; border?: boolean; surface?: boolean; padding?: number; height?: string; aspectRatio?: string; color?: Value; size?: string; wrap?: boolean; numeric?: boolean };
+type Layout = "box" | "row" | "col" | "grid" | "card" | "title" | "text" | "badge" | "caption" | "grid-item" | "flow-item" | "carousel-item"
+  | "label" | "blockquote" | "callout";
+type LayoutOptions = { gap?: number; columns?: number; flex?: number; align?: "start" | "center" | "end" | "stretch"; justify?: "start" | "center" | "end" | "between"; border?: boolean; surface?: boolean; background?: Value;
+  padding?: number | Partial<Record<"top" | "right" | "bottom" | "left", number>>; radius?: "md" | "lg" | "xl" | "2xl" | "full"; square?: number; height?: string; aspectRatio?: string; color?: Value; size?: string; wrap?: boolean; numeric?: boolean };
 type ChartRow = { name: Value; values: Value[]; x?: Value; filter?: Scalar };
 export type WidgetMarker = { lat: number; lon: number; label: string } | { address: string; label: string };
 type SvgShape = { tag: "rect" | "circle" | "ellipse" | "path" | "line" | "polygon" | "polyline"; attrs: Record<string, string> };
@@ -25,26 +52,30 @@ export const chatWidgetStartTags = [
   "segmented-control", "segmented", "Chart", "chart", "Map", "map", "AsyncImage", "AsyncImageGroup", "Entity", "AsyncVideo", "list", "caption",
   "video", "follow-up", "FollowUp", "input", "text-input", "textarea", "text-area", "date-picker", "date",
   "flow", "MapWidgetV2", "pressable", "divider", "spacer", "svg", "icon", "button", "radio-group", "checkbox", "select", "slider",
+  "table", "math", "Math", "CodeBlock", "code-block", "label", "blockquote", "callout", "switch", "toggle", "progress", "favicon", "each", "chat-repeat",
 ];
+
+const mathTags = new Set(["math", "Math"]);
+const codeTags = new Set(["CodeBlock", "code-block"]);
 
 export type WidgetNode =
   | { kind: "layout"; variant: Layout; children: WidgetNode[]; options?: LayoutOptions }
-  | { kind: "form"; label?: string; submit?: Value; children: WidgetNode[] }
+  | { kind: "form"; label?: string; action?: Action; submit?: Value; children: WidgetNode[] }
   | { kind: "popover"; label: string; icon?: string; children: WidgetNode[] }
   | { kind: "carousel"; label: string; binding?: string; showArrows: boolean; children: WidgetNode[] }
-  | { kind: "pressable"; action: Action; label: string; options: LayoutOptions; children: WidgetNode[] }
+  | { kind: "pressable"; action: Action; label: string; options: LayoutOptions; children: WidgetNode[]; pressed?: Value; expanded?: Value }
   | { kind: "markdown"; parts: (string | { value: Value })[] }
-  | { kind: "icon"; name: string; size?: string }
+  | { kind: "icon"; name: Value; size?: string; color?: Value }
   | { kind: "divider" }
   | { kind: "spacer" }
-  | { kind: "unsupported"; tag: string; text: string }
+  | { kind: "unsupported"; tag: string; text: string; source?: string }
   | { kind: "svg"; viewBox: string; shapes: SvgShape[] }
   | { kind: "list"; ordered: boolean; connected: boolean; gap?: number; children: Extract<WidgetNode, { kind: "list-item" }>[] }
   | { kind: "list-item"; children: WidgetNode[] }
-  | { kind: "radio"; name: string; label: string; options: Option[]; segmented?: boolean; horizontal?: boolean }
-  | { kind: "checkbox"; name: string; label: string; item?: string }
-  | { kind: "select"; name: string; label: string; options: Option[] }
-  | { kind: "input"; name: string; label: string; inputType: "text" | "textarea" | "date" | "number"; placeholder?: string; required: boolean; maxLength: number; min?: string; max?: string; rows?: number }
+  | ({ kind: "radio"; label: string; options: Option[]; segmented?: boolean; horizontal?: boolean; numeric?: boolean; block?: boolean; required?: boolean } & FieldBinding)
+  | { kind: "checkbox"; name: string; label: string; item?: string; index?: number; switch?: boolean; compact?: boolean }
+  | ({ kind: "select"; label: string; options: Option[] } & FieldBinding)
+  | ({ kind: "input"; label: string; inputType: "text" | "textarea" | "date" | "number" | "email"; placeholder?: string; required: boolean; maxLength: number; min?: string; max?: string; rows?: number } & FieldBinding)
   | { kind: "slider"; name: string; min: number; max: number; step: number }
   | { kind: "chart"; chartType: "bar" | "line" | "pie" | "scatter"; rows: ChartRow[]; series: string[]; label: string; description?: string; min?: number; filter?: Value }
   | { kind: "condition"; test: Value; children: WidgetNode[]; fallback: WidgetNode[] }
@@ -53,51 +84,128 @@ export type WidgetNode =
   | WidgetImage
   | { kind: "map"; label: string; markers: WidgetMarker[] }
   | { kind: "video"; label: string; src?: string }
-  | { kind: "button"; children: WidgetNode[]; action: Action; label?: string; color?: string; style?: string };
+  | { kind: "table"; label?: string; children: Extract<WidgetNode, { kind: "table-row" }>[]; unsupportedRepeats?: Extract<WidgetNode, { kind: "unsupported" }>[] }
+  | { kind: "table-row"; children: Extract<WidgetNode, { kind: "table-cell" }>[] }
+  | { kind: "table-cell"; children: WidgetNode[]; align?: string; width?: number }
+  | { kind: "math"; latex: string; inline: boolean }
+  | { kind: "code"; source: string; language?: string }
+  | { kind: "progress"; value: Value; max: number; label: string }
+  | { kind: "button"; children: WidgetNode[]; action: Action; label?: string; color?: Value; style?: Value; disabled?: Value; loading?: Value; block?: boolean; uniform?: boolean; size?: string };
 
-export type ChatWidget = { root: WidgetNode; initial: Map<string, WidgetStateValue>; form: boolean; explicitForm: boolean };
+export type ChatWidget = { root: WidgetNode; initial: Map<string, WidgetStateValue>; form: boolean; explicitForm: boolean;
+  compileForState?: (values: ReadonlyMap<string, WidgetStateValue>) => WidgetNode };
+
+function isDataArray(value: WidgetData): value is readonly WidgetData[] {
+  return Array.isArray(value);
+}
+
+function isDataRecord(value: WidgetData): value is ReadonlyMap<string, WidgetData> {
+  return typeof value === "object" && !isDataArray(value);
+}
+
+function stateValue(value: WidgetData): WidgetStateValue | undefined {
+  if (typeof value !== "object") return value;
+  return isDataArray(value) && value.every((part): part is Scalar => typeof part !== "object") ? value : undefined;
+}
+
+function dataExpression(value: WidgetData): Value {
+  if (isDataArray(value)) return { array: value.map(dataExpression) };
+  if (isDataRecord(value)) return { record: new Map([...value].map(([key, part]) => [key, dataExpression(part)])) };
+  return value;
+}
+
+function evaluateData(value: Value, state: ReadonlyMap<string, WidgetStateValue>, onRead?: (name: string) => void): WidgetData {
+  let remaining = 4096;
+  function evaluate(value: Value, depth: number): WidgetData {
+    if (--remaining < 0 || depth > 64) return "";
+    if (typeof value !== "object") return value;
+    if ("variable" in value) {
+      onRead?.(value.variable);
+      return state.get(value.variable) ?? "";
+    }
+    if ("array" in value) return value.array.map((part) => evaluate(part, depth + 1));
+    if ("record" in value) return new Map([...value.record].map(([key, part]) => [key, evaluate(part, depth + 1)]));
+    if ("field" in value) {
+      const record = evaluate(value.field[0], depth + 1);
+      return isDataRecord(record) ? record.get(value.field[1]) ?? "" : "";
+    }
+    if ("index" in value) {
+      const sequence = evaluate(value.index[0], depth + 1);
+      const index = evaluate(value.index[1], depth + 1);
+      if (isDataRecord(sequence) && typeof index === "string") return sequence.get(index) ?? "";
+      return isDataArray(sequence) && typeof index === "number" && Number.isInteger(index) && index >= 0 ? sequence[index] ?? "" : "";
+    }
+    if ("trim" in value) {
+      const text = evaluate(value.trim, depth + 1);
+      return typeof text === "string" ? text.trim() : text;
+    }
+    if ("not" in value) return !evaluate(value.not, depth + 1);
+    if ("length" in value) {
+      const sequence = evaluate(value.length, depth + 1);
+      return typeof sequence === "string" || Array.isArray(sequence) ? sequence.length : 0;
+    }
+    if ("includes" in value) {
+      const collection = evaluate(value.includes[0], depth + 1);
+      const item = evaluate(value.includes[1], depth + 1);
+      return isDataArray(collection) && typeof item !== "object" && collection.includes(item);
+    }
+    if ("joinState" in value) {
+      const collection = evaluate(value.joinState, depth + 1);
+      const parts = stateValue(collection);
+      return Array.isArray(parts) ? parts.join(value.separator) : "";
+    }
+    if ("choose" in value) return evaluate(evaluate(value.choose[0], depth + 1) ? value.choose[1] : value.choose[2], depth + 1);
+    if ("fallback" in value) return evaluate(value.fallback[0], depth + 1) || evaluate(value.fallback[1], depth + 1);
+    if ("join" in value) return value.join.map((item) => stateValue(evaluate(item, depth + 1))).filter(Boolean).join(value.separator);
+    if ("compare" in value) {
+      const [operator, first, second] = value.compare;
+      const left = evaluate(first, depth + 1);
+      const right = evaluate(second, depth + 1);
+      if (operator === "===") return left === right;
+      if (operator === "!==") return left !== right;
+      if (typeof left !== "number" || typeof right !== "number") return false;
+      if (operator === ">") return left > right;
+      if (operator === "<") return left < right;
+      if (operator === ">=") return left >= right;
+      return left <= right;
+    }
+    const left = evaluate(value.add[0], depth + 1);
+    const right = evaluate(value.add[1], depth + 1);
+    return typeof left === "number" && typeof right === "number" ? left + right
+      : (String(stateValue(left) ?? "") + String(stateValue(right) ?? "")).slice(0, 30000);
+  }
+  return evaluate(value, 0);
+}
 
 export function widgetValue(value: Value, state: ReadonlyMap<string, WidgetStateValue>): WidgetStateValue {
-  if (typeof value !== "object") return value;
-  if ("variable" in value) return state.get(value.variable) ?? "";
-  if ("not" in value) return !widgetValue(value.not, state);
-  if ("length" in value) {
-    const sequence = widgetValue(value.length, state);
-    return typeof sequence === "string" || Array.isArray(sequence) ? sequence.length : 0;
+  return stateValue(evaluateData(value, state)) ?? "";
+}
+
+export function applyWidgetArrayAction(action: WidgetArrayAction, state: ReadonlyMap<string, WidgetStateValue>): WidgetStateValue | undefined {
+  const current = state.get(action.name);
+  if (!Array.isArray(current) || current.length > 40) return undefined;
+  if (action.kind === "replace") {
+    const replacement = evaluateData(action.value, state);
+    if (typeof replacement === "object" || typeof current[action.index] !== typeof replacement
+      || (typeof replacement === "number" && !Number.isFinite(replacement))) return undefined;
+    return current.map((item, index) => index === action.index ? replacement : item);
   }
-  if ("includes" in value) {
-    const collection = widgetValue(value.includes[0], state);
-    const item = widgetValue(value.includes[1], state);
-    return Array.isArray(collection) && typeof item === "string" && collection.includes(item);
+  if (current.some((item) => typeof item !== "string")) return undefined;
+  if (action.kind === "toggle") {
+    if (current.includes(action.item)) return current.filter((item) => item !== action.item);
+    return current.length < 40 ? [...current, action.item] : undefined;
   }
-  if ("joinState" in value) {
-    const collection = widgetValue(value.joinState, state);
-    return Array.isArray(collection) ? collection.join(value.separator) : "";
-  }
-  if ("choose" in value) return widgetValue(widgetValue(value.choose[0], state) ? value.choose[1] : value.choose[2], state);
-  if ("fallback" in value) return widgetValue(value.fallback[0], state) || widgetValue(value.fallback[1], state);
-  if ("join" in value) return value.join.map((item) => widgetValue(item, state)).filter(Boolean).join(value.separator);
-  if ("compare" in value) {
-    const [operator, first, second] = value.compare;
-    const left = widgetValue(first, state);
-    const right = widgetValue(second, state);
-    if (operator === "===") return left === right;
-    if (operator === "!==") return left !== right;
-    if (typeof left !== "number" || typeof right !== "number") return false;
-    if (operator === ">") return left > right;
-    if (operator === "<") return left < right;
-    if (operator === ">=") return left >= right;
-    return left <= right;
-  }
-  const left = widgetValue(value.add[0], state);
-  const right = widgetValue(value.add[1], state);
-  return typeof left === "number" && typeof right === "number" ? left + right : String(left) + String(right);
+  const list = evaluateData(action.list, state);
+  if (!isDataArray(list) || list.length > 40) return undefined;
+  const items = list.map((row) => isDataRecord(row) ? row.get(action.field) : undefined);
+  return items.every((item): item is string => typeof item === "string" && item.length <= 500)
+    ? [...new Set(items)] : undefined;
 }
 
 function readBraces(source: string, from: number): number | undefined {
   let depth = 0;
   let quote = "";
-  for (let index = from; index < source.length; index++) {
+  for (let index = from; index < Math.min(source.length, from + 16384); index++) {
     const char = source[index];
     if (quote) {
       if (char === "\\") index++;
@@ -121,12 +229,15 @@ function readElement(source: string, from: number, depth = 0): Element | undefin
   const attr = /\s*([\w-]+)(?:\s*=\s*|(?=[\s/>]))/y;
   const endTag = /\s*(\/?)\s*>/y;
   let cursor = opening.lastIndex;
+  const element = (inner: string, end: number, contentStart: number): Element => ({
+    tag, attributes, children, inner, start: from, contentStart, end, source: source.slice(from, Math.min(end, from + 2000)),
+  });
   while (cursor < source.length) {
     endTag.lastIndex = cursor;
     const end = endTag.exec(source);
     if (end) {
       cursor = endTag.lastIndex;
-      if (end[1]) return { tag, attributes, children, inner: "", end: cursor };
+      if (end[1]) return element("", cursor, cursor);
       break;
     }
     attr.lastIndex = cursor;
@@ -149,8 +260,9 @@ function readElement(source: string, from: number, depth = 0): Element | undefin
         attributes.set(name, value[1] ?? value[2]);
         cursor = literal.lastIndex;
       } else {
-        const keyword = /^(?:[a-z][a-z-]*|\d+)(?=[\s/>])/.exec(source.slice(cursor));
-        if (!keyword || !["align", "justify", "flex", "marker", "connector", "layout"].includes(name)) return undefined;
+        const keyword = /^(?:[A-Za-z_$][\w$-]*|\d+)(?=[\s/>])/.exec(source.slice(cursor));
+        const repeatAttribute = ["each", "chat-repeat"].includes(tag) && ["alias", "as", "index", "values", "items", "of", "in"].includes(name);
+        if (!keyword || (!repeatAttribute && !["align", "justify", "flex", "marker", "connector", "layout"].includes(name))) return undefined;
         attributes.set(name, keyword[0]);
         cursor += keyword[0].length;
       }
@@ -158,15 +270,28 @@ function readElement(source: string, from: number, depth = 0): Element | undefin
   }
 
   const start = cursor;
-  const nextTag = /<(\/?)([A-Za-z][\w-]*)(?=[\s/>])/g;
   const closing = new RegExp(`</${tag}\\s*>`, "y");
+  if (mathTags.has(tag) || codeTags.has(tag)) {
+    const close = new RegExp(closing.source, "g");
+    close.lastIndex = start;
+    const match = close.exec(source);
+    return match ? element(source.slice(start, match.index), close.lastIndex, start) : undefined;
+  }
+  const nextTag = /\{|<(\/?)([A-Za-z][\w-]*)(?=[\s/>])/g;
+  let steps = 0;
   nextTag.lastIndex = cursor;
   for (let next = nextTag.exec(source); next; next = nextTag.exec(source)) {
+    if (++steps > 4000) return undefined;
+    if (next[0] === "{") {
+      const end = readBraces(source, next.index);
+      if (end !== undefined) nextTag.lastIndex = end;
+      continue;
+    }
     if (next.index > cursor) children.push(source.slice(cursor, next.index));
     if (next[1]) {
       closing.lastIndex = next.index;
       if (!closing.test(source)) return undefined;
-      return { tag, attributes, children, inner: source.slice(start, next.index), end: closing.lastIndex };
+      return element(source.slice(start, next.index), closing.lastIndex, start);
     }
     const child = readElement(source, next.index, depth + 1);
     if (!child) return undefined;
@@ -180,16 +305,18 @@ function parseExpression(source: string | undefined): Expression | undefined {
   if (!source || source.length > 16384) return undefined;
   try {
     const node = parseExpressionAt(source, 0, { ecmaVersion: 2020 }) as Expression;
-    return source.slice(node.end).trim() === "" ? node : undefined;
+    const tail = source.slice(node.end).trim();
+    if (!tail) return node;
+    if (!/^[\s)]+$/.test(tail)) return undefined;
+    const wrapped = parseExpressionAt(source, 0, { ecmaVersion: 2020, preserveParens: true });
+    return source.slice(wrapped.end).trim() === "" ? node : undefined;
   } catch {
     return undefined;
   }
 }
 
-function literalStrings(expression: Expression | undefined): string[] | undefined {
-  if (expression?.type !== "ArrayExpression" || expression.elements.length > 40) return undefined;
-  const values = expression.elements.map((item) => item?.type === "Literal" ? item.value : undefined);
-  return values.every((item): item is string => typeof item === "string" && item.length <= 500) ? values : undefined;
+function isSafeField(key: unknown): key is string {
+  return typeof key === "string" && /^[A-Za-z_$][\w$-]{0,80}$/.test(key) && !["__proto__", "prototype", "constructor"].includes(key);
 }
 
 function memberCall(node: AstNode | null | undefined, name: string): node is Extract<Expression, { type: "CallExpression" }> & { callee: Extract<Expression, { type: "MemberExpression" }> } {
@@ -205,14 +332,48 @@ function valueExpression(node: AstNode | null | undefined, states: Map<string, S
     return typeof node.value === "string" || typeof node.value === "boolean" || (typeof node.value === "number" && Number.isFinite(node.value)) ? node.value : undefined;
   }
   if (node.type === "Identifier" && states.has(node.name)) return states.get(node.name)?.derived ?? { variable: node.name };
-  if (node.type === "MemberExpression" && !node.computed && !node.optional && node.property.type === "Identifier" && node.property.name === "length") {
-    const value = valueExpression(node.object, states, depth + 1);
-    return value === undefined ? undefined : { length: value };
+  if (node.type === "ArrayExpression") {
+    if (node.elements.length > 40) return undefined;
+    const array = node.elements.map((item) => valueExpression(item, states, depth + 1));
+    return array.every((item): item is Value => item !== undefined && (typeof item !== "string" || item.length <= 500)) ? { array } : undefined;
+  }
+  if (node.type === "ObjectExpression") {
+    if (node.properties.length > 20) return undefined;
+    const record = new Map<string, Value>();
+    for (const property of node.properties) {
+      if (property.type !== "Property" || property.computed || property.method || property.kind !== "init") return undefined;
+      const key = property.key.type === "Identifier" ? property.key.name : property.key.type === "Literal" ? property.key.value : undefined;
+      const value = valueExpression(property.value, states, depth + 1);
+      if (!isSafeField(key) || record.has(key) || value === undefined || (typeof value === "string" && value.length > 500)) return undefined;
+      record.set(key, value);
+    }
+    return { record };
+  }
+  if (node.type === "MemberExpression" && node.computed && !node.optional) {
+    const collection = valueExpression(node.object, states, depth + 1);
+    const index = valueExpression(node.property, states, depth + 1);
+    if (collection === undefined || index === undefined || (typeof index === "string" && !isSafeField(index))) return undefined;
+    if (typeof collection === "object" && "array" in collection && typeof index === "number") {
+      return Number.isInteger(index) && index >= 0 ? collection.array[index] ?? "" : "";
+    }
+    return { index: [collection, index] };
+  }
+  if (node.type === "MemberExpression" && !node.computed && !node.optional && node.property.type === "Identifier") {
+    const key = node.property.name;
+    const target = valueExpression(node.object, states, depth + 1);
+    if (target === undefined || !isSafeField(key)) return undefined;
+    if (typeof target === "object" && "record" in target) return target.record.get(key);
+    if (key === "length") return { length: target };
+    return { field: [target, key] };
   }
   if (memberCall(node, "includes") && node.arguments.length === 1) {
     const collection = valueExpression(node.callee.object, states, depth + 1);
     const item = valueExpression(node.arguments[0], states, depth + 1);
     return collection === undefined || item === undefined ? undefined : { includes: [collection, item] };
+  }
+  if (memberCall(node, "trim") && !node.arguments.length) {
+    const text = valueExpression(node.callee.object, states, depth + 1);
+    return text === undefined ? undefined : { trim: text };
   }
   if (node.type === "ConditionalExpression") {
     const test = valueExpression(node.test, states, depth + 1);
@@ -229,7 +390,9 @@ function valueExpression(node: AstNode | null | undefined, states: Map<string, S
     const filter = node.callee.object;
     const separator = node.arguments.length === 1 && valueExpression(node.arguments[0], new Map());
     if (typeof separator !== "string") return undefined;
-    if (filter.type === "Identifier" && Array.isArray(states.get(filter.name)?.initial)) return { joinState: { variable: filter.name }, separator };
+    if (filter.type === "Identifier" && Array.isArray(states.get(filter.name)?.initial)) {
+      return { joinState: states.get(filter.name)?.derived ?? { variable: filter.name }, separator };
+    }
     if (!memberCall(filter, "filter") || filter.callee.object.type !== "ArrayExpression" || filter.arguments.length !== 1 || filter.arguments[0].type !== "Identifier" || filter.arguments[0].name !== "Boolean") return undefined;
     const items = filter.callee.object.elements.map((item) => valueExpression(item, states, depth + 1));
     return items.every((item): item is Value => item !== undefined) ? { join: items, separator } : undefined;
@@ -260,6 +423,13 @@ function attrExpression(element: Element, name: string): string | undefined {
   return typeof value === "object" ? value.expression : undefined;
 }
 
+function attrValue(element: Element, name: string, states: Map<string, State>): Value | undefined {
+  const attr = element.attributes.get(name);
+  if (typeof attr === "object") return valueExpression(parseExpression(attr.expression), states);
+  if (attr === "true" || attr === "false") return attr === "true";
+  return attr;
+}
+
 function attrNumber(element: Element, name: string): number | undefined {
   const value = valueExpression(parseExpression(attrExpression(element, name) ?? attrText(element, name)), new Map());
   return typeof value === "number" ? value : undefined;
@@ -284,6 +454,19 @@ function stateBinding(element: Element, states: Map<string, State>, attribute = 
   return name && setter && states.get(name)?.setter === setter ? name : undefined;
 }
 
+function numericSelectBinding(element: Element, states: Map<string, State>): string | undefined {
+  const value = parseExpression(attrExpression(element, "value"));
+  const change = parseExpression(attrExpression(element, "onChange"));
+  if (!setterCall(value) || value.callee.name !== "String" || value.arguments[0].type !== "Identifier"
+    || !simpleParameter(change) || !setterCall(change.body)) return undefined;
+  const name = value.arguments[0].name;
+  const state = states.get(name);
+  const converted = change.body.arguments[0];
+  return typeof state?.initial === "number" && change.body.callee.name === state.setter
+    && setterCall(converted) && converted.callee.name === "Number" && isIdentifier(converted.arguments[0], change.params[0].name)
+    ? name : undefined;
+}
+
 function parseOptionArray(element: Element): Option[] | undefined {
   const values = parseExpression(attrExpression(element, "options"));
   if (values?.type !== "ArrayExpression" || values.elements.length > 40) return undefined;
@@ -298,11 +481,31 @@ function parseOptionArray(element: Element): Option[] | undefined {
   return options;
 }
 
-function repeatBindings(element: Element, states: Map<string, State>): Map<string, State>[] | undefined {
-  const alias = attrText(element, "alias");
-  const entries = literalStrings(parseExpression(attrExpression(element, "values")));
-  if (!alias || !entries || states.has(alias) || [...states.values()].some((state) => state.loop)) return undefined;
-  return entries.map((item) => new Map(states).set(alias, { setter: "", initial: item, derived: item, loop: true }));
+function isRepeat(element: Element): boolean {
+  return element.tag === "chat-repeat" || element.tag === "each";
+}
+
+function repeatBindings(element: Element, states: WidgetScope): WidgetScope[] | undefined {
+  const alias = attrString(element, "alias") ?? attrString(element, "as") ?? (element.tag === "each" ? "item" : undefined);
+  const indexName = attrText(element, "index");
+  const source = ["values", "items", "of", "in"].map((name) => attrExpression(element, name) ?? attrText(element, name)).find((attr) => attr !== undefined);
+  const value = valueExpression(parseExpression(source), states);
+  if (!alias || !/^[A-Za-z_$][\w$]*$/.test(alias) || (indexName && !/^[A-Za-z_$][\w$]*$/.test(indexName)) || value === undefined
+    || states.has(alias) || (indexName && (states.has(indexName) || indexName === alias))
+    || states.repeatDepth >= 3) return undefined;
+  const rows = evaluateData(value, states.snapshot(), (name) => {
+    if (states.get(name)?.setter) states.context.dynamic = true;
+  });
+  if (!isDataArray(rows) || rows.length > 40 || rows.length > states.context.remaining) return undefined;
+  states.context.remaining -= rows.length;
+  const entries: WidgetScope[] = [];
+  for (const [index, row] of rows.entries()) {
+    const binding = new WidgetScope(states, states.context, states.repeatDepth + 1);
+    binding.set(alias, { setter: "", initial: stateValue(row) ?? "", derived: dataExpression(row), loop: true });
+    if (indexName) binding.set(indexName, { setter: "", initial: index, derived: index, loop: true });
+    entries.push(binding);
+  }
+  return entries;
 }
 
 function option(element: Element, states: Map<string, State>): Option | undefined {
@@ -314,14 +517,13 @@ function option(element: Element, states: Map<string, State>): Option | undefine
   return value && typeof label === "string" && label.trim() ? { value, label } : undefined;
 }
 
-function parseOptions(element: Element): Option[] | undefined {
+function parseOptions(element: Element, states: WidgetScope): Option[] | undefined {
   if (element.attributes.has("options")) return parseOptionArray(element);
-  const states = new Map<string, State>();
   const options: Option[] = [];
   for (const child of element.children) {
     if (typeof child === "string" && !child.trim()) continue;
     if (typeof child === "string") return undefined;
-    if (child.tag === "chat-repeat") {
+    if (isRepeat(child)) {
       const items = child.children.filter((part) => typeof part !== "string" || part.trim());
       const bindings = repeatBindings(child, states);
       if (!bindings || items.length !== 1 || typeof items[0] === "string") return undefined;
@@ -343,6 +545,37 @@ function isIdentifier(node: AstNode | null | undefined, name: string): boolean {
   return node?.type === "Identifier" && node.name === name;
 }
 
+function setterCall(node: AstNode | BlockStatement | null | undefined): node is Extract<Expression, { type: "CallExpression" }> & { callee: Extract<Expression, { type: "Identifier" }> } {
+  return node?.type === "CallExpression" && !node.optional && node.callee.type === "Identifier" && node.arguments.length === 1;
+}
+
+function simpleParameter(node: AstNode | null | undefined): node is Extract<Expression, { type: "ArrowFunctionExpression" }> & { params: [Extract<Expression, { type: "Identifier" }>] } {
+  return node?.type === "ArrowFunctionExpression" && !node.async && node.params.length === 1 && node.params[0].type === "Identifier";
+}
+
+function indexedCheckbox(element: Element, states: Map<string, State>): { name: string; index: number } | undefined {
+  const checked = parseExpression(attrExpression(element, "checked"));
+  const change = parseExpression(attrExpression(element, "onChange"));
+  if (checked?.type !== "MemberExpression" || !checked.computed || checked.optional || checked.object.type !== "Identifier"
+    || !simpleParameter(change) || !setterCall(change.body)) return undefined;
+  const name = checked.object.name;
+  const state = states.get(name);
+  const index = valueExpression(checked.property, states);
+  const update = change.body.arguments[0];
+  if (typeof index !== "number" || !Number.isInteger(index) || !Array.isArray(state?.initial) || typeof state.initial[index] !== "boolean"
+    || change.body.callee.name !== state.setter || !simpleParameter(update) || update.body.type === "BlockStatement" || !memberCall(update.body, "map")
+    || !isIdentifier(update.body.callee.object, update.params[0].name) || update.body.arguments.length !== 1) return undefined;
+  const mapper = update.body.arguments[0];
+  if (mapper.type !== "ArrowFunctionExpression" || mapper.async || mapper.params.length !== 2
+    || mapper.params[0].type !== "Identifier" || mapper.params[1].type !== "Identifier" || mapper.body.type !== "ConditionalExpression"
+    || mapper.body.test.type !== "BinaryExpression" || mapper.body.test.operator !== "==="
+    || !isIdentifier(mapper.body.consequent, change.params[0].name) || !isIdentifier(mapper.body.alternate, mapper.params[0].name)) return undefined;
+  const { left, right } = mapper.body.test;
+  const position = mapper.params[1].name;
+  return (isIdentifier(left, position) && valueExpression(right, states) === index)
+    || (isIdentifier(right, position) && valueExpression(left, states) === index) ? { name, index } : undefined;
+}
+
 function collectionCheckbox(element: Element, states: Map<string, State>): { name: string; item: string } | undefined {
   const checked = parseExpression(attrExpression(element, "checked"));
   if (!memberCall(checked, "includes") || checked.callee.object.type !== "Identifier" || checked.arguments.length !== 1) return undefined;
@@ -361,14 +594,70 @@ function collectionCheckbox(element: Element, states: Map<string, State>): { nam
   if (updateBody.type !== "ConditionalExpression" || !isIdentifier(updateBody.test, change.params[0].name)) return undefined;
   const append = updateBody.consequent;
   const filter = updateBody.alternate;
-  if (append.type !== "ArrayExpression" || append.elements.length !== 2 || append.elements[0]?.type !== "SpreadElement"
-    || !isIdentifier(append.elements[0].argument, old) || valueExpression(append.elements[1], states) !== item
-    || !memberCall(filter, "filter") || !isIdentifier(filter.callee.object, old) || filter.arguments.length !== 1) return undefined;
+  const visible = new Map(states);
+  visible.delete(old);
+  visible.delete(change.params[0].name);
+  return appendedItem(append, old, visible) === item && removedItem(filter, old, visible) === item ? { name, item } : undefined;
+}
+
+function appendedItem(node: AstNode | null | undefined, collection: string, states: Map<string, State>): Value | undefined {
+  if (node?.type !== "ArrayExpression" || node.elements.length !== 2 || node.elements[0]?.type !== "SpreadElement"
+    || !isIdentifier(node.elements[0].argument, collection)) return undefined;
+  return valueExpression(node.elements[1], states);
+}
+
+function removedItem(filter: AstNode | null | undefined, old: string, states: Map<string, State>): Value | undefined {
+  if (!memberCall(filter, "filter") || !isIdentifier(filter.callee.object, old) || filter.arguments.length !== 1) return undefined;
   const predicate = filter.arguments[0];
-  if (predicate.type !== "ArrowFunctionExpression" || predicate.async || predicate.params.length !== 1 || predicate.params[0].type !== "Identifier"
-    || predicate.body.type !== "BinaryExpression" || predicate.body.operator !== "!==" || !isIdentifier(predicate.body.left, predicate.params[0].name)
-    || valueExpression(predicate.body.right, states) !== item) return undefined;
-  return { name, item };
+  if (!simpleParameter(predicate) || predicate.body.type !== "BinaryExpression" || predicate.body.operator !== "!=="
+    || !isIdentifier(predicate.body.left, predicate.params[0].name)) return undefined;
+  const visible = new Map(states);
+  visible.delete(old);
+  visible.delete(predicate.params[0].name);
+  return valueExpression(predicate.body.right, visible);
+}
+
+function arrayAction(target: string, argument: AstNode | undefined, states: Map<string, State>): WidgetArrayAction | undefined {
+  const initial = states.get(target)?.initial;
+  if (!Array.isArray(initial)) return undefined;
+  const isStringCollection = initial.every((item) => typeof item === "string");
+  if (isStringCollection && memberCall(argument, "map") && argument.arguments.length === 1) {
+    const mapper = argument.arguments[0];
+    const list = valueExpression(argument.callee.object, states);
+    if (!simpleParameter(mapper) || mapper.body.type !== "MemberExpression" || mapper.body.computed || mapper.body.optional
+      || !isIdentifier(mapper.body.object, mapper.params[0].name) || mapper.body.property.type !== "Identifier"
+      || !isSafeField(mapper.body.property.name) || list === undefined) return undefined;
+    const field = mapper.body.property.name;
+    const action = { name: target, kind: "select", list, field } as const;
+    const snapshot = new Map([...states].map(([name, state]) => [name, state.initial]));
+    return applyWidgetArrayAction(action, snapshot) !== undefined ? action : undefined;
+  }
+  if (!simpleParameter(argument) || argument.body.type === "BlockStatement") return undefined;
+  const old = argument.params[0].name;
+  const visible = new Map(states);
+  visible.delete(old);
+  const body = argument.body;
+  if (isStringCollection && body.type === "ConditionalExpression" && memberCall(body.test, "includes")
+    && isIdentifier(body.test.callee.object, old) && body.test.arguments.length === 1) {
+    const item = valueExpression(body.test.arguments[0], visible);
+    if (typeof item === "string" && item === appendedItem(body.alternate, old, visible) && item === removedItem(body.consequent, old, visible)) {
+      return { name: target, kind: "toggle", item };
+    }
+  }
+  if (!memberCall(body, "map") || !isIdentifier(body.callee.object, old) || body.arguments.length !== 1) return undefined;
+  const mapper = body.arguments[0];
+  if (mapper.type !== "ArrowFunctionExpression" || mapper.async || mapper.params.length !== 2 || mapper.params[0].type !== "Identifier"
+    || mapper.params[1].type !== "Identifier" || mapper.body.type !== "ConditionalExpression"
+    || mapper.body.test.type !== "BinaryExpression" || mapper.body.test.operator !== "==="
+    || !isIdentifier(mapper.body.alternate, mapper.params[0].name)) return undefined;
+  const position = mapper.params[1].name;
+  visible.delete(mapper.params[0].name);
+  visible.delete(position);
+  const { left, right } = mapper.body.test;
+  const index = valueExpression(isIdentifier(left, position) ? right : isIdentifier(right, position) ? left : undefined, visible);
+  const value = valueExpression(mapper.body.consequent, visible);
+  if (typeof index !== "number" || !Number.isInteger(index) || index < 0 || index >= 40 || value === undefined) return undefined;
+  return { name: target, kind: "replace", index, value };
 }
 
 function parseAction(source: string | undefined, states: Map<string, State>): Action | undefined {
@@ -381,7 +670,11 @@ function parseAction(source: string | undefined, states: Map<string, State>): Ac
     if (target.type === "Identifier") {
       const state = [...states].find(([, value]) => value.setter === target.name);
       const match = /^Math\.(min|max)\(\s*(-?\d+)\s*,\s*([\w$]+)\s*([+-])\s*(\d+)\s*\)$/.exec((attrSource(body.arguments[0], source) ?? "").trim());
-      if (!state || Array.isArray(state[1].initial)) return undefined;
+      if (!state) return undefined;
+      if (Array.isArray(state[1].initial)) {
+        const array = arrayAction(state[0], body.arguments[0], states);
+        return array ? { array } : undefined;
+      }
       if (match && typeof state[1].initial === "number" && match[3] === state[0] && (match[1] === "min") === (match[4] === "+")) {
         return { adjust: { name: state[0], change: Number(match[5]) * (match[4] === "+" ? 1 : -1), bound: Number(match[2]) } };
       }
@@ -396,17 +689,44 @@ function parseAction(source: string | undefined, states: Map<string, State>): Ac
     return submit === undefined ? undefined : { submit };
   }
   if (body.type !== "BlockStatement" || !body.body.length) return undefined;
-  const reset: string[] = [];
-  for (const statement of body.body) {
-    if (statement.type !== "ExpressionStatement" || statement.expression.type !== "CallExpression") return undefined;
-    const call = statement.expression;
-    if (call.optional || call.callee.type !== "Identifier" || call.arguments.length !== 1) return undefined;
-    const setter = call.callee.name;
-    const state = [...states.entries()].find(([, entry]) => entry.setter === setter);
-    if (!state || valueExpression(call.arguments[0], new Map()) !== state[1].initial) return undefined;
-    reset.push(state[0]);
+  const updates = parseStateUpdates(body.body, states);
+  if (!updates) return undefined;
+  return updates.every(({ name, value }) => typeof value !== "object" && value === states.get(name)?.initial)
+    ? { reset: updates.map(({ name }) => name) } : { updates };
+}
+
+function parseStateUpdates(statements: BlockStatement["body"], states: Map<string, State>): StateUpdate[] | undefined {
+  if (statements.length > 12) return undefined;
+  const updates: StateUpdate[] = [];
+  const initial = new Map([...states].map(([name, state]) => [name, state.initial]));
+  for (const statement of statements) {
+    const call = statement.type === "ExpressionStatement" ? statement.expression : undefined;
+    if (!setterCall(call)) return undefined;
+    const target = [...states].find(([, entry]) => entry.setter === call.callee.name);
+    const value = valueExpression(call.arguments[0], states);
+    if (!target || value === undefined || Array.isArray(target[1].initial)
+      || typeof widgetValue(value, initial) !== typeof target[1].initial) return undefined;
+    updates.push({ name: target[0], value });
   }
-  return { reset };
+  return updates;
+}
+
+function fieldBinding(element: Element, states: Map<string, State>): FieldBinding | undefined {
+  const direct = stateBinding(element, states);
+  if (direct) return { name: direct };
+  const name = attrExpression(element, "value")?.trim();
+  if (!name) return undefined;
+  const change = parseExpression(attrExpression(element, "onChange") ?? attrExpression(element, "onInput") ?? attrExpression(element, "onValueChange"));
+  if (!simpleParameter(change)) return undefined;
+  const statements = change.body.type === "BlockStatement" ? change.body.body : undefined;
+  const first = statements?.[0];
+  const call = first ? (first.type === "ExpressionStatement" ? first.expression : undefined) : change.body;
+  if (!setterCall(call) || call.callee.name !== states.get(name)?.setter || !isIdentifier(call.arguments[0], change.params[0].name)) return undefined;
+  const visible = new Map(states);
+  visible.delete(change.params[0].name);
+  const updates = statements ? parseStateUpdates(statements.slice(1), visible) : undefined;
+  if (statements && !updates) return undefined;
+  return { name, updates };
 }
 
 function attrSource(node: { start: number; end: number }, source: string | undefined): string | undefined {
@@ -479,17 +799,17 @@ function compileText(source: string, states: Map<string, State>): WidgetNode {
   const text = source.trim().replace(/^[ \t]+/gm, "").replace(/\{(?:turn\d+|sample)[\w-]*(?:\.\w+)+\}/g, "");
   const parts: (string | { value: Value })[] = [];
   let cursor = 0;
-  for (const match of text.matchAll(/\{([^{}\r\n]+)\}/g)) {
-    const value = valueExpression(parseExpression(match[1]), states);
+  for (const [start, end] of bracedRanges(text)) {
+    const value = valueExpression(parseExpression(text.slice(start + 1, end - 1)), states);
     if (value === undefined) continue;
-    parts.push(text.slice(cursor, match.index), { value });
-    cursor = match.index + match[0].length;
+    parts.push(text.slice(cursor, start), { value });
+    cursor = end;
   }
   parts.push(text.slice(cursor));
   return { kind: "markdown", parts };
 }
 
-function compileChildren(element: Element, states: Map<string, State>): WidgetNode[] | undefined {
+function compileChildren(element: Element, states: WidgetScope): WidgetNode[] | undefined {
   const segments: Element["children"] = [];
   for (const part of element.children) {
     const child = typeof part !== "string" && part.tag === "Entity"
@@ -504,7 +824,11 @@ function compileChildren(element: Element, states: Map<string, State>): WidgetNo
   for (let index = 0; index < segments.length; index++) {
     const child = segments[index];
     if (typeof child === "string") {
-      const text = child.trim();
+      const raw = child.trim();
+      if (raw && states.repeatDepth && states.context.remaining-- <= 0) return undefined;
+      const declarations = readDeclarations(raw, states, true);
+      if (!declarations.valid) return undefined;
+      const text = declarations.text.trim();
       if (!text) continue;
       const next = segments[index + 1];
       if (next && typeof next !== "string" && ["radio-group", "select", "input", "text-input", "textarea", "date-picker", "segmented-control", "segmented"].includes(next.tag)) {
@@ -513,40 +837,62 @@ function compileChildren(element: Element, states: Map<string, State>): WidgetNo
         children.push(compileText(text, states));
       }
     } else {
-      if (child.tag === "chat-repeat") {
-        const bindings = repeatBindings(child, states);
-        if (!bindings) children.push({ kind: "unsupported", tag: "each", text: child.inner });
-        else for (const binding of bindings) {
-          const repeated = compileChildren(child, binding);
-          if (!repeated) return undefined;
-          children.push(...repeated);
+      if (child.tag === "label") {
+        const next = segments.slice(index + 1).find((part) => typeof part !== "string" || part.trim());
+        if (typeof next === "object" && ["input", "text-input", "textarea", "text-area", "select", "date", "date-picker"].includes(next.tag)) {
+          label = child.inner.trim();
+          continue;
         }
+      }
+      if (isRepeat(child)) {
+        const repeated = compileRepeat(child, states);
+        if (repeated) children.push(...repeated);
+        else children.push({ kind: "unsupported", tag: "each", text: child.inner, source: child.source });
         label = "";
         continue;
       }
       const node = compileNode(child, states, label);
-      if (!node) return undefined;
-      children.push(node);
+      const previous = children.at(-1);
+      if (node?.kind === "condition" && previous?.kind === "pressable" && previous.expanded === undefined
+        && togglesCondition(previous.action, node.test)) {
+        previous.expanded = node.test;
+        previous.pressed = undefined;
+      }
+      children.push(node ?? { kind: "unsupported", tag: child.tag, text: child.inner, source: child.source });
       label = "";
     }
   }
   return children;
 }
 
+function compileRepeat(element: Element, states: WidgetScope): WidgetNode[] | undefined {
+  const bindings = repeatBindings(element, states);
+  if (!bindings) return undefined;
+  const children: WidgetNode[] = [];
+  for (const binding of bindings) {
+    if (states.context.remaining <= 0) return undefined;
+    const repeated = compileChildren(element, binding);
+    if (!repeated) return undefined;
+    children.push(...repeated);
+  }
+  return children;
+}
+
 function compileInput(element: Element, states: Map<string, State>, label: string): WidgetNode | undefined {
-  const name = stateBinding(element, states);
+  const binding = fieldBinding(element, states);
   const inputType = element.tag === "textarea" || element.tag === "text-area" ? "textarea"
     : element.tag === "date-picker" || element.tag === "date" ? "date"
       : attrString(element, "inputType") ?? attrString(element, "type") ?? "text";
-  if (inputType !== "text" && inputType !== "textarea" && inputType !== "date" && inputType !== "number") return undefined;
-  const initial = name ? states.get(name)?.initial : undefined;
-  if (!name || (typeof initial !== "string" && !(inputType === "number" && typeof initial === "number"))) return undefined;
+  if (inputType !== "text" && inputType !== "textarea" && inputType !== "date" && inputType !== "number" && inputType !== "email") return undefined;
+  if (!binding) return undefined;
+  const initial = states.get(binding.name)?.initial;
+  if (typeof initial !== "string" && !(inputType === "number" && typeof initial === "number")) return undefined;
   const maxLength = Math.max(1, Math.min(4000, Math.trunc(attrNumber(element, "maxLength") ?? 1000)));
   const date = /^\d{4}-\d{2}-\d{2}$/;
   const min = attrString(element, "min");
   const max = attrString(element, "max");
   return {
-    kind: "input", name, inputType, label: label || attrString(element, "label") || (inputType === "date" ? "选择日期" : "输入内容"),
+    kind: "input", ...binding, inputType, label: label || attrString(element, "label") || (inputType === "date" ? "选择日期" : "输入内容"),
     required: attrBoolean(element, "required") ?? false, placeholder: attrString(element, "placeholder"),
     maxLength, rows: inputType === "textarea" ? Math.max(2, Math.min(12, Math.trunc(attrNumber(element, "rows") ?? 3))) : undefined,
     min: inputType === "number" ? attrNumber(element, "min")?.toString() : min && date.test(min) ? min : undefined,
@@ -554,14 +900,25 @@ function compileInput(element: Element, states: Map<string, State>, label: strin
   };
 }
 
-function layoutOptions(element: Element): LayoutOptions {
+function layoutOptions(element: Element, states = new Map<string, State>()): LayoutOptions {
   const align = attrString(element, "align");
   const justify = attrString(element, "justify");
   const gap = attrNumber(element, "gap");
   const columns = attrNumber(element, "columns");
   const flex = attrNumber(element, "flex");
   const padding = attrNumber(element, "padding");
-  const height = attrString(element, "height");
+  const paddingRecord = parseExpression(attrExpression(element, "padding"));
+  const sides: Exclude<LayoutOptions["padding"], number | undefined> = {};
+  if (paddingRecord?.type === "ObjectExpression") {
+    for (const side of ["top", "right", "bottom", "left"] as const) {
+      const value = valueExpression(property(paddingRecord, side), states);
+      if (typeof value === "number") sides[side] = Math.min(24, Math.max(0, value * 4));
+    }
+  }
+  const radius = attrString(element, "radius");
+  const size = attrString(element, "size");
+  const square = size && /^([1-9]\d{0,2})px$/.exec(size);
+  const height = attrString(element, "height") ?? attrString(element, "minHeight");
   const ratio = ratioAttribute(element);
   return {
     gap: gap === undefined ? undefined : Math.min(24, Math.max(0, gap * 4)),
@@ -571,10 +928,13 @@ function layoutOptions(element: Element): LayoutOptions {
     justify: justify === "start" || justify === "center" || justify === "end" || justify === "between" ? justify : undefined,
     border: attrBoolean(element, "border"),
     surface: attrString(element, "background") === "surface-secondary" || undefined,
-    padding: padding === undefined ? undefined : Math.min(24, Math.max(0, padding * 4)),
+    background: attrValue(element, "background", states),
+    padding: padding === undefined ? (Object.keys(sides).length > 0 ? sides : undefined) : Math.min(24, Math.max(0, padding * 4)),
+    radius: radius === "md" || radius === "lg" || radius === "xl" || radius === "2xl" || radius === "full" ? radius : undefined,
+    square: square ? Math.min(160, Number(square[1])) : undefined,
     height: height === "100%" || (height && /^[1-9]\d{0,2}px$/.test(height) && parseInt(height, 10) <= 480) ? height : undefined,
     aspectRatio: ratio,
-    size: attrString(element, "size"),
+    size,
     wrap: attrString(element, "wrap") === "wrap" || undefined,
     numeric: attrBoolean(element, "tabularNums"),
   };
@@ -680,34 +1040,106 @@ function widgetHas(node: WidgetNode, matches: (child: WidgetNode) => boolean): b
     || (node.kind === "condition" && node.fallback.some((child) => widgetHas(child, matches)));
 }
 
-function compileNode(element: Element, states: Map<string, State>, label = ""): WidgetNode | undefined {
+function rawContent(element: Element, names: string[], states: Map<string, State>): string {
+  for (const name of names) {
+    const attribute = attrText(element, name);
+    if (attribute !== undefined) return attribute;
+    const expression = parseExpression(attrExpression(element, name));
+    if (expression?.type === "TemplateLiteral" && !expression.expressions.length) {
+      return expression.quasis[0].value.cooked ?? "";
+    }
+    if (expression?.type === "TaggedTemplateExpression" && !expression.quasi.expressions.length
+      && expression.tag.type === "MemberExpression" && !expression.tag.computed && !expression.tag.optional
+      && isIdentifier(expression.tag.object, "String") && isIdentifier(expression.tag.property, "raw")) {
+      return expression.quasi.quasis[0].value.raw;
+    }
+    const value = valueExpression(expression, states);
+    if (typeof value === "string") return value;
+  }
+  const body = codeTags.has(element.tag) ? element.inner.replace(/^\r?\n|\r?\n[ \t]*$/g, "") : element.inner.trim();
+  const expression = /^\{([\s\S]*)\}$/.exec(body);
+  if (expression) {
+    const value = valueExpression(parseExpression(expression[1]), states);
+    if (typeof value === "string") return value;
+  }
+  return body;
+}
+
+function togglesCondition(action: Action, test: Value): boolean {
+  if (!("set" in action) || typeof test !== "object" || typeof action.set.value !== "object") return false;
+  const { name, value } = action.set;
+  if ("variable" in test) return test.variable === name && "not" in value && typeof value.not === "object"
+    && "variable" in value.not && value.not.variable === name;
+  if (!("compare" in test) || !("choose" in value)) return false;
+  const [operator, left, right] = test.compare;
+  const compared = value.choose[0];
+  const isBinding = (part: Value) => typeof part === "object" && "variable" in part && part.variable === name;
+  return operator === "===" && isBinding(left) && typeof right !== "object" && typeof compared === "object" && "compare" in compared
+    && compared.compare[0] === operator && isBinding(compared.compare[1]) && compared.compare[2] === right && value.choose[2] === right
+    && typeof value.choose[1] !== "object" && value.choose[1] !== right;
+}
+
+function pressableLabel(nodes: WidgetNode[], values: ReadonlyMap<string, WidgetStateValue>): string {
+  for (const node of nodes) {
+    if (node.kind === "markdown") {
+      const text = node.parts.map((part) => typeof part === "string" ? part : String(widgetValue(part.value, values))).join("")
+        .replace(/[*_\x60]/g, "").trim();
+      if (text) return text.slice(0, 160);
+    }
+    if (node.kind === "layout" && !["badge", "caption"].includes(node.variant)) {
+      const label = pressableLabel(node.children, values);
+      if (label) return label;
+    }
+  }
+  return "";
+}
+
+function compileNode(element: Element, states: WidgetScope, label = ""): WidgetNode | undefined {
+  if (states.repeatDepth && states.context.remaining-- <= 0) return undefined;
   const tag = element.tag;
   switch (tag) {
+    case "each":
+    case "chat-repeat": {
+      const children = compileRepeat(element, states);
+      return children ? { kind: "layout", variant: "col", children } : undefined;
+    }
     case "radio-group":
     case "segmented-control":
     case "segmented": {
-      const name = stateBinding(element, states);
-      const options = parseOptions(element);
-      if (!name || !options?.length || options.length > 40) return undefined;
+      const numericBinding = tag === "radio-group" ? undefined : numericSelectBinding(element, states);
+      const binding = fieldBinding(element, states) ?? (numericBinding ? { name: numericBinding } : undefined);
+      const options = parseOptions(element, states);
+      if (!binding || !options?.length || options.length > 40) return undefined;
       const values = new Set(options.map((option) => option.value));
-      const initial = states.get(name)?.initial;
-      if (values.size !== options.length || typeof initial !== "string" || !values.has(initial)) return undefined;
-      return { kind: "radio", name, label: label || attrString(element, "label") || "请选择", options, segmented: tag !== "radio-group", horizontal: attrString(element, "direction") === "row" };
+      const initial = states.get(binding.name)?.initial;
+      const segmented = tag !== "radio-group";
+      if (values.size !== options.length || (numericBinding
+        ? !values.has(String(initial)) || options.some(({ value }) => value === "" || !Number.isFinite(Number(value)) || String(Number(value)) !== value)
+        : typeof initial !== "string" || (segmented && !values.has(initial)))) return undefined;
+      return { kind: "radio", ...binding, label: label || attrString(element, "label") || "请选择", options, segmented,
+        required: !segmented && typeof initial === "string" && !values.has(initial),
+        horizontal: attrString(element, "direction") === "row", numeric: Boolean(numericBinding), block: attrBoolean(element, "block") };
     }
+    case "switch":
+    case "toggle":
     case "checkbox": {
-      const name = stateBinding(element, states, "checked");
+      const name = stateBinding(element, states, "checked") ?? (tag === "checkbox" ? undefined : stateBinding(element, states));
       const collection = collectionCheckbox(element, states);
-      const label = attrString(element, "label") ?? (collection?.item || element.inner.trim());
-      if (!label || element.children.some((child) => typeof child !== "string")) return undefined;
-      if (collection) return { kind: "checkbox", ...collection, label };
-      return name && typeof states.get(name)?.initial === "boolean" ? { kind: "checkbox", name, label } : undefined;
+      const indexed = indexedCheckbox(element, states);
+      const text = /^\{([^{}]+)\}$/.exec(element.inner.trim());
+      const explicitLabel = attrString(element, "label", states);
+      const label = explicitLabel ?? (text ? valueExpression(parseExpression(text[1]), states) : element.inner.trim() || collection?.item);
+      if (typeof label !== "string" || !label || element.children.some((child) => typeof child !== "string")) return undefined;
+      const binding = collection ?? indexed;
+      if (binding) return { kind: "checkbox", ...binding, label, compact: Boolean(collection && !explicitLabel && !element.inner.trim()) };
+      return name && typeof states.get(name)?.initial === "boolean" ? { kind: "checkbox", name, label, switch: tag !== "checkbox" } : undefined;
     }
     case "select": {
-      const name = stateBinding(element, states);
-      const options = parseOptions(element);
-      if (!name || !options || options.length > 40) return undefined;
-      if (!options.some((option) => option.value === states.get(name)?.initial)) return undefined;
-      return { kind: "select", name, label: label || attrText(element, "label") || "请选择", options };
+      const binding = fieldBinding(element, states);
+      const options = parseOptions(element, states);
+      if (!binding || !options || options.length > 40) return undefined;
+      if (!options.some((option) => option.value === states.get(binding.name)?.initial)) return undefined;
+      return { kind: "select", ...binding, label: label || attrText(element, "label") || "请选择", options };
     }
     case "slider": {
       const name = stateBinding(element, states);
@@ -728,6 +1160,48 @@ function compileNode(element: Element, states: Map<string, State>, label = ""): 
     case "Chart":
     case "chart":
       return compileChart(element, states);
+    case "table": {
+      const children = compileChildren(element, states);
+      if (!children?.length) return undefined;
+      const rows: Extract<WidgetNode, { kind: "table-row" }>[] = [];
+      const unsupportedRepeats: Extract<WidgetNode, { kind: "unsupported" }>[] = [];
+      for (const child of children) {
+        if (child.kind === "table-row") rows.push(child);
+        else if (child.kind === "unsupported" && child.tag === "each") unsupportedRepeats.push(child);
+        else return undefined;
+      }
+      if (!rows.length || !rows.every((row) => row.children.length === rows[0].children.length)) return undefined;
+      return { kind: "table", label: attrString(element, "label"), children: rows,
+        ...(unsupportedRepeats.length ? { unsupportedRepeats } : {}) };
+    }
+    case "table-row": {
+      const children = compileChildren(element, states);
+      if (!children?.length || children.length > 20 || !children.every((child): child is Extract<WidgetNode, { kind: "table-cell" }> => child.kind === "table-cell")) return undefined;
+      return { kind: "table-row", children };
+    }
+    case "table-cell": {
+      const children = compileChildren(element, states);
+      const align = attrString(element, "align");
+      const width = /^(\d{1,2}|100)%$/.exec(attrString(element, "width") ?? "");
+      return children ? { kind: "table-cell", children, align: align === "center" || align === "end" ? align : undefined, width: width ? Number(width[1]) : undefined } : undefined;
+    }
+    case "Math":
+    case "math": {
+      const latex = rawContent(element, ["latex", "tex", "expression", "formula", "content", "value"], states).trim()
+        .replace(/^\$\$([\s\S]+)\$\$$|^\$([^$\n]+)\$$|^\\\[([\s\S]+)\\\]$|^\\\(([^\n]+)\\\)$/, (_, a, b, c, d) => a ?? b ?? c ?? d).trim();
+      return latex && latex.length <= 8000 ? { kind: "math", latex, inline: attrBoolean(element, "inline") === true || attrBoolean(element, "display") === false } : undefined;
+    }
+    case "CodeBlock":
+    case "code-block": {
+      const source = rawContent(element, ["code", "content", "text", "value"], states);
+      const language = attrString(element, "language") ?? attrString(element, "lang");
+      return source && source.length <= 30000 ? { kind: "code", source, language: language && /^[\w.+-]{1,24}$/.test(language) ? language : undefined } : undefined;
+    }
+    case "progress": {
+      const value = attrValue(element, "value", states);
+      const max = attrNumber(element, "max") ?? 100;
+      return value !== undefined && max > 0 ? { kind: "progress", value, max, label: attrString(element, "label") ?? "进度" } : undefined;
+    }
     case "chat-condition": {
       const test = parseExpression(attrExpression(element, "test"));
       const value = valueExpression(test, states);
@@ -752,7 +1226,7 @@ function compileNode(element: Element, states: Map<string, State>, label = ""): 
       return children ? { kind: "list-item", children } : undefined;
     }
     case "icon":
-      return { kind: "icon", name: attrString(element, "name", states) ?? "", size: attrString(element, "size") };
+      return { kind: "icon", name: attrValue(element, "name", states) ?? "", size: attrString(element, "size"), color: attrValue(element, "color", states) };
     case "favicon":
       return { kind: "icon", name: "globe" };
     case "Entity":
@@ -786,10 +1260,11 @@ function compileNode(element: Element, states: Map<string, State>, label = ""): 
     case "form": {
       const handler = attrExpression(element, "onSubmit");
       const action = parseAction(handler, states);
-      if (handler && (!action || !("submit" in action))) return undefined;
+      if (element.attributes.has("onSubmit") && !action) return undefined;
       const children = compileChildren(element, states);
-      if (!children || children.some((child) => widgetHas(child, (node) => node.kind === "form"))) return undefined;
-      return { kind: "form", label: attrString(element, "label"), submit: action && "submit" in action ? action.submit : undefined, children };
+      if (!children || children.some((child) => widgetHas(child, (node) => node.kind === "form" || node.kind === "unsupported"))) return undefined;
+      return { kind: "form", label: attrString(element, "label"), submit: action && "submit" in action ? action.submit : undefined,
+        action: action && !("submit" in action) ? action : undefined, children };
     }
     case "popover": {
       const trigger = element.children.find((child): child is Element => typeof child !== "string" && child.tag === "popover-trigger");
@@ -806,10 +1281,16 @@ function compileNode(element: Element, states: Map<string, State>, label = ""): 
       return children?.length ? { kind: "carousel", label: attrString(element, "label") ?? attrString(element, "title") ?? "内容轮播", binding, showArrows: attrBoolean(element, "showArrows") ?? true, children } : undefined;
     }
     case "pressable": {
-      const action = parseAction(attrExpression(element, "onClick"), states);
+      const action = element.attributes.has("onClick") ? parseAction(attrExpression(element, "onClick"), states) : { updates: [] };
       const children = compileChildren(element, states);
-      if (!action || !children?.length || children.some((child) => widgetHas(child, (node) => !["layout", "markdown", "icon", "spacer", "divider", "svg"].includes(node.kind)))) return undefined;
-      return { kind: "pressable", action, children, label: attrString(element, "label") ?? "切换卡片状态", options: layoutOptions(element) };
+      if (!action || !children?.length || children.some((child) => widgetHas(child, (node) =>
+        !["layout", "markdown", "icon", "spacer", "divider", "svg", "condition"].includes(node.kind)))) return undefined;
+      const label = attrString(element, "label", states) || pressableLabel(children, states.snapshot());
+      const options = layoutOptions(element, states);
+      const background = options.background;
+      const pressed: Value | undefined = typeof background === "object" && "choose" in background ? background.choose[0] : undefined;
+      return { kind: "pressable", action, children, label: label || "切换卡片状态", options,
+        pressed: attrValue(element, "aria-pressed", states) ?? pressed, expanded: attrValue(element, "aria-expanded", states) ?? attrValue(element, "ariaExpanded", states) };
     }
     case "AsyncVideo":
     case "video": {
@@ -841,12 +1322,20 @@ function compileNode(element: Element, states: Map<string, State>, label = ""): 
     case "follow-up": {
       const prompt = attrString(element, "prompt");
       const handler = attrExpression(element, "onClick");
-      const action: Action | undefined = handler ? parseAction(handler, states)
+      const action = element.attributes.has("onClick") ? parseAction(handler, states)
         : prompt ? { submit: prompt }
-          : attrString(element, "type") === "submit" ? { submitForm: true } : undefined;
+          : attrString(element, "type") === "submit" || attrBoolean(element, "submit") ? { submitForm: true as const }
+            : tag === "button" ? { updates: [] } : undefined;
       const children = element.children.length ? compileChildren(element, states) : [compileText(attrString(element, "label") ?? "继续", states)];
+      const disabled = attrValue(element, "disabled", states);
+      const icon = children?.find((child) => child.kind === "icon");
+      const label = attrString(element, "label") ?? (action && "adjust" in action ? `${action.adjust.change > 0 ? "增加" : "减少"} ${action.adjust.name}`
+        : children?.every((child) => child.kind === "icon") ? icon?.name : undefined);
       return action && children?.length && children.every((child) => child.kind === "icon" || child.kind === "markdown")
-        ? { kind: "button", action, children, color: attrString(element, "color"), style: attrString(element, "variant"), label: "adjust" in action ? `${action.adjust.change > 0 ? "增加" : "减少"} ${action.adjust.name}` : undefined }
+        && (!element.attributes.has("disabled") || disabled !== undefined)
+        ? { kind: "button", action, children, color: attrValue(element, "color", states), style: attrValue(element, "variant", states),
+          disabled, loading: attrValue(element, "loading", states), block: attrBoolean(element, "block"), uniform: attrBoolean(element, "uniform"),
+          size: attrString(element, "size"), label: typeof label === "string" ? label : undefined }
         : undefined;
     }
     case "box":
@@ -862,19 +1351,59 @@ function compileNode(element: Element, states: Map<string, State>, label = ""): 
     case "title":
     case "text":
     case "caption":
+    case "label":
+    case "blockquote":
+    case "callout":
     case "badge": {
       const children = compileChildren(element, states);
-      const options = layoutOptions(element);
+      const options = layoutOptions(element, states);
       options.color = attrText(element, "color") ?? valueExpression(parseExpression(attrExpression(element, "color")), states);
       return children ? { kind: "layout", variant: tag === "column" ? "col" : tag === "flow" ? "grid" : tag, options, children } : undefined;
     }
     default:
-      return { kind: "unsupported", tag, text: element.inner.slice(0, 2000) };
+      return { kind: "unsupported", tag, text: element.inner.slice(0, 2000), source: element.source };
   }
 }
 
-function expandWidgetDirectives(source: string): string {
-  return source.replace(/\{#each\s+(\[[^\r\n]*\])\s+as\s+([\w$]+)\s*\}([\s\S]*?)\{\/each\}/g, (original, list: string, alias: string, body: string) => {
+type WidgetDirective = { name: string; args: string; start: number; end: number };
+
+function* bracedRanges(text: string): Generator<[number, number]> {
+  const opening = /\{/g;
+  for (let match = opening.exec(text); match; match = opening.exec(text)) {
+    const end = readBraces(text, match.index);
+    if (end === undefined) continue;
+    yield [match.index, end];
+    opening.lastIndex = end;
+  }
+}
+
+function widgetDirectives(root: Element): WidgetDirective[] {
+  const directives: WidgetDirective[] = [];
+  function visit(element: Element): void {
+    if (mathTags.has(element.tag) || codeTags.has(element.tag)) return;
+    let cursor = element.contentStart;
+    for (const child of element.children) {
+      if (typeof child === "string") {
+        for (const [start, end] of bracedRanges(child)) {
+          const match = /^(#each|#if|\/each|\/if|:else)(?=\s|$)([\s\S]*)$/.exec(child.slice(start + 1, end - 1));
+          if (match) directives.push({ name: match[1], args: match[2].trim(), start: cursor + start, end: cursor + end });
+        }
+        cursor += child.length;
+      } else {
+        visit(child);
+        cursor = child.end;
+      }
+    }
+  }
+  visit(root);
+  return directives;
+}
+
+function expandLegacySliders(source: string, directives: ReadonlyMap<number, WidgetDirective>): string {
+  return source.replace(/\{#each\s+(\[[^\r\n]*\])\s+as\s+([\w$]+)\s*\}([\s\S]*?)\{\/each\}/g, (original, list: string, alias: string, body: string, offset: number) => {
+    const opening = directives.get(offset);
+    const closing = directives.get(offset + original.length - "{/each}".length);
+    if (opening?.name !== "#each" || closing?.name !== "/each") return original;
     const array = parseExpression(list);
     if (array?.type !== "ArrayExpression" || array.elements.length > 12 || !body.includes("<slider")) return original;
     const expanded = [];
@@ -888,43 +1417,105 @@ function expandWidgetDirectives(source: string): string {
       expanded.push(body.replace(new RegExp(`\\b${prefix}\\.(name|value|set)\\b`, "g"), (_, field) => field === "name" ? JSON.stringify(name.value) : field === "value" ? value.name : setter.name));
     }
     return expanded.join("");
-  }).replace(/\{#each\s+(\[[^\r\n]*?\])\s+as\s+([a-zA-Z_$][\w$]*)\s*\}/g, '<chat-repeat values={$1} alias="$2">')
-    .replace(/\{\/each\}/g, "</chat-repeat>")
-    .replace(/\{#if\s+([^{}\r\n]+?)\s*\}/g, "<chat-condition test={$1}>")
-    .replace(/\{:else\}/g, "<chat-otherwise/>")
-    .replace(/\{\/if\}/g, "</chat-condition>");
+  });
+}
+
+function expandElementDirectives(source: string, root: Element): string {
+  let directives = widgetDirectives(root).map((directive) => ({
+    ...directive, start: directive.start - root.start, end: directive.end - root.start,
+  }));
+  const original = source.slice(root.start, root.end);
+  const expanded = expandLegacySliders(original, new Map(directives.map((directive) => [directive.start, directive])));
+  if (expanded !== original) {
+    const element = readElement(expanded, 0);
+    if (!element) return expanded;
+    directives = widgetDirectives(element);
+  }
+
+  const parts: string[] = [];
+  let cursor = 0;
+  for (const { name, args, start, end } of directives) {
+    let markup: string | undefined;
+    if (name === "#each") {
+      const binding = /^([\s\S]+)\s+as\s+([A-Za-z_$][\w$]*)(?:\s*,\s*([A-Za-z_$][\w$]*))?$/.exec(args);
+      markup = binding
+        ? `<chat-repeat values={${binding[1]}} alias="${binding[2]}"${binding[3] ? ` index="${binding[3]}"` : ""}>`
+        : "<chat-repeat>";
+    } else if (name === "#if" && args) {
+      markup = `<chat-condition test={${args}}>`;
+    } else if (!args) {
+      markup = name === "/each" ? "</chat-repeat>" : name === "/if" ? "</chat-condition>" : "<chat-otherwise/>";
+    }
+    if (markup === undefined) continue;
+    parts.push(expanded.slice(cursor, start), markup);
+    cursor = end;
+  }
+  parts.push(expanded.slice(cursor));
+  return parts.join("");
+}
+
+function readDeclarations(source: string, states: Map<string, State>, inline = false): { end: number; valid: boolean; text: string } {
+  const lineStarts = /^[\t ]*(?=\{@body[\t ])/gm;
+  const mutable = /^const\s*\[\s*([A-Za-z_$][\w$]*)\s*,\s*([A-Za-z_$][\w$]*)\s*\]\s*=\s*DIL\.useState\(\s*([\s\S]+?)\s*\)$/;
+  const constant = /^const\s+([A-Za-z_$][\w$]*)\s*=\s*([\s\S]+)$/;
+  let cursor = 0;
+  let text = "";
+  let valid = true;
+  while (cursor < source.length) {
+    if (inline) {
+      lineStarts.lastIndex = cursor;
+      const start = lineStarts.exec(source);
+      if (!start) break;
+      text += source.slice(cursor, start.index);
+      cursor = lineStarts.lastIndex;
+    }
+    if (!source.startsWith("{@body", cursor) || !/\s/.test(source[cursor + 6] ?? "")) {
+      if (inline) valid = false;
+      break;
+    }
+    const end = readBraces(source, cursor);
+    if (end === undefined) {
+      valid = false;
+      break;
+    }
+    const body = source.slice(cursor + 6, end - 1).trim().replace(/;\s*$/, "");
+    cursor = end;
+    if (!inline) cursor += /^[ \t\r\n]*/.exec(source.slice(cursor))![0].length;
+    const state = mutable.exec(body);
+    const derived = state ? undefined : constant.exec(body);
+    const binding = state?.[1] ?? derived?.[1];
+    const setter = state?.[2];
+    const value = valueExpression(parseExpression(state?.[3] ?? derived?.[2]), state ? new Map() : states);
+    if (!binding || value === undefined || states.size >= 64 || states.has(binding) || [...states.values()].some((state) => state.loop)
+      || (setter && (binding === setter || states.has(setter) || [...states.values()].some((state) => state.setter === setter)))) {
+      valid = false;
+      continue;
+    }
+    const initial = stateValue(evaluateData(value, new Map([...states].map(([key, state]) => [key, state.initial]))));
+    if (state && initial === undefined) {
+      valid = false;
+      continue;
+    }
+    states.set(binding, { setter: setter ?? "", initial: initial ?? "", derived: derived ? value : undefined });
+  }
+  return { end: cursor, valid, text: text + source.slice(cursor) };
 }
 
 export function readChatWidget(source: string): { end: number; widget?: ChatWidget } | undefined {
-  const declaration = /\{@body\s+const\s*(?:\[\s*([\w$]+)\s*,\s*([\w$]+)\s*\]\s*=\s*DIL\.useState\(\s*("(?:[^"\\\r\n]|\\.)*"|'(?:[^'\\\r\n]|\\.)*'|\[[^\r\n]*?\]|-?\d+(?:\.\d+)?|true|false)\s*\)|([\w$]+)\s*=\s*([^{};\r\n]+))\s*;?\s*\}\s*/y;
-  const states = new Map<string, State>();
-  let cursor = 0;
-  let valid = true;
-  for (let match = declaration.exec(source); match; match = declaration.exec(source)) {
-    const [, name, setter, literal, derivedName, derivedSource] = match;
-    if (derivedName) {
-      const derived = valueExpression(parseExpression(derivedSource), states);
-      if (derived === undefined || states.has(derivedName)) valid = false;
-      else states.set(derivedName, { setter: "", initial: "", derived });
-      cursor = declaration.lastIndex;
-      continue;
-    }
-    const expression = parseExpression(literal);
-    const initial = expression?.type === "ArrayExpression" ? literalStrings(expression) : valueExpression(expression, new Map());
-    if (initial === undefined || (typeof initial === "object" && !Array.isArray(initial))) return undefined;
-    if (states.has(name) || [...states.values()].some((state) => state.setter === setter)) valid = false;
-    states.set(name, { setter, initial });
-    cursor = declaration.lastIndex;
-  }
+  const prelude = new Map<string, State>();
+  const { end: cursor, valid } = readDeclarations(source, prelude);
   const element = readElement(source, cursor);
   if (!element) return undefined;
   const original = source.slice(cursor, element.end);
-  const expanded = original.includes("{#each") || original.includes("{#if") ? expandWidgetDirectives(original) : original;
+  const expanded = original.includes("{#each") || original.includes("{#if") ? expandElementDirectives(source, element) : original;
   const display = expanded === original ? element : readElement(expanded, 0);
-  let root = valid && display ? compileNode(display, states) : undefined;
+  if (!valid || !display) return { end: element.end };
+  const states = new WidgetScope(prelude, { remaining: 800, dynamic: false });
+  let root = compileNode(display, states);
   const initial = new Map([...states].map(([name, state]) => [name, state.initial]));
   if (!root) return { end: element.end };
   let end = element.end;
+  let captionNode: WidgetNode | undefined;
   if (root.kind === "carousel" && root.binding) {
     const following = /^[\t ]*\r?\n[\r\n\t ]*/.exec(source.slice(end));
     if (following) {
@@ -933,14 +1524,21 @@ export function readChatWidget(source: string): { end: number; widget?: ChatWidg
       const suffix = caption && ["caption", "text"].includes(caption.tag) ? caption.inner : source.slice(offset).split(/\r?\n/, 1)[0];
       const fields = [...suffix.matchAll(/\{([^{}\r\n]+)\}/g)];
       if (suffix.length <= 250 && !/^[<#]/.test(suffix) && fields.length && fields.every((field) => valueExpression(parseExpression(field[1]), states) !== undefined)) {
-        root = { kind: "layout", variant: "col", children: [root, { kind: "layout", variant: "caption", children: [compileText(suffix, states)] }] };
+        captionNode = { kind: "layout", variant: "caption", children: [compileText(suffix, states)] };
+        root = { kind: "layout", variant: "col", children: [root, captionNode] };
         end = caption && ["caption", "text"].includes(caption.tag) ? caption.end : offset + suffix.length;
       }
     }
   }
   const explicitForm = widgetHas(root, (node) => node.kind === "form");
   const form = explicitForm || widgetHas(root, (node) => node.kind === "radio" || node.kind === "checkbox" || node.kind === "select" || node.kind === "input");
-  return { end, widget: { root, initial, form, explicitForm } };
+  const initialRoot = root;
+  const compileForState = states.context.dynamic && [...states.values()].some((state) => state.setter)
+    ? (values: ReadonlyMap<string, WidgetStateValue>): WidgetNode => {
+      const next = compileNode(display, new WidgetScope(prelude, { values, remaining: 800, dynamic: false }));
+      return next && captionNode ? { kind: "layout", variant: "col", children: [next, captionNode] } : next ?? initialRoot;
+    } : undefined;
+  return { end, widget: { root, initial, form, explicitForm, compileForState } };
 }
 
 export function chatWidgetInlineImages(widget: ChatWidget): WidgetImage[] {

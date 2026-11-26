@@ -14,12 +14,38 @@ import "katex/dist/katex.min.css";
 
 export async function copyReplyText(text: string): Promise<boolean> {
   try {
-    await navigator.clipboard.writeText(text);
-    return true;
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
   } catch {
-    toast.error("复制失败，请手动选择文字复制");
-    return false;
+    // Fall back to the browser's copy command on HTTP or when clipboard access is denied.
   }
+
+  const focused = document.activeElement;
+  const selection = window.getSelection();
+  const ranges = selection ? Array.from({ length: selection.rangeCount }, (_, index) => selection.getRangeAt(index).cloneRange()) : [];
+  const field = document.createElement("textarea");
+  field.value = text;
+  field.readOnly = true;
+  field.style.cssText = "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none";
+  document.body.append(field);
+  try {
+    field.focus({ preventScroll: true });
+    field.select();
+    if (document.execCommand("copy")) return true;
+  } catch {
+    // Both clipboard mechanisms can be blocked by the browser.
+  } finally {
+    field.remove();
+    if (focused instanceof HTMLElement) focused.focus({ preventScroll: true });
+    if (selection) {
+      selection.removeAllRanges();
+      for (const range of ranges) selection.addRange(range);
+    }
+  }
+  toast.error("复制失败，请手动选择文字复制");
+  return false;
 }
 
 let mermaidId = 0;
@@ -86,7 +112,7 @@ function downloadText(source: string, format: "csv" | "txt", filename: string): 
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function CodeBlock({ children, streaming, filenames }: { children?: ReactNode; streaming: boolean; filenames?: ReadonlyMap<string, string> }) {
+export function CodeBlock({ children, streaming, filenames }: { children?: ReactNode; streaming: boolean; filenames?: ReadonlyMap<string, string> }) {
   const ref = useRef<HTMLPreElement>(null);
   const [copied, setCopied] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
