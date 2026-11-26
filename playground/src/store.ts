@@ -27,6 +27,7 @@ import { POOL_AGENT_PROFILE_ID, POOL_PROFILE_ID, isPoolBuild, poolSettings } fro
 import { isPoolProfileId } from './lib/poolProfileIds'
 import { enforcePresetConfigPolicy, getPresetConfig, getPresetProfileIds, getPresetProviderIds, isPresetConfigDeletionPrevented, isPresetConfigOnlyEnabled, isPresetConfigParamsLocked, isPresetProfile, isPresetProviderDeletionPrevented } from './lib/presetConfig'
 import { dismissAllTooltips } from './lib/tooltipDismiss'
+import { loadGalleryDensity, saveGalleryDensity, type GalleryDensity } from './lib/galleryDensity'
 import { remapImageMentionsForOrder, replaceImageMentionsForApi } from './lib/promptImageMentions'
 import {
   getAllTasks,
@@ -353,8 +354,12 @@ export interface AppState extends CanvasSlice, SettingsSlice {
   setFilterStatus: (status: AppState['filterStatus']) => void
   filterFavorite: boolean
   setFilterFavorite: (f: boolean) => void
+  galleryDensity: GalleryDensity
+  setGalleryDensity: (density: GalleryDensity) => void
 
   // 多选
+  gallerySelectionMode: boolean
+  setGallerySelectionMode: (active: boolean) => void
   selectedTaskIds: string[]
   setSelectedTaskIds: (ids: string[] | ((prev: string[]) => string[])) => void
   toggleTaskSelection: (id: string, force?: boolean) => void
@@ -882,9 +887,20 @@ export const useStore = create<AppState>()(
       filterStatus: 'all',
       setFilterStatus: (filterStatus) => set({ filterStatus }),
       filterFavorite: false,
-      setFilterFavorite: (filterFavorite) => set(filterFavorite ? { filterFavorite, selectedTaskIds: [], selectedFavoriteCollectionIds: [] } : { filterFavorite, activeFavoriteCollectionId: null, selectedTaskIds: [], selectedFavoriteCollectionIds: [] }),
+      setFilterFavorite: (filterFavorite) => set(filterFavorite ? { filterFavorite, gallerySelectionMode: false, selectedTaskIds: [], selectedFavoriteCollectionIds: [] } : { filterFavorite, activeFavoriteCollectionId: null, gallerySelectionMode: false, selectedTaskIds: [], selectedFavoriteCollectionIds: [] }),
+      galleryDensity: loadGalleryDensity(),
+      setGalleryDensity: (galleryDensity) => {
+        saveGalleryDensity(galleryDensity)
+        set({ galleryDensity })
+      },
 
       // Selection
+      gallerySelectionMode: false,
+      setGallerySelectionMode: (active) => set((s) => (
+        active
+          ? { gallerySelectionMode: true }
+          : { gallerySelectionMode: false, selectedTaskIds: s.selectedTaskIds.length ? [] : s.selectedTaskIds }
+      )),
       selectedTaskIds: [],
       setSelectedTaskIds: (updater) => set((s) => ({
         selectedTaskIds: typeof updater === 'function' ? updater(s.selectedTaskIds) : updater
@@ -899,7 +915,7 @@ export const useStore = create<AppState>()(
             : s.selectedTaskIds.filter((x) => x !== id)
         }
       }),
-      clearSelection: () => set({ selectedTaskIds: [] }),
+      clearSelection: () => set({ selectedTaskIds: [], gallerySelectionMode: false }),
       selectedFavoriteCollectionIds: [],
       setSelectedFavoriteCollectionIds: (updater) => set((s) => ({
         selectedFavoriteCollectionIds: typeof updater === 'function' ? updater(s.selectedFavoriteCollectionIds) : updater

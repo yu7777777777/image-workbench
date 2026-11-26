@@ -113,6 +113,8 @@ export default function InputBar() {
   const setLightboxImageId = useStore((s) => s.setLightboxImageId)
   const showToast = useStore((s) => s.showToast)
   const setConfirmDialog = useStore((s) => s.setConfirmDialog)
+  const gallerySelectionMode = useStore((s) => s.gallerySelectionMode)
+  const setGallerySelectionMode = useStore((s) => s.setGallerySelectionMode)
   const selectedTaskIds = useStore((s) => s.selectedTaskIds)
   const setSelectedTaskIds = useStore((s) => s.setSelectedTaskIds)
   const clearSelection = useStore((s) => s.clearSelection)
@@ -204,20 +206,28 @@ export default function InputBar() {
   }, [filteredFavoriteCollectionCards, setSelectedFavoriteCollectionIds])
 
   const handleToggleFavorite = useCallback(() => {
+    if (selectedTaskIds.length === 0) return
     openFavoritePicker(selectedTaskIds)
   }, [openFavoritePicker, selectedTaskIds])
 
   const handleDeleteSelected = useCallback(() => {
+    if (selectedTaskIds.length === 0) return
+    const targetIds = [...selectedTaskIds]
     setConfirmDialog({
       title: '批量删除',
-      message: `确定要删除选中的 ${selectedTaskIds.length} 个任务吗？`,
+      message: `确定要删除选中的 ${targetIds.length} 个作品吗？删除后不可恢复。`,
+      confirmText: '确认删除',
+      cancelText: '取消',
+      tone: 'danger',
       action: () => {
-        removeMultipleTasks(selectedTaskIds)
+        removeMultipleTasks(targetIds)
+        setGallerySelectionMode(false)
       },
     })
-  }, [selectedTaskIds, setConfirmDialog])
+  }, [selectedTaskIds, setConfirmDialog, setGallerySelectionMode])
 
   const handleDownloadSelected = useCallback(async () => {
+    if (selectedTaskIds.length === 0) return
     const selectedTasks = tasks.filter((t) => selectedTaskIds.includes(t.id))
     const imageIds = selectedTasks.flatMap(t => t.outputImages || [])
     if (imageIds.length === 0) {
@@ -1772,7 +1782,7 @@ export default function InputBar() {
   )
 
   const showFavoriteCollectionBatchBar = inCollectionOverview && selectedFavoriteCollectionIds.length > 0
-  const showTaskBatchBar = !showFavoriteCollectionBatchBar && selectedTaskIds.length > 0
+  const showTaskBatchBar = !showFavoriteCollectionBatchBar && !isAgentMode && (gallerySelectionMode || selectedTaskIds.length > 0)
 
   return (
     <>
@@ -1786,6 +1796,13 @@ export default function InputBar() {
           allowAuto={!isFalTextToImage}
           codexCli={activeProfile.codexCli}
           codexPoolImage={isPoolProfile && isGptImage25Model(getImageGenerationModel(activeProfile))}
+        />
+      )}
+
+      {!isAgentMode && !promptExpanded && !inCollectionOverview && (
+        <div
+          aria-hidden="true"
+          className="studio-gallery-bottom-fade pointer-events-none fixed inset-x-0 bottom-0 z-20 h-36"
         />
       )}
 

@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState, useEffect, useLayoutEffect } from 'react'
 import { useStore, reuseConfig, editOutputs, removeTask, taskMatchesFilterStatus, taskMatchesSearchQuery } from '../store'
 import { ALL_FAVORITES_COLLECTION_ID, getTaskFavoriteCollectionIds } from '../lib/favoriteState'
+import { computeGalleryColumns, getGalleryDensitySpec } from '../lib/galleryDensity'
 import TaskCard from './TaskCard'
 
 export default function TaskGrid() {
@@ -8,11 +9,15 @@ export default function TaskGrid() {
   const searchQuery = useStore((s) => s.searchQuery)
   const filterStatus = useStore((s) => s.filterStatus)
   const filterFavorite = useStore((s) => s.filterFavorite)
+  const galleryDensity = useStore((s) => s.galleryDensity)
+  const densitySpec = getGalleryDensitySpec(galleryDensity)
   const activeFavoriteCollectionId = useStore((s) => s.activeFavoriteCollectionId)
   const defaultFavoriteCollectionId = useStore((s) => s.defaultFavoriteCollectionId)
   const setDetailTaskId = useStore((s) => s.setDetailTaskId)
   const setConfirmDialog = useStore((s) => s.setConfirmDialog)
+  const gallerySelectionMode = useStore((s) => s.gallerySelectionMode)
   const selectedTaskIds = useStore((s) => s.selectedTaskIds)
+  const isSelectionActive = gallerySelectionMode || selectedTaskIds.length > 0
   const setSelectedTaskIds = useStore((s) => s.setSelectedTaskIds)
   const clearSelection = useStore((s) => s.clearSelection)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -65,28 +70,28 @@ export default function TaskGrid() {
     })
   }, [tasks, searchQuery, filterStatus, filterFavorite, activeFavoriteCollectionId, defaultFavoriteCollectionId])
 
-  const [columns, setColumns] = useState(1)
+  const [columns, setColumns] = useState(densitySpec.mobileColumns)
   useLayoutEffect(() => {
     const root = rootRef.current
     if (!root) return
-    // 使用内容区宽度，同时驱动网格、虚拟滚动和框选计算。
+    // 使用内容区宽度与当前画廊密度，同时驱动网格、虚拟滚动和框选计算。
     const resize = () => {
       const width = root.clientWidth
-      setColumns(width < 600 ? 1 : Math.max(2, Math.floor((width + 16) / 296)))
+      setColumns(computeGalleryColumns(width, galleryDensity))
     }
     const observer = new ResizeObserver(resize)
     observer.observe(root)
     resize()
     return () => observer.disconnect()
-  }, [filteredTasks.length > 0])
+  }, [filteredTasks.length > 0, galleryDensity])
   const virtualize = filteredTasks.length > 80
   const totalRows = Math.ceil(filteredTasks.length / columns)
-  // 卡片高度随内容变化（提示词行数、参考图条数），固定按 430px 估算会让占位块
-  // 与真实行高不一致：滚动时浏览器不断修正 scrollTop，表现为画面跳回上方、
-  // 下方留白、继续滚动才渲染出新卡片。这里改为测量已渲染卡片的真实高度。
-  const rowMetricsRef = useRef({ height: 260, gap: 16 })
+  // 卡片高度随列宽变化，通过实测已渲染卡片高度作为虚拟列表行高基准。
+  const rowMetricsRef = useRef({ height: densitySpec.estimatedCardHeight, gap: densitySpec.gap })
   const [metricsVersion, setMetricsVersion] = useState(0)
   const estimatedRowHeight = rowMetricsRef.current.height + rowMetricsRef.current.gap
+  const marqueeLayoutRef = useRef({ columns, gap: densitySpec.gap, estimatedRowHeight, filteredTasks })
+  marqueeLayoutRef.current = { columns, gap: densitySpec.gap, estimatedRowHeight, filteredTasks }
   const rootTop = rootRef.current ? rootRef.current.getBoundingClientRect().top + window.scrollY : 0
   const relativeScroll = Math.max(0, window.scrollY - rootTop)
   const firstVisibleRow = virtualize ? Math.max(0, Math.floor(relativeScroll / estimatedRowHeight) - 2) : 0
@@ -126,9 +131,9 @@ export default function TaskGrid() {
   // 会让基准回落到默认估算值（276px），与真实行高（约 430px）偏差过大，占位块
   // 高度骤变导致文档高度剧烈变化，浏览器钳制 scrollTop，页面表现为自己乱跳。
   useEffect(() => {
-    rowMetricsRef.current = { height: 260, gap: 16 }
+    rowMetricsRef.current = { height: densitySpec.estimatedCardHeight, gap: densitySpec.gap }
     setMetricsVersion((value) => value + 1)
-  }, [columns])
+  }, [columns, densitySpec.estimatedCardHeight, densitySpec.gap])
 
   // 删除任务后把锚点卡片吸回原位：删除会让后续卡片整体上移一行，浏览器还可能
   // 因文档变矮钳制 scrollTop。这里在浏览器绘制前把差值补回，消除视觉跳动。
@@ -179,7 +184,7 @@ export default function TaskGrid() {
           }
           suppressClickUntil.current = 0
           const isCtrl = isMac ? e.metaKey : e.ctrlKey
-          if (isCtrl) {
+          if (isCtrl || isSelectionActive) {
             useStore.getState().toggleTaskSelection(task.id)
             return
           }
@@ -190,6 +195,7 @@ export default function TaskGrid() {
         onEditOutputs={() => editOutputs(task)}
         onDelete={() => handleDelete(task)}
         isSelected={selectedTaskIds.includes(task.id)}
+        selectionMode={isSelectionActive}
       />
     </div>
   )
@@ -242,21 +248,21 @@ export default function TaskGrid() {
     })
     const rootRect = rootRef.current?.getBoundingClientRect()
     const gridWidth = rootRect?.width ?? gridRef.current.clientWidth
-    const gap = 16
-    const cardWidth = Math.max(0, (gridWidth - gap * (columns - 1)) / columns)
+    const { columns: liveColumns, gap, estimatedRowHeight: liveRowHeight, filteredTasks: liveTasks } = marqueeLayoutRef.current
+    const cardWidth = Math.max(0, (gridWidth - gap * (liveColumns - 1)) / liveColumns)
 
-    filteredTasks.forEach((task, index) => {
+    liveTasks.forEach((task, index) => {
       const rendered = renderedRects.get(task.id)
-      const row = Math.floor(index / columns)
-      const column = index % columns
+      const row = Math.floor(index / liveColumns)
+      const column = index % liveColumns
       const cardLeft = rendered
         ? rendered.left + window.scrollX
         : (rootRect?.left ?? 0) + window.scrollX + column * (cardWidth + gap)
       const cardTop = rendered
         ? rendered.top + window.scrollY
-        : (rootRect?.top ?? 0) + window.scrollY + row * estimatedRowHeight
+        : (rootRect?.top ?? 0) + window.scrollY + row * liveRowHeight
       const cardRight = rendered ? rendered.right + window.scrollX : cardLeft + cardWidth
-      const cardBottom = rendered ? rendered.bottom + window.scrollY : cardTop + estimatedRowHeight - gap
+      const cardBottom = rendered ? rendered.bottom + window.scrollY : cardTop + liveRowHeight - gap
       const isIntersecting = minX < cardRight && maxX > cardLeft && minY < cardBottom && maxY > cardTop
 
       if (isIntersecting) {
@@ -293,7 +299,7 @@ export default function TaskGrid() {
         document.body.classList.remove('select-none')
         document.body.classList.remove('drag-selecting')
       }
-      if (isDragging.current && clearEmptySurfaceClick && !hasDragged.current && !startedOnCard.current && !startedWithCtrl.current) {
+      if (isDragging.current && clearEmptySurfaceClick && !hasDragged.current && !startedOnCard.current && !startedWithCtrl.current && !useStore.getState().gallerySelectionMode) {
         clearSelection()
       }
       if (isDragging.current && suppressClick && hasDragged.current) {
@@ -443,7 +449,11 @@ export default function TaskGrid() {
     >
       <div ref={gridRef}>
         {virtualize && <div aria-hidden style={{ height: firstVisibleRow * estimatedRowHeight + rowMetricsRef.current.gap }} />}
-        <div className="grid gap-4 pb-10" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+        <div
+          data-density={galleryDensity}
+          className="grid pb-10"
+          style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gap: `${densitySpec.gap}px` }}
+        >
           {visibleTasks.map(renderTask)}
         </div>
         {virtualize && <div aria-hidden style={{ height: Math.max(0, (totalRows - lastVisibleRow) * estimatedRowHeight - rowMetricsRef.current.gap) + 40 }} />}

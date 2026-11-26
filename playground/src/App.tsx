@@ -200,7 +200,7 @@ export default function App() {
         </ErrorBoundary>
       ) : (
         <main data-home-main data-drag-select-surface className={inCollectionOverview ? "studio-gallery [--input-bar-clearance:0px]" : "studio-gallery"}>
-          <div className="safe-area-x mx-auto w-full max-w-[1680px] px-4 sm:px-6 lg:px-8">
+          <div className="safe-area-x w-full px-4 sm:px-6 lg:px-8">
             <SearchBar />
             {inCollectionOverview ? <FavoriteCollectionsView /> : <TaskGrid />}
           </div>

@@ -3,11 +3,6 @@ import type { TaskRecord } from '../types'
 import { useStore, retryTask } from '../store'
 import { ensureImageThumbnailCached, subscribeImageThumbnail } from '../lib/imageCache'
 import { formatImageRatio } from '../lib/size'
-import { getImageActualParams, getImageRequestedParams } from '../lib/imageActualParams'
-import { getParamDisplay, ActualValueBadge } from '../lib/paramDisplay'
-import { DEFAULT_FAL_MODEL, DEFAULT_IMAGES_MODEL } from '../lib/apiProfiles'
-import { isAgentTaskPromptPending } from '../lib/taskPromptDisplay'
-import { CodeIcon, TransparentBgIcon } from './icons'
 import ViewportTooltip from './ViewportTooltip'
 
 interface Props {
@@ -17,6 +12,7 @@ interface Props {
   onDelete: () => void
   onClick: (e: React.MouseEvent | React.TouchEvent) => void
   isSelected?: boolean
+  selectionMode?: boolean
   disableSwipe?: boolean
   adaptiveAspect?: boolean
 }
@@ -67,6 +63,7 @@ export default function TaskCard({
   onDelete,
   onClick,
   isSelected,
+  selectionMode = false,
   disableSwipe,
   adaptiveAspect = false,
 }: Props) {
@@ -310,42 +307,12 @@ export default function TaskCard({
       : 'bg-blue-500'
     : 'bg-gray-200 dark:bg-gray-700'
 
-  const qualityDisplay = getParamDisplay(task, 'quality')
-  const showQuality = task.params.quality !== 'auto' || qualityDisplay.isMismatch
-
-  const sizeDisplay = getParamDisplay(task, 'size')
-  const showSize = task.params.size !== 'auto' || sizeDisplay.isMismatch
-
-  const formatDisplay = getParamDisplay(task, 'output_format')
-  const showFormat = task.params.output_format !== 'png' || formatDisplay.isMismatch
   const showTransparentOutput = task.transparentOutput || task.params.transparent_output
   const isTransparentOutput = Boolean(showTransparentOutput || (task.params as unknown as Record<string, unknown> | undefined)?.background === 'transparent')
-
-  const nDisplay = getParamDisplay(task, 'n')
-  const isAgentTask = task.sourceMode === 'agent' || Boolean(task.agentConversationId || task.agentRoundId)
-
-  // 封面图真实像素与请求参数的对比（不一致时徽章显示实际值）
-  const coverActualParams = coverDims ? getImageActualParams(task, coverDims.width, coverDims.height) : null
-  const coverRequestedParams = getImageRequestedParams(task)
-  const coverRatioMismatch = Boolean(
-    coverActualParams?.aspect_ratio
-    && coverRequestedParams.aspect_ratio
-    && coverActualParams.aspect_ratio !== coverRequestedParams.aspect_ratio,
-  )
-  const coverSizeMismatch = Boolean(
-    coverActualParams?.size
-    && task.params.size !== 'auto'
-    && `${task.params.size.replace(/×/g, 'x')}` !== coverActualParams.size,
-  )
-  const showPendingPrompt = isAgentTaskPromptPending(task)
-  const showN = !isAgentTask && (task.params.n > 1 || nDisplay.isMismatch)
   const outputErrorCount = task.outputErrors?.length ?? 0
   const outputSuccessCount = task.outputImages?.length ?? 0
   const requestedOutputCount = Math.max(task.params.n, outputSuccessCount + outputErrorCount)
   const hasPartialOutputFailure = task.status === 'done' && outputErrorCount > 0
-
-  const defaultModelForProvider = task.apiProvider === 'fal' ? DEFAULT_FAL_MODEL : DEFAULT_IMAGES_MODEL
-  const showModel = task.apiModel && task.apiModel !== defaultModelForProvider
   const isInterrupted = task.status === 'error' && task.error === '已停止生成。'
 
   return (
@@ -369,13 +336,13 @@ export default function TaskCard({
 
       <div
         ref={cardRef}
-        className={`studio-task-surface relative rounded-2xl border overflow-hidden cursor-pointer touch-pan-y will-change-transform duration-200 ${
+        className={`studio-task-surface group relative rounded-2xl border overflow-hidden cursor-pointer touch-pan-y will-change-transform duration-200 ${
           !isSwiping ? 'transition-[box-shadow,border-color,background-color,transform]' : 'transition-[box-shadow,border-color,background-color]'
         } ${
           task.status === 'running'
-            ? 'border-blue-400 generating'
+            ? 'border-blue-400/80 generating'
             : isSelected
-            ? 'border-blue-500 shadow-md ring-2 ring-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.15)]'
+            ? 'studio-task-selected'
             : 'studio-task-neutral'
         }`}
         onClick={(e) => {
@@ -410,13 +377,26 @@ export default function TaskCard({
           }
         }}
       >
-        {/* 选中时的角标 */}
-      {isSelected && (
-        <div className="absolute top-2 right-2 z-10 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center shadow-sm">
-          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+        {/* 批量选择勾选角标：选中态或选择模式下常驻右上角 */}
+      {(selectionMode || isSelected) && (
+        <button
+          type="button"
+          aria-label={isSelected ? '取消勾选此作品' : '勾选此作品'}
+          aria-pressed={Boolean(isSelected)}
+          onClick={(e) => {
+            e.stopPropagation()
+            toggleTaskSelection(task.id)
+          }}
+          className={`absolute top-2 right-2 z-20 flex h-6 w-6 items-center justify-center rounded-full border transition-all ${
+            isSelected
+              ? 'border-[#315b73] bg-[#315b73] text-white shadow-sm'
+              : 'border-slate-400/70 bg-white/88 text-transparent hover:border-[#315b73] hover:bg-white shadow-sm backdrop-blur-md dark:border-white/35 dark:bg-gray-900/75 dark:hover:border-blue-400'
+          }`}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.75} d="M5 13l4 4L19 7" />
           </svg>
-        </div>
+        </button>
       )}
       <div className="studio-task-layout">
         {/* 左侧图片区域 */}
@@ -494,9 +474,9 @@ export default function TaskCard({
             </div>
           )}
           {task.status === 'error' && !isFalReconnecting && (
-            <div className="flex flex-col items-center gap-1 px-2">
+            <div className="flex flex-col items-center gap-1.5 px-4 text-center">
               <svg
-                className={`w-7 h-7 ${isInterrupted ? 'text-yellow-400' : 'text-red-400'}`}
+                className={`w-7 h-7 ${isInterrupted ? 'text-amber-500' : 'text-red-400'}`}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -508,9 +488,24 @@ export default function TaskCard({
                   d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
-              <span className={`text-xs text-center leading-tight ${isInterrupted ? 'text-yellow-500' : 'text-red-400'}`}>
-                {isInterrupted ? '已停止' : '失败'}
+              <span className={`text-xs font-medium leading-tight ${isInterrupted ? 'text-amber-600 dark:text-amber-400' : 'text-red-500 dark:text-red-400'}`}>
+                {isInterrupted ? '已停止' : '生成失败'}
               </span>
+              {task.error && !isInterrupted && (
+                <p className="max-w-full truncate text-[11px] text-gray-400 dark:text-gray-500" title={task.error}>
+                  {task.error}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void retryTask(task)
+                }}
+                className="mt-1 rounded-full border border-gray-200/80 bg-white/90 px-3 py-1 text-[11px] font-medium text-gray-600 transition hover:bg-white hover:text-gray-900 dark:border-white/10 dark:bg-white/[0.08] dark:text-gray-200 dark:hover:bg-white/[0.14]"
+              >
+                重试
+              </button>
             </div>
           )}
           {task.status === 'done' && thumbSrc && (
@@ -524,8 +519,8 @@ export default function TaskCard({
                 alt=""
               />
               {(hasPartialOutputFailure || task.outputImages.length > 1) && (
-                <span className="absolute bottom-1 right-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">
-                  {hasPartialOutputFailure ? <>{requestedOutputCount} | <span className="font-semibold text-yellow-300">{outputSuccessCount}</span></> : task.outputImages.length}
+                <span className="studio-task-glass-pill absolute bottom-2 right-2 z-10 px-2 py-0.5 text-[11px] font-medium tabular-nums">
+                  {hasPartialOutputFailure ? <>{requestedOutputCount} | <span className="font-semibold text-amber-500 dark:text-amber-300">{outputSuccessCount}</span></> : task.outputImages.length}
                 </span>
               )}
             </>
@@ -545,141 +540,54 @@ export default function TaskCard({
               />
             </svg>
           )}
-          {/* 运行中显示耗时，完成后显示封面图比例与分辨率标签 */}
-          <div className="absolute top-1.5 left-1.5 flex items-center gap-1">
-            {showRunningTimer || task.status !== 'done' || !coverRatio || !coverSize ? (
-              <span className="flex items-center gap-1 bg-black/50 text-white text-[10px] sm:text-xs px-1.5 py-0.5 rounded backdrop-blur-sm font-mono">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                {duration}
-              </span>
-            ) : (
-              <>
-                {coverRatioMismatch && coverActualParams?.aspect_ratio ? (
-                  <ActualValueBadge
-                    value={coverActualParams.aspect_ratio}
-                    tooltip="图片实际值"
-                    className="rounded text-[10px] sm:text-xs px-1.5 py-0.5 font-mono"
-                  />
-                ) : (
-                  <span className="bg-black/50 text-white text-[10px] sm:text-xs px-1.5 py-0.5 rounded backdrop-blur-sm font-mono">
-                    {coverRatio}
-                  </span>
-                )}
-                {coverSizeMismatch && coverActualParams?.size ? (
-                  <ActualValueBadge
-                    value={coverActualParams.size.replace('x', '×')}
-                    tooltip="图片实际值"
-                    className="rounded text-[10px] sm:text-xs px-1.5 py-0.5 font-medium"
-                  />
-                ) : (
-                  <span className="bg-black/50 text-white/90 text-[10px] sm:text-xs px-1.5 py-0.5 rounded backdrop-blur-sm font-medium">
-                    {coverSize}
-                  </span>
-                )}
-              </>
-            )}
-          </div>
-        </div>
 
-        {/* 右侧信息区域 */}
-        <div className="studio-task-info flex-1 p-3 flex flex-col min-w-0">
-          <div className="studio-task-prompt-wrap flex-1 min-h-0 mb-2 overflow-hidden">
-            {showPendingPrompt ? (
-              <div className="leading-relaxed">
-                <p className="text-sm text-gray-700 dark:text-gray-300">正在生成……</p>
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">输入内容将在响应完成时接收</p>
-              </div>
-            ) : (
-              <p className="studio-task-prompt text-sm text-gray-700 dark:text-gray-300 leading-relaxed line-clamp-2">
-                {task.prompt || '(无提示词)'}
-              </p>
-            )}
-          </div>
-          <div className="mt-auto flex flex-col gap-1.5">
-            {/* 参数与信息：横向滚动 */}
-            <div 
-              data-tag-scroll-area
-              className="flex overflow-x-auto hide-scrollbar pt-0.5 gap-1.5 whitespace-nowrap mask-edge-r min-w-0 pr-2"
-              onTouchStart={(e) => e.stopPropagation()}
-              onTouchMove={(e) => e.stopPropagation()}
-              onTouchEnd={(e) => e.stopPropagation()}
-              onTouchCancel={(e) => e.stopPropagation()}
+          {/* 状态/规格徽章：与右上操作条统一采用同款毛玻璃胶囊，运行中常驻左上耗时，完成后悬停于左下轻柔浮现 */}
+          {(showRunningTimer || task.status !== 'done' || (coverRatio && coverSize)) && (
+            <div
+              className={`absolute left-2 z-10 flex items-center gap-1 pointer-events-none ${
+                showRunningTimer || task.status !== 'done'
+                  ? 'top-2 opacity-100'
+                  : 'bottom-2 studio-task-hover-reveal'
+              }`}
             >
-              {/* API Name */}
-              {(task.apiProfileName || task.apiProvider) && (
-                <span 
-                  className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-100 dark:bg-white/[0.04] text-gray-600 dark:text-gray-300 text-xs flex-shrink-0"
-                  title={task.apiProfileName || task.apiProvider}
-                >
-                  <CodeIcon className="w-3 h-3 flex-shrink-0 text-gray-400" />
-                  <span className="truncate max-w-[8rem]">
-                    {task.apiProfileName || task.apiProvider}
-                  </span>
-                </span>
-              )}
-              {/* Model */}
-              {showModel && (
-                <span 
-                  className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-100 dark:bg-white/[0.04] text-gray-600 dark:text-gray-300 text-xs flex-shrink-0"
-                  title={task.apiModel}
-                >
-                  <svg className="w-3 h-3 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+              {showRunningTimer || task.status !== 'done' || !coverRatio || !coverSize ? (
+                <span className="studio-task-glass-pill flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium tabular-nums">
+                  <svg className="w-3 h-3 opacity-75" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span className="truncate max-w-[8rem]">
-                    {task.apiModel}
-                  </span>
+                  {duration}
                 </span>
-              )}
-              {/* Mask */}
-              {task.maskImageId && (
-                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 text-xs flex-shrink-0">
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </svg>
-                  局部重绘
-                </span>
-              )}
-              {/* Transparent background */}
-              {showTransparentOutput && (
-                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs flex-shrink-0">
-                  <TransparentBgIcon className="w-3 h-3 flex-shrink-0" />
-                  透明背景
-                </span>
-              )}
-              {/* Params: only show if not default or mismatch */}
-              {showQuality && (
-                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-100 dark:bg-white/[0.04] text-xs flex-shrink-0">
-                  <span className="text-gray-400 dark:text-gray-500">质量</span>
-                  {qualityDisplay.isMismatch ? <ActualValueBadge value={qualityDisplay.displayValue} className="px-1 rounded-sm" /> : <span className="text-gray-600 dark:text-gray-300">{qualityDisplay.displayValue}</span>}
-                </span>
-              )}
-              {showSize && (
-                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-100 dark:bg-white/[0.04] text-xs flex-shrink-0">
-                  <span className="text-gray-400 dark:text-gray-500">尺寸</span>
-                  {sizeDisplay.isMismatch ? <ActualValueBadge value={sizeDisplay.displayValue} className="px-1 rounded-sm" /> : <span className="text-gray-600 dark:text-gray-300">{sizeDisplay.displayValue}</span>}
-                </span>
-              )}
-              {showFormat && (
-                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-100 dark:bg-white/[0.04] text-xs flex-shrink-0">
-                  <span className="text-gray-400 dark:text-gray-500">格式</span>
-                  {formatDisplay.isMismatch ? <ActualValueBadge value={formatDisplay.displayValue} className="px-1 rounded-sm" /> : <span className="text-gray-600 dark:text-gray-300">{formatDisplay.displayValue}</span>}
-                </span>
-              )}
-              {showN && (
-                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-100 dark:bg-white/[0.04] text-xs flex-shrink-0">
-                  <span className="text-gray-400 dark:text-gray-500">数量</span>
-                  {nDisplay.isMismatch ? <ActualValueBadge value={nDisplay.displayValue} className="px-1 rounded-sm" /> : <span className="text-gray-600 dark:text-gray-300">{nDisplay.displayValue}</span>}
+              ) : (
+                <span className="studio-task-glass-pill px-2.5 py-1 text-[11px] font-medium tabular-nums">
+                  {coverRatio} · {coverSize}
                 </span>
               )}
             </div>
-            {/* 操作按钮 */}
-            <div className="studio-task-actions relative ml-auto max-w-full">
+          )}
+
+          {/* 已收藏的轻星标（默认态仅显一颗克制金星，悬停时无缝切换为操作条；批量选择态隐藏避免与勾选框重叠） */}
+          {task.isFavorite && !isSelected && !selectionMode && (
+            <span
+              aria-hidden="true"
+              className="studio-task-favorite-pill pointer-events-none absolute top-2 right-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded-full text-amber-400 transition-opacity duration-150 group-hover:opacity-0 group-focus-within:opacity-0"
+            >
+              <svg className="w-3.5 h-3.5" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+                />
+              </svg>
+            </span>
+          )}
+
+          {/* 右上角悬停操作条（选中态或批量选择模式隐藏，避免遮挡勾选角标或误触） */}
+          {!isSelected && !selectionMode && (
+            <div className="studio-task-actions">
               <div
                 data-tag-scroll-area
-                className="flex items-center gap-1 flex-shrink-0 mt-0.5 max-w-full overflow-x-auto hide-scrollbar mask-edge-r pr-2"
+                className="flex items-center gap-0.5 flex-shrink-0 max-w-full overflow-x-auto hide-scrollbar"
                 onClick={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
                 onTouchMove={(e) => e.stopPropagation()}
@@ -690,9 +598,9 @@ export default function TaskCard({
                   <TaskActionButton
                     tooltip="重试任务"
                     onClick={() => retryTask(task)}
-                    className="p-1.5 rounded-md hover:bg-blue-50 dark:hover:bg-blue-950/30 text-gray-400 hover:text-blue-500 transition"
+                    className="p-1.5 rounded-full hover:bg-black/[0.06] dark:hover:bg-white/[0.1] text-gray-500 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                   </TaskActionButton>
@@ -700,14 +608,14 @@ export default function TaskCard({
                 <TaskActionButton
                   tooltip={task.isFavorite ? '编辑收藏夹' : '收藏任务'}
                   onClick={() => openFavoritePicker([task.id])}
-                  className={`p-1.5 rounded-md transition ${
+                  className={`p-1.5 rounded-full transition ${
                     task.isFavorite
-                      ? 'text-yellow-400 hover:bg-yellow-50 dark:hover:bg-yellow-500/10'
-                      : 'text-gray-400 hover:text-yellow-400 hover:bg-yellow-50 dark:hover:bg-yellow-500/10'
+                      ? 'text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/10'
+                      : 'text-gray-500 dark:text-gray-300 hover:text-amber-400 hover:bg-black/[0.06] dark:hover:bg-white/[0.1]'
                   }`}
                 >
                   <svg
-                    className="w-4 h-4"
+                    className="w-3.5 h-3.5"
                     fill={task.isFavorite ? 'currentColor' : 'none'}
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -723,10 +631,10 @@ export default function TaskCard({
                 <TaskActionButton
                   tooltip="复用配置"
                   onClick={onReuse}
-                  className="p-1.5 rounded-md hover:bg-blue-50 dark:hover:bg-blue-950/30 text-gray-400 hover:text-blue-500 transition"
+                  className="p-1.5 rounded-full hover:bg-black/[0.06] dark:hover:bg-white/[0.1] text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition"
                 >
                   <svg
-                    className="w-4 h-4"
+                    className="w-3.5 h-3.5"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -742,11 +650,11 @@ export default function TaskCard({
                 <TaskActionButton
                   tooltip="编辑输出"
                   onClick={onEditOutputs}
-                  className="p-1.5 rounded-md hover:bg-green-50 dark:hover:bg-green-950/30 text-gray-400 hover:text-green-500 transition disabled:opacity-30"
+                  className="p-1.5 rounded-full hover:bg-black/[0.06] dark:hover:bg-white/[0.1] text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition disabled:opacity-30"
                   disabled={!task.outputImages?.length}
                 >
                   <svg
-                    className="w-4 h-4"
+                    className="w-3.5 h-3.5"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -762,10 +670,10 @@ export default function TaskCard({
                 <TaskActionButton
                   tooltip="删除任务"
                   onClick={onDelete}
-                  className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-950/30 text-gray-400 hover:text-red-500 transition"
+                  className="p-1.5 rounded-full hover:bg-red-50 dark:hover:bg-red-950/40 text-gray-500 dark:text-gray-300 hover:text-red-500 dark:hover:text-red-400 transition"
                 >
                   <svg
-                    className="w-4 h-4"
+                    className="w-3.5 h-3.5"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -780,7 +688,7 @@ export default function TaskCard({
                 </TaskActionButton>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
       </div>
