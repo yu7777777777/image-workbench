@@ -2,6 +2,7 @@ import { useEffect, useRef, type ReactNode } from 'react'
 import { clearFailedTasks, useStore, taskMatchesFilterStatus, taskMatchesSearchQuery } from '../store'
 import { ALL_FAVORITES_COLLECTION_ID, getTaskFavoriteCollectionIds } from '../lib/favoriteState'
 import { GALLERY_DENSITY_OPTIONS, type GalleryDensity } from '../lib/galleryDensity'
+import { GALLERY_LAYOUT_OPTIONS, type GalleryLayoutMode } from '../lib/galleryLayout'
 import { useTooltip } from '../hooks/useTooltip'
 import Select from './Select'
 import { ChevronLeftIcon, CollectionManageIcon, FavoriteIcon, TrashIcon } from './icons'
@@ -81,6 +82,27 @@ function DensityGridIcon({ density }: { density: GalleryDensity }) {
   )
 }
 
+function LayoutModeIcon({ mode }: { mode: GalleryLayoutMode }) {
+  if (mode === 'masonry') {
+    return (
+      <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.45" aria-hidden="true">
+        <rect x="1.75" y="1.75" width="5" height="7.5" rx="1.2" />
+        <rect x="1.75" y="11.25" width="5" height="3" rx="0.9" />
+        <rect x="9.25" y="1.75" width="5" height="3.25" rx="0.9" />
+        <rect x="9.25" y="7" width="5" height="7.25" rx="1.2" />
+      </svg>
+    )
+  }
+  return (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.45" aria-hidden="true">
+      <rect x="1.75" y="1.75" width="5" height="5" rx="1.2" />
+      <rect x="9.25" y="1.75" width="5" height="5" rx="1.2" />
+      <rect x="1.75" y="9.25" width="5" height="5" rx="1.2" />
+      <rect x="9.25" y="9.25" width="5" height="5" rx="1.2" />
+    </svg>
+  )
+}
+
 export default function SearchBar() {
   const rootRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -93,6 +115,8 @@ export default function SearchBar() {
   const setFilterFavorite = useStore((s) => s.setFilterFavorite)
   const galleryDensity = useStore((s) => s.galleryDensity)
   const setGalleryDensity = useStore((s) => s.setGalleryDensity)
+  const galleryLayout = useStore((s) => s.galleryLayout)
+  const setGalleryLayout = useStore((s) => s.setGalleryLayout)
   const gallerySelectionMode = useStore((s) => s.gallerySelectionMode)
   const setGallerySelectionMode = useStore((s) => s.setGallerySelectionMode)
   const selectedTaskCount = useStore((s) => s.selectedTaskIds.length)
@@ -318,6 +342,28 @@ export default function SearchBar() {
               )}
             </button>
           )}
+          <div
+            role="group"
+            aria-label="画廊视图"
+            className="studio-density-switch inline-flex items-center p-0.5 rounded-lg border"
+          >
+            {GALLERY_LAYOUT_OPTIONS.map((option) => {
+              const active = galleryLayout === option.id
+              return (
+                <SearchActionButton
+                  key={option.id}
+                  tooltip={option.description}
+                  pressed={active}
+                  onClick={() => setGalleryLayout(option.id)}
+                  className={`studio-density-btn inline-flex items-center justify-center h-7 w-7 rounded-md transition-colors ${
+                    active ? 'studio-density-btn-active' : ''
+                  }`}
+                >
+                  <LayoutModeIcon mode={option.id} />
+                </SearchActionButton>
+              )
+            })}
+          </div>
           <div
             role="group"
             aria-label="画廊密度"
