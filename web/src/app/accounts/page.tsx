@@ -854,7 +854,7 @@ function AccountsPageContent() {
   };
 
   return (
-    <div className="space-y-5 pt-5">
+    <div className="admin-page space-y-5">
       <h1 className="sr-only">号池管理</h1>
       <section aria-label="号池操作" className="flex flex-wrap items-center gap-2">
         <Button

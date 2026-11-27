@@ -1,6 +1,9 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* The repository ignores runtime logs/ directories, including this route by name. */
+@source "./logs";
+
 html:has(.image-workspace-active),
 body:has(.image-workspace-active) {
   overflow: hidden !important;
@@ -186,6 +189,10 @@ body:has(.image-workspace-active) {
   padding-inline-start: 56px;
 }
 
+.admin-page {
+  padding-block-start: 32px;
+}
+
 .workspace-nav-rail {
   position: fixed;
   inset: 0 auto 0 0;
@@ -335,6 +342,10 @@ body:has(.image-workspace-active) {
 }
 
 @media (max-width: 639px) {
+  .admin-page {
+    padding-block-start: 20px;
+  }
+
   .app-shell-inner:has(> .workspace-nav-rail) {
     padding-inline-start: 0;
     padding-top: calc(48px + env(safe-area-inset-top));

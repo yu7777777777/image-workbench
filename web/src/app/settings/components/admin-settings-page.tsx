@@ -83,7 +83,7 @@ function SettingsDataController({ loadAccountSources }: { loadAccountSources: bo
 export default function AdminSettingsPageContent({ owner }: { owner: string }) {
   const [advancedSourcesOpen, setAdvancedSourcesOpen] = useState(false);
   return (
-    <div className="min-w-0 pt-5">
+    <div className="admin-page min-w-0">
       <SettingsDataController loadAccountSources={advancedSourcesOpen} />
       <SettingsHeader />
       <Tabs defaultValue="basic" className="gap-5">

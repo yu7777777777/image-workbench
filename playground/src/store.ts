@@ -3505,9 +3505,11 @@ async function executeAgentRound(
     )
 
     const latestTasks = useStore.getState().tasks
-    const existingTaskIds = new Set(latestTasks.map((task) => task.id))
-    const taskIds = streamingTaskIds.filter((taskId) => existingTaskIds.has(taskId))
-    const outputIds = taskIds.flatMap((taskId) => latestTasks.find((task) => task.id === taskId)?.outputImages ?? [])
+    const latestTasksById = new Map(latestTasks.map((task) => [task.id, task]))
+    const roundTasks = streamingTaskIds.flatMap((taskId) => latestTasksById.get(taskId) ?? [])
+    const taskIds = roundTasks.map((task) => task.id)
+    const outputIds = roundTasks.flatMap((task) => task.outputImages)
+    const failedTaskCount = roundTasks.filter((task) => task.status === 'error').length
     const latestConversation = useStore.getState().agentConversations.find((item) => item.id === conversationId)
     const latestRound = latestConversation?.rounds.find((item) => item.id === roundId)
     const deletedTasks = getDeletedAgentTasks()
@@ -3519,7 +3521,7 @@ async function executeAgentRound(
     const finalContent = [joinedText, limitNotice]
       .filter(Boolean)
       .join(joinedText ? '\n\n' : '')
-      || (taskIds.length > 0 || outputIds.length > 0 ? '图像已生成。' : '')
+      || (outputIds.length > 0 ? '图像已生成。' : failedTaskCount > 0 ? '图像生成失败。' : '')
 
     const assistantMessage: AgentMessage = {
       id: assistantMessageId,
@@ -3553,10 +3555,13 @@ async function executeAgentRound(
         : [...current.messages, assistantMessage],
     }))
 
-    useStore.getState().showToast(outputIds.length > 0 ? 'Agent 已生成图片' : 'Agent 已回复', 'success')
+    const completionTitle = failedTaskCount > 0
+      ? outputIds.length > 0 ? `已生成 ${outputIds.length} 张图片，${failedTaskCount} 次生图失败` : 'Agent 生图失败'
+      : outputIds.length > 0 ? 'Agent 已生成图片' : 'Agent 已回复'
+    useStore.getState().showToast(completionTitle, outputIds.length === 0 && failedTaskCount > 0 ? 'error' : 'success')
     showTaskCompletionNotification(
-      outputIds.length > 0 ? 'Agent 已生成图片' : 'Agent 已回复',
-      outputIds.length > 0 ? `Agent 回复已结束，共生成 ${outputIds.length} 张图片。` : 'Agent 回复已结束。',
+      completionTitle,
+      outputIds.length > 0 && failedTaskCount === 0 ? `Agent 回复已结束，共生成 ${outputIds.length} 张图片。` : 'Agent 回复已结束。',
     )
   } catch (err) {
     flushPendingAgentTextUpdatesForConversation(conversationId)
@@ -3614,7 +3619,13 @@ async function executeAgentRound(
             ],
       }
     })
-    useStore.getState().showToast(`Agent 请求失败：${message}`, 'error')
+    const completedImageCount = useStore.getState().tasks
+      .filter((task) => task.agentConversationId === conversationId && task.agentRoundId === roundId && task.status === 'done')
+      .reduce((count, task) => count + task.outputImages.length, 0)
+    useStore.getState().showToast(
+      completedImageCount > 0 ? `已生成 ${completedImageCount} 张图片，后续请求失败` : `Agent 请求失败：${message}`,
+      'error',
+    )
   } finally {
     if (agentRoundControllers.get(controllerKey) === controller) {
       agentRoundControllers.delete(controllerKey)

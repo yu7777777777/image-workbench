@@ -875,7 +875,8 @@ export default function AgentWorkspace() {
                 const favoriteTasksForRound = tasksForRound.filter((task) => (task.outputImages?.length ?? 0) > 0)
                 const hasRoundFavoriteTasks = favoriteTasksForRound.length > 0
                 const allRoundTasksFavorited = hasRoundFavoriteTasks && favoriteTasksForRound.every((task) => task.isFavorite)
-                const assistantBlocks = isAssistant ? getAgentAssistantBlocks(round ?? null, taskSlotsForRound, tasks, Boolean(message.content.trim())) : []
+                const showRequestError = round?.status === 'error' && isAssistant && message.content.startsWith('请求失败：')
+                const assistantBlocks = isAssistant ? getAgentAssistantBlocks(round ?? null, taskSlotsForRound, tasks, !showRequestError && Boolean(message.content.trim())) : []
                 const inputImagesForRound = (round?.inputImageIds || []).map(id => ({ id, dataUrl: '' }))
                 const parts = getPromptMentionParts(message.content, inputImagesForRound)
                 return (
@@ -913,7 +914,7 @@ export default function AgentWorkspace() {
                       </div>
                     )}
 
-                    {round?.status === 'error' && isAssistant && message.content.startsWith('请求失败：') ? (
+                    {showRequestError && (
                       <div
                         data-selectable-text
                         className="-m-2 flex cursor-copy select-text flex-col rounded-xl p-2 transition-colors hover:bg-red-50/60 dark:hover:bg-red-500/5"
@@ -943,7 +944,8 @@ export default function AgentWorkspace() {
                           );
                         })()}
                       </div>
-                    ) : (
+                    )}
+                    {(!showRequestError || assistantBlocks.length > 0) && (
                       <div data-selectable-text className={`text-[15px] leading-relaxed text-gray-800 dark:text-gray-100 ${!isAssistant ? 'select-text' : ''}`}>
                         {isAssistant ? (
                           <>
