@@ -31,11 +31,72 @@ function errorText(value: unknown): string {
   return "";
 }
 
+export type ChatStreamStatusStage =
+  | "thinking"
+  | "searching"
+  | "tool"
+  | "retrying"
+  | "answering";
+
+export type ChatStreamStatus = {
+  stage: ChatStreamStatusStage;
+  label?: string;
+  detail?: string;
+  thoughts?: string[];
+  thoughtDurationSec?: number;
+};
+
+const CHAT_STREAM_STAGES = new Set<string>([
+  "thinking",
+  "searching",
+  "tool",
+  "retrying",
+  "answering",
+]);
+
+export function readChatStreamStatus(raw: unknown): ChatStreamStatus | undefined {
+  const item = recordValue(raw);
+  if (!item || typeof item.stage !== "string") return undefined;
+  const stage = item.stage.trim();
+  if (!CHAT_STREAM_STAGES.has(stage)) return undefined;
+
+  const status: ChatStreamStatus = { stage: stage as ChatStreamStatusStage };
+
+  if (typeof item.label === "string") {
+    const label = item.label.trim().slice(0, 120);
+    if (label) status.label = label;
+  }
+  if (typeof item.detail === "string") {
+    const detail = item.detail.trim().slice(0, 280);
+    if (detail) status.detail = detail;
+  }
+  if (Array.isArray(item.thoughts)) {
+    const thoughts: string[] = [];
+    for (const entry of item.thoughts) {
+      if (typeof entry !== "string") continue;
+      const cleaned = entry.trim().slice(0, 280);
+      if (cleaned) thoughts.push(cleaned);
+      if (thoughts.length >= 12) break;
+    }
+    if (thoughts.length) status.thoughts = thoughts;
+  }
+  if (
+    typeof item.thoughtDurationSec === "number"
+    && Number.isSafeInteger(item.thoughtDurationSec)
+    && item.thoughtDurationSec >= 0
+  ) {
+    status.thoughtDurationSec = item.thoughtDurationSec;
+  }
+
+  return status;
+}
+
 // Decode frames, not network chunks: UTF-8 and SSE boundaries may split anywhere.
 export async function readChatResponse(
   response: Response,
   onText: (text: string) => void,
   onResources?: (resources: ChatResource[]) => void,
+  onStatus?: (status: ChatStreamStatus) => void,
 ): Promise<void> {
   if (!response.ok) {
     const payload: unknown = await response.json().catch(() => null);
@@ -46,8 +107,11 @@ export async function readChatResponse(
     if (payload?.error) throw new Error(errorText(payload.error));
     const choice = Array.isArray(payload?.choices) ? recordValue(payload.choices[0]) : undefined;
     const text = recordValue(choice?.message)?.content;
-    const resources = onResources ? readChatResources(recordValue(payload?.workbench)?.blocks) : [];
+    const workbench = recordValue(payload?.workbench);
+    const status = onStatus ? readChatStreamStatus(workbench?.status) : undefined;
+    const resources = onResources ? readChatResources(workbench?.blocks) : [];
     const hasText = typeof text === "string" && Boolean(text);
+    if (status) onStatus?.(status);
     if (!hasText && !resources.length)
       throw new Error("模型没有返回内容，请重试或更换模型");
     if (hasText) onText(text);
@@ -82,6 +146,11 @@ export async function readChatResponse(
     if (event?.error) {
       throw new Error(errorText(event.error) || "生成失败");
     }
+    const workbench = recordValue(event?.workbench);
+    if (onStatus) {
+      const status = readChatStreamStatus(workbench?.status);
+      if (status) onStatus(status);
+    }
     const choice = Array.isArray(event?.choices) ? recordValue(event.choices[0]) : undefined;
     const text = recordValue(choice?.delta)?.content;
     if (typeof text === "string" && text) {
@@ -89,7 +158,7 @@ export async function readChatResponse(
       onText(text);
     }
     if (onResources) {
-      const resources = readChatResources(recordValue(event?.workbench)?.blocks);
+      const resources = readChatResources(workbench?.blocks);
       if (resources.length) {
         hasContent = true;
         onResources(resources);

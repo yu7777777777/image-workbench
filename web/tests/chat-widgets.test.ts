@@ -114,7 +114,7 @@ test("recognizes standalone bento image groups without parsing query expressions
   const blocks = splitChatReply(`上文\n\n${markup}\n\n下文`);
   expect(blocks.map((block) => block.kind)).toEqual(["markdown", "widget", "markdown"]);
   expect(blocks[1]).toMatchObject({ widget: { root: { kind: "image", group: true, bento: true, queries: ["地图", "背包", "战斗"], aspectRatio: "5 / 4" } } });
-  expect(splitChatReply(markup.slice(0, -2), true)).toEqual([{ kind: "pending", offset: 0 }]);
+  expect(splitChatReply(markup.slice(0, -2), true)).toEqual([{ kind: "pending", offset: 0, chars: markup.length - 2, label: "正在绘制交互卡片" }]);
   expect(readChatWidget('<AsyncImageGroup query={[window.location.href]}/>')?.widget?.root).toMatchObject({ kind: "image", queries: undefined });
 });
 

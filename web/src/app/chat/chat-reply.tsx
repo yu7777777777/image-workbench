@@ -405,8 +405,25 @@ export function ChatReply({ text, writingDrafts, resources = emptyResources, own
                 <pre>{block.text}</pre>
               </details>
             );
-          case "pending":
-            return null;
+          case "pending": {
+            const received = block.chars >= 1000
+              ? `已接收 ${(block.chars / 1000).toFixed(1)} KB`
+              : `已接收 ${block.chars} 字`;
+            return (
+              <div key={block.offset} className="chat-widget-pending" role="status" aria-live="polite">
+                <div className="chat-widget-pending-head">
+                  <span className="chat-thinking-dot" aria-hidden="true" />
+                  <span className="chat-widget-pending-label">{block.label}</span>
+                  <span className="chat-widget-pending-meta">{received}</span>
+                </div>
+                <div className="chat-widget-pending-skeleton" aria-hidden="true">
+                  <span className="chat-widget-pending-bar chat-widget-pending-bar-title" />
+                  <span className="chat-widget-pending-bar chat-widget-pending-bar-wide" />
+                  <span className="chat-widget-pending-bar chat-widget-pending-bar-short" />
+                </div>
+              </div>
+            );
+          }
         }
       })}
       <ReplyResourcePanel resources={resources.filter(({ id }) => !renderedInline.has(id))} owner={owner} />

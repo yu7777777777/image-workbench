@@ -41,6 +41,7 @@ import { useAuthGuard } from "@/lib/use-auth-guard";
 import { isHttpAuthKey, LEGACY_AUTH_KEY_MESSAGE } from "@/lib/auth-key";
 import { useChatModels } from "@/hooks/use-chat-models";
 import { createChatId } from "@/lib/chat-stream";
+import { splitChatReply } from "@/lib/chat-rich-reply";
 import {
   CHAT_LEVELS,
   chatFamilies,
@@ -49,10 +50,90 @@ import {
   chatChoice,
   chatModelLabel,
 } from "@/lib/chat-models";
-import { useChatStore, type ChatImage, type ChatThread } from "@/store/chat";
+import {
+  useChatStore,
+  type ChatImage,
+  type ChatMessage,
+  type ChatThread,
+} from "@/store/chat";
 import { ChatReply } from "./chat-reply";
 import { copyReplyText } from "./chat-markdown";
 import "./chat.css";
+
+function formatDuration(sec: number): string {
+  const safe = Math.max(0, Math.floor(sec));
+  return safe < 60 ? `${safe}s` : `${Math.floor(safe / 60)}m ${safe % 60}s`;
+}
+
+function ChatThinkingStatus({ message }: { message: ChatMessage }) {
+  const thinking = message.thinking;
+  const active = message.status === "streaming" && !thinking?.done && !message.text;
+  const [elapsed, setElapsed] = useState(() =>
+    message.startedAt ? Math.max(0, Math.floor((Date.now() - message.startedAt) / 1000)) : 0,
+  );
+
+  useEffect(() => {
+    if (!active) return;
+    const origin = message.startedAt ?? Date.now();
+    const sync = () => setElapsed(Math.max(0, Math.floor((Date.now() - origin) / 1000)));
+    sync();
+    const timer = window.setInterval(sync, 1000);
+    return () => window.clearInterval(timer);
+  }, [active, message.startedAt]);
+
+  if (active) {
+    const label = thinking?.label || (elapsed >= 3 ? "正在思考" : "正在连接模型");
+    const displaySec =
+      thinking?.durationSec !== undefined ? Math.max(elapsed, thinking.durationSec) : elapsed;
+    return (
+      <div
+        className="chat-thinking-panel"
+        data-active="true"
+        data-stage={thinking?.stage || "thinking"}
+        role="status"
+        aria-live="polite"
+      >
+        <div className="chat-thinking-head">
+          <span className="chat-thinking-dot" aria-hidden="true" />
+          <span className="chat-thinking-label">{label}</span>
+          <span className="chat-thinking-timer">· {formatDuration(displaySec)}</span>
+        </div>
+        {thinking?.detail && (
+          <div className="chat-thinking-detail">{thinking.detail}</div>
+        )}
+        {!!thinking?.thoughts?.length && (
+          <details className="chat-thinking-details">
+            <summary>查看思考要点（{thinking.thoughts.length}）</summary>
+            <ul>
+              {thinking.thoughts.map((item, idx) => (
+                <li key={idx}>{item}</li>
+              ))}
+            </ul>
+          </details>
+        )}
+      </div>
+    );
+  }
+
+  if (thinking?.done && (thinking.thoughts?.length || (thinking.durationSec ?? 0) >= 2)) {
+    const duration = formatDuration(thinking.durationSec ?? 1);
+    if (thinking.thoughts?.length) {
+      return (
+        <details className="chat-thinking-recap">
+          <summary>已思考 {duration}</summary>
+          <ul>
+            {thinking.thoughts.map((item, idx) => (
+              <li key={idx}>{item}</li>
+            ))}
+          </ul>
+        </details>
+      );
+    }
+    return <div className="chat-thinking-recap-plain">已思考 {duration}</div>;
+  }
+
+  return null;
+}
 
 function readImage(file: File): Promise<ChatImage> {
   return new Promise((resolve, reject) => {
@@ -358,21 +439,26 @@ export default function ChatPage() {
                   {message.role === "user" ? (
                     <div className="chat-user-text">{message.text}</div>
                   ) : (
-                    <ChatReply
-                      text={message.text}
-                      writingDrafts={message.writingDrafts}
-                      resources={message.resources}
-                      owner={owner}
-                      streaming={message.status === "streaming"}
-                      canSend={canSend && !chat.busyId}
-                      onSend={(text) => { void chat.send(text, []); }}
-                      onSaveWriting={(offset, text) => chat.saveWritingDraft(thread.id, message.id, offset, text)}
-                    />
+                    <>
+                      <ChatThinkingStatus message={message} />
+                      <ChatReply
+                        text={message.text}
+                        writingDrafts={message.writingDrafts}
+                        resources={message.resources}
+                        owner={owner}
+                        streaming={message.status === "streaming"}
+                        canSend={canSend && !chat.busyId}
+                        onSend={(text) => { void chat.send(text, []); }}
+                        onSaveWriting={(offset, text) => chat.saveWritingDraft(thread.id, message.id, offset, text)}
+                      />
+                    </>
                   )}
-                  {message.status === "streaming" && (
+                  {message.status === "streaming" && message.text && (
                     <div className="chat-generating" role="status">
                       <span />
-                      {message.text ? "正在回复" : "正在等待模型回复…"}
+                      {splitChatReply(message.text, true).some((block) => block.kind === "pending")
+                        ? "正在绘制交互组件…"
+                        : "正在回复"}
                     </div>
                   )}
                   {message.status === "stopped" && (
