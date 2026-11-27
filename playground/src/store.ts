@@ -30,6 +30,7 @@ import { isPoolProfileId } from './lib/poolProfileIds'
 import { enforcePresetConfigPolicy, getPresetConfig, getPresetProfileIds, getPresetProviderIds, isPresetConfigDeletionPrevented, isPresetConfigOnlyEnabled, isPresetConfigParamsLocked, isPresetProfile, isPresetProviderDeletionPrevented } from './lib/presetConfig'
 import { dismissAllTooltips } from './lib/tooltipDismiss'
 import { loadGalleryDensity, saveGalleryDensity, type GalleryDensity } from './lib/galleryDensity'
+import { loadGalleryLayoutMode, saveGalleryLayoutMode, type GalleryLayoutMode } from './lib/galleryLayout'
 import { remapImageMentionsForOrder, replaceImageMentionsForApi } from './lib/promptImageMentions'
 import {
   getAllTasks,
@@ -363,6 +364,8 @@ export interface AppState extends CanvasSlice, SettingsSlice {
   setFilterFavorite: (f: boolean) => void
   galleryDensity: GalleryDensity
   setGalleryDensity: (density: GalleryDensity) => void
+  galleryLayout: GalleryLayoutMode
+  setGalleryLayout: (layout: GalleryLayoutMode) => void
 
   // 多选
   gallerySelectionMode: boolean
@@ -912,6 +915,11 @@ export const useStore = create<AppState>()(
       setGalleryDensity: (galleryDensity) => {
         saveGalleryDensity(galleryDensity)
         set({ galleryDensity })
+      },
+      galleryLayout: loadGalleryLayoutMode(),
+      setGalleryLayout: (galleryLayout) => {
+        saveGalleryLayoutMode(galleryLayout)
+        set({ galleryLayout })
       },
 
       // Selection

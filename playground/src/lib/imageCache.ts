@@ -16,6 +16,7 @@ type ImageThumbnail = {
 
 const imageCache = new Map<string, string>()
 const thumbnailCache = new Map<string, ImageThumbnail>()
+const dimensionsCache = new Map<string, { width: number; height: number }>()
 const thumbnailBackfillIds = new Map<string, 'visible' | 'background'>()
 const thumbnailBackfillRunningIds = new Set<string>()
 const thumbnailSubscribers = new Map<string, Set<(thumbnail: ImageThumbnail) => void>>()
@@ -23,7 +24,31 @@ let thumbnailBackfillScheduled = false
 
 const MAX_IMAGE_CACHE_ENTRIES = 8
 const MAX_THUMBNAIL_CACHE_ENTRIES = 80
+const MAX_DIMENSIONS_CACHE_ENTRIES = 2000
 const MAX_THUMBNAIL_BACKFILL_CONCURRENT = 4
+
+export function getCachedImageDimensions(id: string): { width: number; height: number } | undefined {
+  const cached = dimensionsCache.get(id)
+  if (cached) return cached
+  const thumb = thumbnailCache.get(id)
+  if (hasImageDimensions(thumb)) {
+    const dims = { width: thumb.width, height: thumb.height }
+    cacheImageDimensions(id, dims.width, dims.height)
+    return dims
+  }
+  return undefined
+}
+
+export function cacheImageDimensions(id: string, width: number, height: number) {
+  if (!hasImageDimensions({ width, height })) return
+  dimensionsCache.delete(id)
+  dimensionsCache.set(id, { width, height })
+  while (dimensionsCache.size > MAX_DIMENSIONS_CACHE_ENTRIES) {
+    const oldestKey = dimensionsCache.keys().next().value
+    if (oldestKey == null) break
+    dimensionsCache.delete(oldestKey)
+  }
+}
 
 export function getCachedImage(id: string): string | undefined {
   const dataUrl = imageCache.get(id)
@@ -60,6 +85,9 @@ function getCachedThumbnail(id: string) {
 }
 
 export function cacheThumbnail(id: string, thumbnail: ImageThumbnail) {
+  if (hasImageDimensions(thumbnail)) {
+    cacheImageDimensions(id, thumbnail.width, thumbnail.height)
+  }
   if (thumbnail.thumbnailVersion !== CURRENT_THUMBNAIL_VERSION) return
   thumbnailCache.delete(id)
   thumbnailCache.set(id, thumbnail)
@@ -73,6 +101,7 @@ export function cacheThumbnail(id: string, thumbnail: ImageThumbnail) {
 export function deleteImageCacheEntry(id: string) {
   imageCache.delete(id)
   thumbnailCache.delete(id)
+  dimensionsCache.delete(id)
   thumbnailBackfillIds.delete(id)
   thumbnailBackfillRunningIds.delete(id)
   thumbnailSubscribers.delete(id)
@@ -81,6 +110,7 @@ export function deleteImageCacheEntry(id: string) {
 export function clearImageCaches() {
   imageCache.clear()
   thumbnailCache.clear()
+  dimensionsCache.clear()
   thumbnailBackfillIds.clear()
 }
 
@@ -117,11 +147,14 @@ export async function ensureImageThumbnailCached(id: string): Promise<ImageThumb
 
 /** 读取图片真实宽高：内存缩略图快路径 → IndexedDB（含历史补全写回）。 */
 export async function ensureImageDimensionsCached(id: string): Promise<{ width: number; height: number } | undefined> {
-  const cachedThumbnail = getCachedThumbnail(id)
-  if (hasImageDimensions(cachedThumbnail)) {
-    return { width: cachedThumbnail.width, height: cachedThumbnail.height }
+  const cachedDims = getCachedImageDimensions(id)
+  if (cachedDims) return cachedDims
+  const dims = await getImageDimensions(id)
+  if (hasImageDimensions(dims)) {
+    cacheImageDimensions(id, dims.width, dims.height)
+    return dims
   }
-  return getImageDimensions(id)
+  return dims
 }
 
 export function subscribeImageThumbnail(id: string, callback: (thumbnail: ImageThumbnail) => void) {

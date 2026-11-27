@@ -1,7 +1,9 @@
-import { useMemo, useRef, useState, useEffect, useLayoutEffect } from 'react'
+import { useCallback, useMemo, useRef, useState, useEffect, useLayoutEffect } from 'react'
 import { useStore, reuseConfig, editOutputs, removeTask, taskMatchesFilterStatus, taskMatchesSearchQuery } from '../store'
 import { ALL_FAVORITES_COLLECTION_ID, getTaskFavoriteCollectionIds } from '../lib/favoriteState'
 import { computeGalleryColumns, getGalleryDensitySpec } from '../lib/galleryDensity'
+import { computeMasonryLayout, getVisibleMasonryItems, type ImageDimensions, type MasonryItemLayout } from '../lib/galleryMasonry'
+import { getCachedImageDimensions } from '../lib/imageCache'
 import TaskCard from './TaskCard'
 
 export default function TaskGrid() {
@@ -10,6 +12,7 @@ export default function TaskGrid() {
   const filterStatus = useStore((s) => s.filterStatus)
   const filterFavorite = useStore((s) => s.filterFavorite)
   const galleryDensity = useStore((s) => s.galleryDensity)
+  const galleryLayout = useStore((s) => s.galleryLayout)
   const densitySpec = getGalleryDensitySpec(galleryDensity)
   const activeFavoriteCollectionId = useStore((s) => s.activeFavoriteCollectionId)
   const defaultFavoriteCollectionId = useStore((s) => s.defaultFavoriteCollectionId)
@@ -71,12 +74,55 @@ export default function TaskGrid() {
   }, [tasks, searchQuery, filterStatus, filterFavorite, activeFavoriteCollectionId, defaultFavoriteCollectionId])
 
   const [columns, setColumns] = useState(densitySpec.mobileColumns)
+  const [containerWidth, setContainerWidth] = useState(0)
+  const [measuredDimensions, setMeasuredDimensions] = useState<Map<string, ImageDimensions>>(() => new Map())
+  const pendingDimensionsRef = useRef<Map<string, ImageDimensions>>(new Map())
+  const dimensionsFrameRef = useRef<number | null>(null)
+
+  const handleCoverDimensions = useCallback((imageId: string, dims: ImageDimensions) => {
+    if (!imageId || !(dims.width > 0 && dims.height > 0)) return
+    const existing = pendingDimensionsRef.current.get(imageId)
+    if (existing && existing.width === dims.width && existing.height === dims.height) return
+    pendingDimensionsRef.current.set(imageId, dims)
+    if (dimensionsFrameRef.current != null) return
+    dimensionsFrameRef.current = window.requestAnimationFrame(() => {
+      dimensionsFrameRef.current = null
+      const pending = pendingDimensionsRef.current
+      if (pending.size === 0) return
+      setMeasuredDimensions((prev) => {
+        let changed = false
+        for (const [id, nextDims] of pending) {
+          const prevDims = prev.get(id)
+          if (!prevDims || prevDims.width !== nextDims.width || prevDims.height !== nextDims.height) {
+            changed = true
+            break
+          }
+        }
+        if (!changed) return prev
+        const next = new Map(prev)
+        for (const [id, nextDims] of pending) {
+          next.set(id, nextDims)
+        }
+        return next
+      })
+      pending.clear()
+    })
+  }, [])
+
+  useEffect(() => () => {
+    if (dimensionsFrameRef.current != null) {
+      window.cancelAnimationFrame(dimensionsFrameRef.current)
+      dimensionsFrameRef.current = null
+    }
+  }, [])
+
   useLayoutEffect(() => {
     const root = rootRef.current
     if (!root) return
-    // 使用内容区宽度与当前画廊密度，同时驱动网格、虚拟滚动和框选计算。
+    // 使用内容区宽度与当前画廊密度，同时驱动瀑布流/方格布局、虚拟滚动和框选计算。
     const resize = () => {
       const width = root.clientWidth
+      setContainerWidth(width)
       setColumns(computeGalleryColumns(width, galleryDensity))
     }
     const observer = new ResizeObserver(resize)
@@ -84,14 +130,49 @@ export default function TaskGrid() {
     resize()
     return () => observer.disconnect()
   }, [filteredTasks.length > 0, galleryDensity])
+
+  const effectiveDimensions = useMemo(() => {
+    const map = new Map<string, ImageDimensions>(measuredDimensions)
+    for (const task of filteredTasks) {
+      const coverId = task.outputImages?.[0]
+      if (!coverId || map.has(coverId)) continue
+      const cached = getCachedImageDimensions(coverId)
+      if (cached) map.set(coverId, cached)
+    }
+    return map
+  }, [filteredTasks, measuredDimensions])
+
+  const isMasonryActive = galleryLayout === 'masonry' && containerWidth > 0
+  const masonryLayout = useMemo(() => {
+    if (!isMasonryActive) return null
+    return computeMasonryLayout(filteredTasks, {
+      containerWidth,
+      columns,
+      gap: densitySpec.gap,
+      dimensionsByImageId: effectiveDimensions,
+    })
+  }, [isMasonryActive, filteredTasks, containerWidth, columns, densitySpec.gap, effectiveDimensions])
+
   const virtualize = filteredTasks.length > 80
   const totalRows = Math.ceil(filteredTasks.length / columns)
-  // 卡片高度随列宽变化，通过实测已渲染卡片高度作为虚拟列表行高基准。
+  // 卡片高度随列宽变化，通过实测已渲染卡片高度作为方格虚拟列表行高基准。
   const rowMetricsRef = useRef({ height: densitySpec.estimatedCardHeight, gap: densitySpec.gap })
   const [metricsVersion, setMetricsVersion] = useState(0)
   const estimatedRowHeight = rowMetricsRef.current.height + rowMetricsRef.current.gap
-  const marqueeLayoutRef = useRef({ columns, gap: densitySpec.gap, estimatedRowHeight, filteredTasks })
-  marqueeLayoutRef.current = { columns, gap: densitySpec.gap, estimatedRowHeight, filteredTasks }
+  const marqueeLayoutRef = useRef<{
+    columns: number
+    gap: number
+    estimatedRowHeight: number
+    filteredTasks: typeof filteredTasks
+    masonryItems: MasonryItemLayout[] | null
+  }>({ columns, gap: densitySpec.gap, estimatedRowHeight, filteredTasks, masonryItems: masonryLayout?.items ?? null })
+  marqueeLayoutRef.current = {
+    columns,
+    gap: densitySpec.gap,
+    estimatedRowHeight,
+    filteredTasks,
+    masonryItems: masonryLayout?.items ?? null,
+  }
   const rootTop = rootRef.current ? rootRef.current.getBoundingClientRect().top + window.scrollY : 0
   const relativeScroll = Math.max(0, window.scrollY - rootTop)
   const firstVisibleRow = virtualize ? Math.max(0, Math.floor(relativeScroll / estimatedRowHeight) - 2) : 0
@@ -99,10 +180,17 @@ export default function TaskGrid() {
   const visibleStart = firstVisibleRow * columns
   const visibleEnd = Math.min(filteredTasks.length, lastVisibleRow * columns)
   const visibleTasks = virtualize ? filteredTasks.slice(visibleStart, visibleEnd) : filteredTasks
+  const visibleMasonryItems = useMemo(() => {
+    if (!masonryLayout) return []
+    if (!virtualize) return masonryLayout.items
+    const overscanPx = Math.max(640, window.innerHeight * 0.75)
+    return getVisibleMasonryItems(masonryLayout.items, relativeScroll, relativeScroll + window.innerHeight, overscanPx)
+  }, [masonryLayout, virtualize, relativeScroll, viewportVersion])
 
-  // 实测已渲染卡片的高度与行间距，作为虚拟列表的行高基准。
+  // 实测已渲染卡片的高度与行间距，作为方格虚拟列表的行高基准。
   // 虚拟列表自带 ±2 行余量，实测值随滚动逐步收敛即可，不必精确到像素。
   useLayoutEffect(() => {
+    if (isMasonryActive) return
     const grid = gridRef.current
     if (!grid) return
     const cards = grid.querySelectorAll<HTMLElement>('.task-card-wrapper')
@@ -173,32 +261,61 @@ export default function TaskGrid() {
     })
   }
 
+  const renderTaskCard = (task: typeof tasks[0], masonryItem?: MasonryItemLayout) => (
+    <TaskCard
+      task={task}
+      onClick={(e) => {
+        if (Date.now() < suppressClickUntil.current) {
+          e.preventDefault()
+          return
+        }
+        suppressClickUntil.current = 0
+        const isCtrl = isMac ? e.metaKey : e.ctrlKey
+        if (isCtrl || isSelectionActive) {
+          useStore.getState().toggleTaskSelection(task.id)
+          return
+        }
+
+        setDetailTaskId(task.id)
+      }}
+      onReuse={() => reuseConfig(task)}
+      onEditOutputs={() => editOutputs(task)}
+      onDelete={() => handleDelete(task)}
+      isSelected={selectedTaskIds.includes(task.id)}
+      selectionMode={isSelectionActive}
+      fillContainer={Boolean(masonryItem)}
+      imageFit={masonryItem ? (masonryItem.isHeightCapped ? 'cover-top' : 'cover') : 'contain'}
+      isHeightCapped={Boolean(masonryItem?.isHeightCapped)}
+      onCoverDimensions={handleCoverDimensions}
+    />
+  )
+
   const renderTask = (task: typeof tasks[0]) => (
     <div key={task.id} className="task-card-wrapper" data-task-id={task.id}>
-      <TaskCard
-        task={task}
-        onClick={(e) => {
-          if (Date.now() < suppressClickUntil.current) {
-            e.preventDefault()
-            return
-          }
-          suppressClickUntil.current = 0
-          const isCtrl = isMac ? e.metaKey : e.ctrlKey
-          if (isCtrl || isSelectionActive) {
-            useStore.getState().toggleTaskSelection(task.id)
-            return
-          }
-
-          setDetailTaskId(task.id)
-        }}
-        onReuse={() => reuseConfig(task)}
-        onEditOutputs={() => editOutputs(task)}
-        onDelete={() => handleDelete(task)}
-        isSelected={selectedTaskIds.includes(task.id)}
-        selectionMode={isSelectionActive}
-      />
+      {renderTaskCard(task)}
     </div>
   )
+
+  const renderMasonryItem = (item: MasonryItemLayout) => {
+    const task = filteredTasks[item.index]
+    if (!task) return null
+    return (
+      <div
+        key={task.id}
+        className="task-card-wrapper absolute"
+        data-task-id={task.id}
+        data-masonry-col={item.column}
+        style={{
+          left: `${item.left}px`,
+          top: `${item.top}px`,
+          width: `${item.width}px`,
+          height: `${item.height}px`,
+        }}
+      >
+        {renderTaskCard(task, item)}
+      </div>
+    )
+  }
 
   const getPagePoint = (clientX: number, clientY: number) => ({
     pageX: clientX + window.scrollX,
@@ -248,30 +365,57 @@ export default function TaskGrid() {
     })
     const rootRect = rootRef.current?.getBoundingClientRect()
     const gridWidth = rootRect?.width ?? gridRef.current.clientWidth
-    const { columns: liveColumns, gap, estimatedRowHeight: liveRowHeight, filteredTasks: liveTasks } = marqueeLayoutRef.current
-    const cardWidth = Math.max(0, (gridWidth - gap * (liveColumns - 1)) / liveColumns)
+    const {
+      columns: liveColumns,
+      gap,
+      estimatedRowHeight: liveRowHeight,
+      filteredTasks: liveTasks,
+      masonryItems,
+    } = marqueeLayoutRef.current
+    const rootPageLeft = (rootRect?.left ?? 0) + window.scrollX
+    const rootPageTop = (rootRect?.top ?? 0) + window.scrollY
 
-    liveTasks.forEach((task, index) => {
-      const rendered = renderedRects.get(task.id)
-      const row = Math.floor(index / liveColumns)
-      const column = index % liveColumns
-      const cardLeft = rendered
-        ? rendered.left + window.scrollX
-        : (rootRect?.left ?? 0) + window.scrollX + column * (cardWidth + gap)
-      const cardTop = rendered
-        ? rendered.top + window.scrollY
-        : (rootRect?.top ?? 0) + window.scrollY + row * liveRowHeight
-      const cardRight = rendered ? rendered.right + window.scrollX : cardLeft + cardWidth
-      const cardBottom = rendered ? rendered.bottom + window.scrollY : cardTop + liveRowHeight - gap
-      const isIntersecting = minX < cardRight && maxX > cardLeft && minY < cardBottom && maxY > cardTop
+    if (masonryItems && masonryItems.length > 0) {
+      masonryItems.forEach((item) => {
+        const rendered = renderedRects.get(item.id)
+        const cardLeft = rendered ? rendered.left + window.scrollX : rootPageLeft + item.left
+        const cardTop = rendered ? rendered.top + window.scrollY : rootPageTop + item.top
+        const cardRight = rendered ? rendered.right + window.scrollX : rootPageLeft + item.right
+        const cardBottom = rendered ? rendered.bottom + window.scrollY : rootPageTop + item.bottom
+        const isIntersecting = minX < cardRight && maxX > cardLeft && minY < cardBottom && maxY > cardTop
 
-      if (isIntersecting) {
-        if (initialSelected.has(task.id)) newSelected.delete(task.id)
-        else newSelected.add(task.id)
-      } else if (!initialSelected.has(task.id)) {
-        newSelected.delete(task.id)
-      }
-    })
+        if (isIntersecting) {
+          if (initialSelected.has(item.id)) newSelected.delete(item.id)
+          else newSelected.add(item.id)
+        } else if (!initialSelected.has(item.id)) {
+          newSelected.delete(item.id)
+        }
+      })
+    } else {
+      const cardWidth = Math.max(0, (gridWidth - gap * (liveColumns - 1)) / liveColumns)
+
+      liveTasks.forEach((task, index) => {
+        const rendered = renderedRects.get(task.id)
+        const row = Math.floor(index / liveColumns)
+        const column = index % liveColumns
+        const cardLeft = rendered
+          ? rendered.left + window.scrollX
+          : rootPageLeft + column * (cardWidth + gap)
+        const cardTop = rendered
+          ? rendered.top + window.scrollY
+          : rootPageTop + row * liveRowHeight
+        const cardRight = rendered ? rendered.right + window.scrollX : cardLeft + cardWidth
+        const cardBottom = rendered ? rendered.bottom + window.scrollY : cardTop + liveRowHeight - gap
+        const isIntersecting = minX < cardRight && maxX > cardLeft && minY < cardBottom && maxY > cardTop
+
+        if (isIntersecting) {
+          if (initialSelected.has(task.id)) newSelected.delete(task.id)
+          else newSelected.add(task.id)
+        } else if (!initialSelected.has(task.id)) {
+          newSelected.delete(task.id)
+        }
+      })
+    }
 
     setSelectedTaskIds(Array.from(newSelected))
   }
@@ -448,15 +592,29 @@ export default function TaskGrid() {
       className="relative min-h-[50vh]"
     >
       <div ref={gridRef}>
-        {virtualize && <div aria-hidden style={{ height: firstVisibleRow * estimatedRowHeight + rowMetricsRef.current.gap }} />}
-        <div
-          data-density={galleryDensity}
-          className="grid pb-10"
-          style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gap: `${densitySpec.gap}px` }}
-        >
-          {visibleTasks.map(renderTask)}
-        </div>
-        {virtualize && <div aria-hidden style={{ height: Math.max(0, (totalRows - lastVisibleRow) * estimatedRowHeight - rowMetricsRef.current.gap) + 40 }} />}
+        {isMasonryActive && masonryLayout ? (
+          <div
+            data-density={galleryDensity}
+            data-layout="masonry"
+            className="relative"
+            style={{ height: `${masonryLayout.totalHeight + 40}px` }}
+          >
+            {visibleMasonryItems.map(renderMasonryItem)}
+          </div>
+        ) : (
+          <>
+            {virtualize && <div aria-hidden style={{ height: firstVisibleRow * estimatedRowHeight + rowMetricsRef.current.gap }} />}
+            <div
+              data-density={galleryDensity}
+              data-layout="grid"
+              className="grid pb-10"
+              style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gap: `${densitySpec.gap}px` }}
+            >
+              {visibleTasks.map(renderTask)}
+            </div>
+            {virtualize && <div aria-hidden style={{ height: Math.max(0, (totalRows - lastVisibleRow) * estimatedRowHeight - rowMetricsRef.current.gap) + 40 }} />}
+          </>
+        )}
       </div>
       {selectionBox && (
         <div
