@@ -280,7 +280,7 @@ function ImageManagerContent() {
   }, [startDate, endDate]);
 
   return (
-    <section className="space-y-5 pt-5">
+    <section className="admin-page space-y-5">
       <h1 className="sr-only">图片管理</h1>
       <div role="group" aria-label="图片筛选" className="flex flex-wrap items-center gap-2">
         <DateRangeFilter startDate={startDate} endDate={endDate} onChange={(start, end) => { setStartDate(start); setEndDate(end); }} />

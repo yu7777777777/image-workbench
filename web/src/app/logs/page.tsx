@@ -154,7 +154,7 @@ function LogsContent() {
   }, [type, startDate, endDate]);
 
   return (
-    <section className="space-y-5 pt-5">
+    <section className="admin-page space-y-5">
       <h1 className="sr-only">日志管理</h1>
       <div role="group" aria-label="日志筛选" className="flex flex-wrap items-center gap-2">
         <Select value={type} onValueChange={setType}>
@@ -303,43 +303,46 @@ function LogsContent() {
         </CardContent>
       </Card>
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="flex h-[min(88vh,860px)] w-[min(92vw,920px)] flex-col overflow-hidden rounded-2xl p-0">
-          <DialogHeader className="shrink-0 border-b border-stone-100 px-6 py-5">
+        <DialogContent className="flex max-h-[88dvh] w-11/12 max-w-[920px] flex-col gap-0 overflow-hidden rounded-2xl border-border p-0">
+          <DialogHeader className="shrink-0 border-b border-border py-4 pr-14 pl-4 sm:pl-6">
             <DialogTitle>日志详情</DialogTitle>
+            <DialogDescription>{detailLog?.summary || "调用记录"} · {detailLog?.time}</DialogDescription>
           </DialogHeader>
-          <div className="flex-1 overflow-y-auto px-6 py-5">
-            <div className="space-y-4">
-              <div className="grid gap-3 rounded-xl border border-stone-200 bg-white p-4 text-sm text-stone-600 md:grid-cols-2">
-                {Object.entries(detailLog?.detail || {})
-                  .filter(([key, value]) => key !== "urls" && typeof value !== "object")
-                  .map(([key, value]) => (
-                    <div key={key} className="flex items-start justify-between gap-4">
-                      <span className="text-stone-400">{key}</span>
-                      <span className="text-right font-medium break-all text-stone-700">{String(value)}</span>
-                    </div>
-                  ))}
+          <div className="min-h-0 min-w-0 space-y-4 overflow-y-auto px-4 py-4 sm:px-6">
+            <dl className="grid gap-x-5 gap-y-3 rounded-xl border border-border bg-card p-4 text-sm sm:grid-cols-2">
+              {Object.entries(detailLog?.detail || {})
+                .filter(([key, value]) => key !== "urls" && typeof value !== "object")
+                .map(([key, value]) => (
+                  <div key={key} className={key === "request_text" || key === "error" ? "sm:col-span-2" : undefined}>
+                    <dt className="break-words text-xs text-muted-foreground">{key}</dt>
+                    <dd className="mt-0.5 whitespace-pre-wrap [overflow-wrap:anywhere]">{String(value)}</dd>
+                  </div>
+                ))}
+            </dl>
+            {detailUrls.length ? (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {detailUrls.map((url, index) => (
+                  <button
+                    key={`${url}-${index}`}
+                    type="button"
+                    aria-label={`预览图片 ${index + 1}`}
+                    className="aspect-square overflow-hidden rounded-xl border border-border"
+                    onClick={() => {
+                      setLightboxIndex(index);
+                      setLightboxOpen(true);
+                    }}
+                  >
+                    <ImageThumbnail src={url} className="h-full w-full" />
+                  </button>
+                ))}
               </div>
-              {detailUrls.length ? (
-                <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-                  {detailUrls.map((url, index) => (
-                    <button
-                      key={url}
-                      type="button"
-                      className="aspect-square overflow-hidden rounded-xl border border-stone-200 bg-stone-100"
-                      onClick={() => {
-                        setLightboxIndex(index);
-                        setLightboxOpen(true);
-                      }}
-                    >
-                      <img src={url} alt="" className="h-full w-full object-cover" />
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-              <pre className="max-h-[72vh] overflow-auto rounded-xl border border-stone-200 bg-stone-50 p-4 text-xs leading-6 text-stone-700">
+            ) : null}
+            <details className="rounded-xl border border-border bg-card p-4">
+              <summary className="cursor-pointer text-sm font-medium">原始日志</summary>
+              <pre className="mt-3 whitespace-pre-wrap text-xs leading-5 [overflow-wrap:anywhere]">
                 {JSON.stringify(detailLog?.detail || {}, null, 2)}
               </pre>
-            </div>
+            </details>
           </div>
         </DialogContent>
       </Dialog>

@@ -5048,6 +5048,7 @@ describe('agent built-in image tool failure', () => {
     expect(finalOutput).toContain('function_call_output')
     expect(useStore.getState().tasks).toHaveLength(1)
     expect(useStore.getState().tasks[0]).toMatchObject({ agentBatchItemId: 'live-item', status: 'done' })
+    expect(useStore.getState().showToast).toHaveBeenCalledWith('已生成 1 张图片，后续请求失败', 'error')
     await vi.waitFor(async () => {
       const persistedOutput = JSON.stringify((await getAllAgentConversations())[0]?.rounds[0]?.responseOutput)
       expect(persistedOutput).not.toContain('failed-deleted')
@@ -5106,6 +5107,45 @@ describe('agent built-in image tool failure', () => {
     const conversation = useStore.getState().agentConversations[0]
     expect(JSON.stringify(conversation.rounds[0].responseOutput)).not.toContain('all-deleted-batch')
     expect(conversation.messages.find((message) => message.role === 'assistant')?.content).not.toContain('图像已生成')
+  })
+
+  it('reports a retry image and the earlier timeout as separate outcomes in the same Agent round', async () => {
+    const imageProfile = createDefaultOpenAIProfile({ id: 'image-profile', apiKey: 'image-key', apiMode: 'images' })
+    useStore.setState({
+      settings: normalizeSettings({
+        ...useStore.getState().settings,
+        profiles: [responsesProfile, imageProfile],
+        activeProfileId: responsesProfile.id,
+        agentApiConfigMode: 'hybrid',
+        agentTextProfileId: responsesProfile.id,
+        agentImageProfileId: imageProfile.id,
+      }),
+    })
+    const imageCall = (callId: string) => ({
+      text: '',
+      images: [],
+      outputItems: [{
+        type: 'function_call',
+        name: 'generate_image',
+        call_id: callId,
+        arguments: JSON.stringify({ id: 'cat', prompt: '画一只水彩猫' }),
+      }],
+    })
+    vi.mocked(callAgentResponsesApi)
+      .mockResolvedValueOnce(imageCall('first'))
+      .mockResolvedValueOnce(imageCall('retry'))
+      .mockResolvedValueOnce({ text: '', images: [], outputItems: [] })
+    vi.mocked(callImageApi)
+      .mockRejectedValueOnce(new Error('ChatGPT 生图超时'))
+      .mockResolvedValueOnce({ images: ['data:image/png;base64,live'] })
+
+    await submitAgentMessage()
+    await vi.waitFor(() => expect(useStore.getState().agentConversations[0].rounds[0].status).toBe('done'))
+    const { agentConversations, tasks, showToast } = useStore.getState()
+    expect(tasks.find((task) => task.agentToolCallId === 'first')).toMatchObject({ status: 'error', error: 'ChatGPT 生图超时' })
+    expect(tasks.find((task) => task.agentToolCallId === 'retry')).toMatchObject({ status: 'done', outputImages: [expect.any(String)] })
+    expect(agentConversations[0].rounds[0].outputTaskIds).toHaveLength(2)
+    expect(showToast).toHaveBeenCalledWith('已生成 1 张图片，1 次生图失败', 'success')
   })
 
   it('marks a started built-in image task as error when the stream fails', async () => {
