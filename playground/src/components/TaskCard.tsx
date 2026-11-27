@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, type ReactNode } from 'react'
 import type { TaskRecord } from '../types'
 import { useStore, retryTask } from '../store'
-import { ensureImageThumbnailCached, subscribeImageThumbnail } from '../lib/imageCache'
+import { cacheImageDimensions, ensureImageThumbnailCached, subscribeImageThumbnail } from '../lib/imageCache'
 import { formatImageRatio } from '../lib/size'
 import ViewportTooltip from './ViewportTooltip'
 
@@ -15,6 +15,10 @@ interface Props {
   selectionMode?: boolean
   disableSwipe?: boolean
   adaptiveAspect?: boolean
+  fillContainer?: boolean
+  imageFit?: 'contain' | 'cover' | 'cover-top'
+  isHeightCapped?: boolean
+  onCoverDimensions?: (imageId: string, dims: { width: number; height: number }) => void
 }
 
 function TaskActionButton({
@@ -66,11 +70,17 @@ export default function TaskCard({
   selectionMode = false,
   disableSwipe,
   adaptiveAspect = false,
+  fillContainer = false,
+  imageFit = 'contain',
+  isHeightCapped = false,
+  onCoverDimensions,
 }: Props) {
   const [thumbSrc, setThumbSrc] = useState<string>('')
   const [coverRatio, setCoverRatio] = useState<string>('')
   const [coverSize, setCoverSize] = useState<string>('')
   const [coverDims, setCoverDims] = useState<{ width: number; height: number } | null>(null)
+  const onCoverDimensionsRef = useRef(onCoverDimensions)
+  onCoverDimensionsRef.current = onCoverDimensions
   const [now, setNow] = useState(Date.now())
   const [isSwiping, setIsSwiping] = useState(false)
   const [swipeStartedSelected, setSwipeStartedSelected] = useState(false)
@@ -265,6 +275,9 @@ export default function TaskCard({
         setCoverRatio(formatImageRatio(thumbnail.width, thumbnail.height))
         setCoverSize(`${thumbnail.width}×${thumbnail.height}`)
         setCoverDims({ width: thumbnail.width, height: thumbnail.height })
+        if (imageId) {
+          onCoverDimensionsRef.current?.(imageId, { width: thumbnail.width, height: thumbnail.height })
+        }
       }
     }
 
@@ -315,8 +328,14 @@ export default function TaskCard({
   const hasPartialOutputFailure = task.status === 'done' && outputErrorCount > 0
   const isInterrupted = task.status === 'error' && task.error === '已停止生成。'
 
+  const imageFitClass = imageFit === 'cover-top'
+    ? 'object-cover object-top'
+    : imageFit === 'cover'
+    ? 'object-cover'
+    : 'object-contain'
+
   return (
-    <div className="relative rounded-2xl">
+    <div className={`relative rounded-2xl${fillContainer ? ' h-full' : ''}`}>
       {/* 侧滑底图 */}
       <div
         className={`absolute inset-0 rounded-2xl flex items-center transition-opacity duration-200 pointer-events-none ${
@@ -336,7 +355,7 @@ export default function TaskCard({
 
       <div
         ref={cardRef}
-        className={`studio-task-surface group relative rounded-2xl border overflow-hidden cursor-pointer touch-pan-y will-change-transform duration-200 ${
+        className={`studio-task-surface group relative rounded-2xl border overflow-hidden cursor-pointer touch-pan-y will-change-transform duration-200${fillContainer ? ' h-full' : ''} ${
           !isSwiping ? 'transition-[box-shadow,border-color,background-color,transform]' : 'transition-[box-shadow,border-color,background-color]'
         } ${
           task.status === 'running'
@@ -398,17 +417,17 @@ export default function TaskCard({
           </svg>
         </button>
       )}
-      <div className="studio-task-layout">
+      <div className={`studio-task-layout${fillContainer ? ' h-full' : ''}`}>
         {/* 左侧图片区域 */}
         <div
-          className={`studio-task-media relative flex items-center justify-center overflow-hidden shrink-0${adaptiveAspect ? ' studio-task-media-adaptive' : ''}`}
+          className={`studio-task-media relative flex items-center justify-center overflow-hidden shrink-0${fillContainer ? ' studio-task-media-fill' : adaptiveAspect ? ' studio-task-media-adaptive' : ''}`}
           style={{
             ...(isTransparentOutput ? {
               backgroundImage: 'linear-gradient(45deg, #808080 25%, transparent 25%), linear-gradient(-45deg, #808080 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #808080 75%), linear-gradient(-45deg, transparent 75%, #808080 75%)',
               backgroundSize: '16px 16px',
               backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0px',
             } : undefined),
-            ...(adaptiveAspect && task.status === 'done' && thumbSrc && coverDims && coverDims.width > 0 && coverDims.height > 0 ? {
+            ...(!fillContainer && adaptiveAspect && task.status === 'done' && thumbSrc && coverDims && coverDims.width > 0 && coverDims.height > 0 ? {
               aspectRatio: `${Math.min(2.4, Math.max(0.65, coverDims.width / coverDims.height))}`,
             } : undefined),
           }}
@@ -514,10 +533,26 @@ export default function TaskCard({
                 src={thumbSrc}
                 data-image-id={task.outputImages[0]}
                 data-output-image-ids={task.outputImages.join(',')}
-                className="saveable-image w-full h-full object-contain"
+                className={`saveable-image w-full h-full ${imageFitClass}`}
                 loading="lazy"
                 alt=""
+                onLoad={(e) => {
+                  const width = e.currentTarget.naturalWidth
+                  const height = e.currentTarget.naturalHeight
+                  const imageId = task.outputImages?.[0]
+                  if (!imageId || !(width > 0 && height > 0) || coverDims) return
+                  cacheImageDimensions(imageId, width, height)
+                  setCoverRatio(formatImageRatio(width, height))
+                  setCoverSize(`${width}×${height}`)
+                  setCoverDims({ width, height })
+                  onCoverDimensionsRef.current?.(imageId, { width, height })
+                }}
               />
+              {isHeightCapped && (
+                <span className="studio-task-glass-pill pointer-events-none absolute bottom-2 left-2 z-10 px-2 py-0.5 text-[11px] font-medium transition-opacity duration-150 group-hover:opacity-0 group-focus-within:opacity-0">
+                  长图
+                </span>
+              )}
               {(hasPartialOutputFailure || task.outputImages.length > 1) && (
                 <span className="studio-task-glass-pill absolute bottom-2 right-2 z-10 px-2 py-0.5 text-[11px] font-medium tabular-nums">
                   {hasPartialOutputFailure ? <>{requestedOutputCount} | <span className="font-semibold text-amber-500 dark:text-amber-300">{outputSuccessCount}</span></> : task.outputImages.length}
