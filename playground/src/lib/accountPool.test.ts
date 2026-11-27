@@ -181,4 +181,18 @@ describe('account pool integration', () => {
     await request('https://other.example/v1/images/generations', init)
     expect(fetcher).toHaveBeenCalledWith('https://other.example/v1/images/generations', init)
   })
+
+  it('authorizes creative library reads through the workbench session', async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response('{}'))
+    const request = poolFetch(fetcher, 'https://pool.example', () => 'session-secret')
+    const headers = { Authorization: `Bearer ${POOL_KEY}` }
+    const list = '/api/creative?kind=style'
+    const detail = '/api/creative/1a274a44-c633-4494-9599-cc37da5fd638'
+    await request(list, { headers })
+    await request(detail, { headers })
+    expect(fetcher.mock.calls.map(([, init]) => new Headers(init.headers).get('Authorization')))
+      .toEqual(['Bearer session-secret', 'Bearer session-secret'])
+    await expect(request(detail, { headers, method: 'PUT' })).rejects.toThrow('本站登录凭据')
+    expect(fetcher).toHaveBeenCalledTimes(2)
+  })
 })

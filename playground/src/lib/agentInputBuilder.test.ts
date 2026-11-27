@@ -79,6 +79,25 @@ describe('agent input builder', () => {
     }])
   })
 
+  it('supplies the current Skill separately from the latest user prompt and excludes earlier Skills', async () => {
+    const previous = round('round-1', 1, {
+      skill: { name: '旧 Skill', instructions: '旧流程' },
+    })
+    const current = round('round-2', 2, {
+      skill: { name: '封面', instructions: '保留包装文字' },
+    })
+    const input = await buildAgentApiInput({
+      conversation: conversation([previous, current], [message(previous, '之前的请求'), message(current, '生成商品图')]),
+      currentRound: current,
+      tasks: [],
+      loadImage: noImage,
+    })
+
+    expect(JSON.stringify(input)).not.toContain('旧流程')
+    expect(JSON.stringify(input[input.length - 2])).toContain('保留包装文字')
+    expect(input[input.length - 1]).toEqual({ role: 'user', content: [{ type: 'input_text', text: '生成商品图' }] })
+  })
+
   it('uses only the current branch path', async () => {
     const first = round('round-1', 1, { assistantMessageId: 'assistant-1' })
     const branchA = round('round-2-a', 2, { parentRoundId: first.id, assistantMessageId: 'assistant-2-a' })

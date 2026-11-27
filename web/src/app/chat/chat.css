@@ -19,7 +19,7 @@ html.chat-route-lock,
 }
 .chat-workspace {
   --chat-line: var(--border);
-  --chat-dock-width: 72rem;
+  --chat-message-width: 72rem;
   display: flex;
   width: 100%;
   min-height: 0;
@@ -231,7 +231,7 @@ html.chat-route-lock,
   background: var(--muted);
 }
 .chat-messages {
-  max-width: var(--chat-dock-width);
+  max-width: var(--chat-message-width);
   margin: 0 auto;
   padding: 24px 16px 76px;
 }
@@ -1681,16 +1681,16 @@ html.chat-route-lock,
 .chat-composer-wrap {
   position: relative;
   flex-shrink: 0;
-  width: 100%;
-  max-width: var(--chat-dock-width);
+  /* Match the gallery and Agent composer. */
+  width: min(calc(100% - 1.5rem), 68rem);
   margin: 0 auto;
-  padding: 0 16px max(5px, env(safe-area-inset-bottom));
+  padding-bottom: max(5px, env(safe-area-inset-bottom));
 }
 .chat-composer {
   border: 1px solid var(--chat-line);
   background: var(--card);
   border-radius: 0.9rem;
-  padding: 16px;
+  padding: 16px 0.75rem;
   box-shadow: 0 5px 18px #0000000d;
   transition: border-color 0.2s;
 }
@@ -1813,8 +1813,8 @@ html.chat-route-lock,
 }
 
 @media (max-width: 639px) {
-  .chat-composer-wrap { padding: 0 12px env(safe-area-inset-bottom); }
-  .chat-composer { padding: 12px; }
+  .chat-composer-wrap { padding-bottom: env(safe-area-inset-bottom); }
+  .chat-composer { padding-block: 12px; }
   .chat-model-controls .chat-icon-button { width: 26px; flex-shrink: 0; }
   .chat-model-control { gap: 4px; padding-inline: 6px; }
   .chat-composer-footnote { margin-top: 2px; }

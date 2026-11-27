@@ -261,7 +261,9 @@ export function poolFetch(fetcher: typeof fetch, origin: string, getKey: () => s
     const url = new URL(input instanceof Request ? input.url : String(input), origin)
     const allowedPath = isFal
       ? /^\/v1\/workbench\/shared\/[^/]+\/fal$/.test(url.pathname)
-      : url.pathname.startsWith('/v1/')
+      : url.pathname.startsWith('/v1/') ||
+        ((init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase() === 'GET' &&
+          /^\/api\/creative(?:\/[0-9a-f-]{36}(?:\/cover)?)?$/.test(url.pathname))
     if (url.origin !== origin || !allowedPath) {
       throw new Error('本站登录凭据只能用于本站 API，请为其他服务单独填写密钥。')
     }

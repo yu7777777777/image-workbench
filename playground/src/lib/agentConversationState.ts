@@ -1,6 +1,7 @@
 import { isAnotherWorkbenchTabActive } from './workbenchOwner'
 import type { AgentConversation, AgentMessage, AgentRound, TaskRecord } from '../types'
 import { normalizeResponsesOutputItems } from './responsesOutputState'
+import { normalizeAgentSkill } from './agentSkill'
 
 const AGENT_ROUND_IMAGE_MENTION_RE = /@(?:第)?(\d+)轮图(\d+)/g
 
@@ -12,6 +13,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const proto = Object.getPrototypeOf(value)
   return proto === Object.prototype || proto === null
+}
+
+function readStoredAgentSkill(value: Record<string, unknown>) {
+  // The first preview stored Skill alongside the preset. Preserve it for old conversations.
+  return normalizeAgentSkill(value.skill ?? (isRecord(value.configuration) ? value.configuration.skill : undefined))
 }
 
 function normalizeAgentRound(value: unknown, fallbackIndex: number): AgentRound | null {
@@ -26,6 +32,7 @@ function normalizeAgentRound(value: unknown, fallbackIndex: number): AgentRound 
     ? round.status
     : 'done'
   const responseOutput = Array.isArray(round.responseOutput) ? normalizeResponsesOutputItems(round.responseOutput) : undefined
+  const skill = readStoredAgentSkill(value)
 
   return {
     id: round.id,
@@ -35,6 +42,7 @@ function normalizeAgentRound(value: unknown, fallbackIndex: number): AgentRound 
     userMessageId: round.userMessageId,
     ...(typeof round.assistantMessageId === 'string' ? { assistantMessageId: round.assistantMessageId } : {}),
     prompt: typeof round.prompt === 'string' ? round.prompt : '',
+    ...(skill ? { skill } : {}),
     inputImageIds: normalizeStringArray(round.inputImageIds),
     maskTargetImageId: typeof round.maskTargetImageId === 'string' ? round.maskTargetImageId : null,
     maskImageId: typeof round.maskImageId === 'string' ? round.maskImageId : null,
@@ -109,9 +117,11 @@ export function normalizeAgentConversations(value: unknown): AgentConversation[]
               return true
             })
         : []
+      const skill = readStoredAgentSkill(conversation)
       return {
         id: conversation.id,
         title: typeof conversation.title === 'string' && conversation.title.trim() ? conversation.title : '新对话',
+        ...(skill ? { skill } : {}),
         activeRoundId: typeof conversation.activeRoundId === 'string' && roundIds.has(conversation.activeRoundId) ? conversation.activeRoundId : rounds[rounds.length - 1]?.id ?? null,
         createdAt: typeof conversation.createdAt === 'number' ? conversation.createdAt : Date.now(),
         updatedAt: typeof conversation.updatedAt === 'number' ? conversation.updatedAt : Date.now(),

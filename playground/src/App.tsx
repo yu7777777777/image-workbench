@@ -1,6 +1,6 @@
 import { applyQueuedWorkbenchSettings } from './lib/workbenchSettings'
-import { useEffect, Suspense, lazy } from 'react'
-import { initStore, restoreExplicitPresetConfig, syncWorkbenchDeletions, useStore } from './store'
+import { useEffect, useState, Suspense, lazy } from 'react'
+import { getActiveAgentConversation, initStore, restoreExplicitPresetConfig, syncWorkbenchDeletions, updateAgentSkill, useStore } from './store'
 import { buildSettingsFromUrlParams, clearUrlSettingParams, getExplicitUrlSettingsIds, hasUrlSettingParams } from './lib/urlSettings'
 import { createDefaultOpenAIProfile, hasDefaultPresetConfig, isAgentTextApiProfile } from './lib/apiProfiles'
 import { getCustomProviderConfigUrl, hasEmbeddedDefaultConfig, loadCustomProviderSettingsFromUrl, loadEmbeddedDefaultConfig } from './lib/customProviderConfigUrl'
@@ -28,12 +28,15 @@ import { getOwnerScopedKey, getWorkbenchOwner, WORKBENCH_PERSIST_BASE_KEY } from
 import { useHashRouter } from './hooks/useHashRouter'
 import ErrorBoundary from './components/ErrorBoundary'
 import { ToastProvider } from './components/ui/Toast'
+import { appendCreativeText, fetchCreative, type CanvasCreativeTransfer, type CreativeItem } from './lib/creativeLibrary'
+import { normalizeAgentSkill, readAgentSkillMarkdown } from './lib/agentSkill'
 
 let defaultConfigImportStarted = false
 
 export default function App() {
   useHashRouter()
   const appMode = useStore((s) => s.appMode)
+  const [canvasCreative, setCanvasCreative] = useState<CanvasCreativeTransfer | null>(null)
   const filterFavorite = useStore((s) => s.filterFavorite)
   const activeFavoriteCollectionId = useStore((s) => s.activeFavoriteCollectionId)
   const inCollectionOverview = filterFavorite && !activeFavoriteCollectionId
@@ -156,6 +159,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    let pendingCreative: { id: string; controller: AbortController } | undefined
     const syncTheme = (isDark: boolean) => {
       document.documentElement.classList.toggle('dark', isDark)
     }
@@ -173,6 +177,65 @@ export default function App() {
       if (e.source === window.parent && e.data?.type === 'apply-playground-settings' && e.data.owner === getWorkbenchOwner()) {
         applyQueuedWorkbenchSettings(useStore.getState().setSettings)
       }
+      if (!isPoolBuild || e.source !== window.parent || !getWorkbenchOwner().startsWith('admin:')) return
+      const { type, requestId, id, mode } = e.data ?? {}
+      if (type === 'cancel-creative-item' && pendingCreative?.id === requestId) {
+        pendingCreative?.controller.abort()
+        pendingCreative = undefined
+        setCanvasCreative(null)
+      }
+      if (type !== 'apply-creative-item' || typeof requestId !== 'string') return
+      const finish = () => {
+        if (pendingCreative?.id === requestId) pendingCreative = undefined
+        window.parent.postMessage({ type: 'creative-item-finished', requestId }, window.location.origin)
+      }
+      if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id) || !['gallery', 'agent', 'canvas'].includes(mode)) {
+        useStore.getState().showToast('创意条目链接无效', 'error')
+        finish()
+        return
+      }
+      pendingCreative?.controller.abort()
+      setCanvasCreative(null)
+      const controller = new AbortController()
+      pendingCreative = { id: requestId, controller }
+      const owner = getWorkbenchOwner()
+      const destination = mode === 'agent' && useStore.getState().appMode === 'agent' ? getActiveAgentConversation().id : null
+      void fetchCreative<CreativeItem>(`/${id}`, controller.signal).then((item) => {
+        if (controller.signal.aborted || owner !== getWorkbenchOwner()) return
+        const state = useStore.getState()
+        if (state.appMode !== mode || (mode === 'agent' && state.activeAgentConversationId !== destination)) {
+          throw new Error('工作区已切换，请重新选择创意条目')
+        }
+        if (item.kind !== 'prompt' && (item.kind !== 'skill' || mode !== 'agent')) {
+          throw new Error('此条目无法用于当前模式')
+        }
+        if (mode === 'canvas') {
+          setCanvasCreative({ item, signal: controller.signal, finish: () => {
+            setCanvasCreative((current) => current?.signal === controller.signal ? null : current)
+            finish()
+          } })
+          return
+        }
+        if (item.kind === 'skill') {
+          const { instructions } = readAgentSkillMarkdown(item.content, item.display_title)
+          const skill = normalizeAgentSkill({ name: item.display_title, instructions })
+          if (!skill) throw new Error('此 Agent 生图技能的内容不符合要求')
+          const conversation = state.agentConversations.find(({ id }) => id === destination)
+          if (!conversation?.skill || window.confirm(`将当前对话的「${conversation.skill.name}」替换为「${skill.name}」？`)) {
+            updateAgentSkill(getActiveAgentConversation().id, skill)
+            state.showToast('已挂载到当前对话', 'success')
+          }
+        } else {
+          if (mode === 'gallery' && state.filterFavorite && !state.activeFavoriteCollectionId) state.setFilterFavorite(false)
+          state.setPrompt(appendCreativeText(state.prompt, item.content))
+          state.showToast('已加入当前输入框', 'success')
+        }
+        finish()
+      }).catch((error: unknown) => {
+        if (controller.signal.aborted) return
+        useStore.getState().showToast(error instanceof Error ? error.message : '应用条目失败', 'error')
+        finish()
+      })
     }
 
     const syncQueuedSettings = (event: StorageEvent) => {
@@ -183,6 +246,7 @@ export default function App() {
     window.addEventListener('message', handleMessage)
     window.addEventListener('storage', syncQueuedSettings)
     return () => {
+      pendingCreative?.controller.abort()
       window.removeEventListener('message', handleMessage)
       window.removeEventListener('storage', syncQueuedSettings)
     }
@@ -194,7 +258,7 @@ export default function App() {
       {appMode === 'canvas' ? (
         <ErrorBoundary>
           <Suspense fallback={<div className="flex items-center justify-center h-screen text-gray-400">加载中…</div>}>
-            <CanvasWorkspace />
+            <CanvasWorkspace creativeTransfer={canvasCreative} />
           </Suspense>
         </ErrorBoundary>
       ) : appMode === 'agent' ? (

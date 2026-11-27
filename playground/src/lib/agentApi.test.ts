@@ -51,6 +51,7 @@ describe('callAgentResponsesApi', () => {
     const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body))
     expect(body.tools.some((tool: { type: string }) => tool.type === 'image_generation')).toBe(false)
     expect(body.tools[0].name).toBe('generate_image')
+    expect(body.instructions).toContain('Current maximum tool-use rounds')
     expect(result.outputItems).toContainEqual(call)
   })
   afterEach(() => {

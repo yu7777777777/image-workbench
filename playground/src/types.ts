@@ -304,6 +304,11 @@ export interface AgentMessage {
   createdAt: number
 }
 
+export interface AgentSkill {
+  name: string
+  instructions: string
+}
+
 export interface AgentRound {
   workbenchTabId?: string
   id: string
@@ -312,6 +317,7 @@ export interface AgentRound {
   userMessageId: string
   assistantMessageId?: string
   prompt: string
+  skill?: AgentSkill
   inputImageIds: string[]
   maskTargetImageId?: string | null
   maskImageId?: string | null
@@ -327,6 +333,7 @@ export interface AgentRound {
 export interface AgentConversation {
   id: string
   title: string
+  skill?: AgentSkill
   activeRoundId?: string | null
   createdAt: number
   updatedAt: number
