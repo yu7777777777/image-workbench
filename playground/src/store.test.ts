@@ -161,7 +161,7 @@ import { callAgentResponsesApi, callBatchImageSingle } from './lib/agentApi'
 import { getFalQueuedImageResult } from './lib/falAiImageApi'
 import { removeKeyedBackgroundFromDataUrl } from './lib/transparentImage'
 import { clearData, clearFailedTasks, deleteFavoriteCollection, editOutputs, getErrorToastMessage, getPersistedState, getTaskApiProfile, importData, initStore, regenerateAgentAssistantMessage, removeMultipleTasks, removeTask, removeTaskOutput, restoreExplicitPresetConfig, reuseConfig, stopAgentResponse, submitAgentMessage, submitTask, taskMatchesFilterStatus, taskMatchesSearchQuery, useStore } from './store'
-import { createInputImageFromFile } from './store'
+import { createInputImageFromFile, updateAgentSkill } from './store'
 
 const commitTaskDeletionImplementation = vi.mocked(commitTaskDeletion).getMockImplementation()!
 const deleteDbImageImplementation = vi.mocked(deleteDbImage).getMockImplementation()!
@@ -4657,6 +4657,33 @@ describe('agent built-in image tool failure', () => {
       unsubscribe()
       vi.useRealTimers()
     }
+  })
+
+  it('keeps the attached Skill for a running round and its retry', async () => {
+    const skill = { name: '封面', instructions: '保留参考图包装文字' }
+    updateAgentSkill('conversation-a', skill)
+    const initial = deferred<Awaited<ReturnType<typeof callAgentResponsesApi>>>()
+    vi.mocked(callAgentResponsesApi)
+      .mockImplementationOnce(() => initial.promise)
+      .mockResolvedValue({ text: '完成', images: [], outputItems: [] })
+
+    await submitAgentMessage()
+    await vi.waitFor(() => expect(callAgentResponsesApi).toHaveBeenCalledTimes(1))
+    updateAgentSkill('conversation-a', undefined)
+    initial.reject(new Error('请求失败'))
+    await vi.waitFor(() => expect(useStore.getState().agentConversations[0].rounds[0].status).toBe('error'))
+    const saved = useStore.getState().agentConversations[0].rounds[0]
+    expect(saved.skill).toEqual(skill)
+
+    await regenerateAgentAssistantMessage('conversation-a', saved.id)
+    await vi.waitFor(() => expect(useStore.getState().agentConversations[0].rounds[0].status).toBe('done'))
+    useStore.getState().setPrompt('继续下一轮')
+    await submitAgentMessage()
+    await vi.waitFor(() => expect(callAgentResponsesApi).toHaveBeenCalledTimes(3))
+
+    const [, retry, next] = vi.mocked(callAgentResponsesApi).mock.calls.map(([options]) => options)
+    expect(JSON.stringify(retry.input)).toContain(skill.instructions)
+    expect(JSON.stringify(next.input)).not.toContain(skill.instructions)
   })
 
   it('flushes the last buffered delta before marking the Agent round stopped', async () => {

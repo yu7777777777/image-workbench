@@ -18,7 +18,7 @@ RUN VITE_ACCOUNT_POOL=true VITE_DEFAULT_API_URL= VITE_API_PROXY_AVAILABLE=true n
 
 FROM chatgpt2api:refresh-20260920
 COPY VERSION CHANGELOG.md RELEASE-NOTES.md main.py /app/
-COPY api/__init__.py api/accounts.py api/ai.py api/app.py api/errors.py api/image_inputs.py api/image_tasks.py api/shared_image_proxy.py api/support.py api/system.py /app/api/
+COPY api/__init__.py api/accounts.py api/ai.py api/app.py api/creative.py api/errors.py api/image_inputs.py api/image_tasks.py api/shared_image_proxy.py api/support.py api/system.py /app/api/
 COPY services/__init__.py services/account_service.py services/account_refresh_scheduler.py services/auth_service.py services/backup_service.py services/config.py services/content_filter.py services/cpa_service.py /app/services/
 COPY services/model_service.py services/openai_backend_api.py services/proxy_service.py /app/services/
 COPY services/sentinel_solver_service.py services/sub2api_service.py /app/services/

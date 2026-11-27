@@ -206,6 +206,14 @@ export async function buildAgentApiInput(options: BuildAgentApiInputOptions): Pr
     const distance = (rounds.length - 1) - i
     const includeImages = isCurrentRound || distance <= maxHistoryImageRounds
 
+    if (isCurrentRound && round.skill) {
+      const { name, instructions } = round.skill
+      input.push({
+        role: 'user',
+        content: [{ type: 'input_text', text: `Use the attached Skill as workflow guidance when relevant to my request.\n\nSkill: ${name}\n\n${instructions}` }],
+      })
+    }
+
     input.push(await createUserInputItem(
       options.conversation,
       round,

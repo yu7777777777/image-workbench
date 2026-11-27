@@ -15,6 +15,7 @@ interface HintTooltipState {
 
 export default function InputParamsPanel({
   cols,
+  section = 'all',
   params,
   setParams,
   activeProfile,
@@ -68,6 +69,7 @@ export default function InputParamsPanel({
   poolProfileAvailable = false,
 }: {
   cols: string
+  section?: 'all' | 'primary' | 'advanced'
   params: TaskParams
   setParams: (patch: Partial<TaskParams>) => void
   activeProfile: ApiProfile
@@ -163,10 +165,11 @@ export default function InputParamsPanel({
     }
   }
 
-  return (
-    <div className={`studio-composer-params grid ${cols} gap-2 text-xs min-w-0 flex-1`}>
+  const modelFieldClass = section === 'primary' ? 'studio-agent-model-field' : 'col-span-2 sm:col-span-1'
+  const modelFields = section !== 'advanced' && (
+    <>
       {isAgentMode && agentTextProfiles && agentTextProfiles.length > 0 && (
-        <label className="relative flex flex-col gap-0.5 min-w-0 col-span-2 sm:col-span-1">
+        <label className={`relative flex flex-col gap-0.5 min-w-0 ${modelFieldClass}`}>
           <span className="text-gray-400 dark:text-gray-500 ml-1 truncate">对话模型</span>
           <Select
             value={currentAgentTextProfileId || agentTextProfiles[0]?.id}
@@ -182,7 +185,7 @@ export default function InputParamsPanel({
       )}
       {/* Image model / profile selector */}
       {(availableModels && availableModels.length > 0 || combinedImageOptions) && (
-        <label className="relative flex flex-col gap-0.5 min-w-0 col-span-2 sm:col-span-1" aria-busy={isLoadingImageModels}>
+        <label className={`relative flex flex-col gap-0.5 min-w-0 ${modelFieldClass}`} aria-busy={isLoadingImageModels}>
           <span className="text-gray-400 dark:text-gray-500 ml-1 truncate">{isAgentMode ? '生图模型' : '模型'}</span>
           {combinedImageOptions ? (
             <Select
@@ -192,6 +195,7 @@ export default function InputParamsPanel({
               onChange={handleCombinedImageChange}
               options={combinedImageOptions}
               showValueTooltips={true}
+              menuAlignment={isAgentMode ? 'end' : undefined}
               className={selectClass}
             />
           ) : (
@@ -208,11 +212,16 @@ export default function InputParamsPanel({
                 return { label, value: m }
               })}
               showValueTooltips={true}
+              menuAlignment={isAgentMode ? 'end' : undefined}
               className={selectClass}
             />
           )}
         </label>
       )}
+    </>
+  )
+  const primaryFields = section !== 'advanced' && (
+    <>
       <label
         className="relative flex flex-col gap-0.5"
         onMouseEnter={sizeHint.show}
@@ -284,6 +293,10 @@ export default function InputParamsPanel({
           className={selectClass}
         />
       </label>
+    </>
+  )
+  const advancedFields = section !== 'primary' && (
+    <>
       {showTransparentOutputControl && (
         <label
           className="relative flex flex-col gap-0.5"
@@ -320,7 +333,7 @@ export default function InputParamsPanel({
       )}
       {!showTransparentOutputControl && (
         <label
-          className="relative flex flex-col gap-0.5"
+          className="relative min-w-0 flex flex-col gap-0.5"
           onMouseEnter={compressionHint.show}
           onMouseLeave={compressionHint.hide}
           onTouchStart={compressionHint.startTouch}
@@ -431,6 +444,14 @@ export default function InputParamsPanel({
         <ButtonTooltip visible={nLimitHint.visible} text={nLimitHintText} />
         <ButtonTooltip visible={streamConcurrentByN && streamConcurrentHint.visible && !nLimitHint.visible} text="数量大于 1 时会将多图生成拆分为并发单图" />
       </label>
+    </>
+  )
+
+  return (
+    <div className={`studio-composer-params grid ${cols} gap-2 text-xs min-w-0 flex-1`}>
+      {modelFields}
+      {primaryFields}
+      {advancedFields}
     </div>
   )
 }

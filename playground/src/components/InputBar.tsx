@@ -1,6 +1,6 @@
-import { useRef, useEffect, useCallback, useState, useMemo, useLayoutEffect } from 'react'
+import { useRef, useEffect, useCallback, useState, useMemo, useLayoutEffect, useId } from 'react'
 import { createPortal } from 'react-dom'
-import { deleteFavoriteCollection, useStore, submitTask, submitAgentMessage, stopAgentResponse, addImageFromFile, removeMultipleTasks, taskMatchesFilterStatus, taskMatchesSearchQuery } from '../store'
+import { deleteFavoriteCollection, useStore, submitTask, submitAgentMessage, stopAgentResponse, addImageFromFile, removeMultipleTasks, taskMatchesFilterStatus, taskMatchesSearchQuery, updateAgentSkill } from '../store'
 import { DEFAULT_PARAMS, type TaskRecord } from '../types'
 import { getActiveAgentRounds } from '../lib/agentConversationState'
 import { getActiveApiProfile, getAgentImageApiProfile, isAgentTextApiProfile, normalizeSettings } from '../lib/apiProfiles'
@@ -21,12 +21,15 @@ import { getContentEditableCursor, getContentEditablePlainText, getContentEditab
 import { useHintTooltip } from '../hooks/useHintTooltip'
 import { downloadImageEntriesAsZip, downloadImageIds, formatExportFileTime, getTaskOutputImageZipEntries } from '../lib/downloadImages'
 import SizePickerModal from './SizePickerModal'
-import { CloseIcon, CollapseIcon, ExpandIcon, HistoryIcon, PlusIcon } from './icons'
+import { ChevronDownIcon, CloseIcon, CollapseIcon, ExpandIcon, HistoryIcon, PlusIcon } from './icons'
 import HistoryModal from './HistoryModal'
 import ButtonTooltip from './input/buttonTooltip'
 import DragUploadOverlay from './input/dragUploadOverlay'
 import InputBatchBars from './input/inputBatchBars'
 import InputParamsPanel from './input/inputParamsPanel'
+import AgentSkillControl from './input/agentSkillControl'
+import CreativePromptControl from './input/creativePromptControl'
+import { getWorkbenchOwner } from '../lib/workbenchOwner'
 import { fetchQuotaData, type QuotaData } from '../lib/quota'
 import { fetchAvailableImageModelsResult, filterHiddenImageModels, getCachedAvailableImageModels } from '../lib/modelsCatalog'
 
@@ -94,6 +97,8 @@ export default function InputBar() {
   const prompt = useStore((s) => s.prompt)
   const appMode = useStore((s) => s.appMode)
   const isAgentMode = appMode === 'agent'
+  const [agentParamsOpen, setAgentParamsOpen] = useState(false)
+  const agentParamsId = useId()
   const createConversation = useStore((s) => s.createAgentConversation)
   const [historyOpen, setHistoryOpen] = useState(false)
   const historyButtonRef = useRef<HTMLButtonElement>(null)
@@ -1213,10 +1218,10 @@ export default function InputBar() {
   useEffect(() => {
     const el = textareaRef.current
     if (!el) return
-    // 输入时不重复渲染以防光标跳动
+    // 保留输入时的光标，同时允许创意广场等外部操作回填更新后的提示词。
     if (isUserInputRef.current) {
       isUserInputRef.current = false
-      return
+      if (getContentEditablePlainText(el) === prompt) return
     }
     const parts = getPromptMentionParts(prompt, inputImages)
     const html = prompt
@@ -1704,9 +1709,10 @@ export default function InputBar() {
     )
   }
 
-  const renderParams = (cols: string) => (
+  const renderParams = (cols: string, section?: 'all' | 'primary' | 'advanced') => (
     <InputParamsPanel
       cols={cols}
+      section={section}
       params={params}
       setParams={setParams}
       activeProfile={activeProfile}
@@ -1772,6 +1778,21 @@ export default function InputBar() {
     />
   )
 
+  const renderAgentMainParams = () => renderParams('studio-agent-main-params', 'primary')
+  const agentParamsButton = (
+    <button
+      type="button"
+      className="studio-agent-control studio-agent-parameters-toggle"
+      aria-expanded={agentParamsOpen}
+      aria-controls={agentParamsOpen ? agentParamsId : undefined}
+      aria-label="生图参数"
+      onClick={() => setAgentParamsOpen((open) => !open)}
+    >
+      <span>参数</span>
+      <ChevronDownIcon aria-hidden="true" className={`size-3 shrink-0 ${agentParamsOpen ? 'rotate-180' : ''}`} />
+    </button>
+  )
+
   const showFavoriteCollectionBatchBar = inCollectionOverview && selectedFavoriteCollectionIds.length > 0
   const showTaskBatchBar = !showFavoriteCollectionBatchBar && !isAgentMode && (gallerySelectionMode || selectedTaskIds.length > 0)
 
@@ -1799,9 +1820,9 @@ export default function InputBar() {
 
       <div
         data-input-bar
-        className={`${isAgentMode
-          ? 'studio-agent-input-bar relative z-20 w-full shrink-0'
-          : 'fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-30 w-full max-w-5xl px-3 sm:px-4'
+        className={`studio-composer-dock ${isAgentMode
+          ? 'studio-agent-input-bar relative z-20 shrink-0'
+          : 'fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-30'
         } transition-all duration-300${promptExpanded ? ' flex flex-col' : ''}`}
         style={!isAgentMode && promptExpanded ? { top: `${promptExpandedTop}px`, transitionProperty: 'none' } : undefined}
       >
@@ -1822,20 +1843,36 @@ export default function InputBar() {
           onDownloadSelected={handleDownloadSelected}
           onDeleteSelected={handleDeleteSelected}
         />
-        {appMode === 'agent' && isPoolBuild && !promptExpanded && (
+        {isPoolBuild && !isAgentMode && !promptExpanded && !inCollectionOverview && getWorkbenchOwner().startsWith('admin:') && (
+          <div className="mb-2 flex flex-wrap justify-end gap-2" data-no-drag-select>
+            <CreativePromptControl />
+          </div>
+        )}
+        {isAgentMode && !promptExpanded && (
           <div className="studio-conversation-actions" data-no-drag-select>
-            <button ref={historyButtonRef} type="button" aria-expanded={historyOpen} aria-haspopup="dialog" onClick={() => setHistoryOpen(!historyOpen)}>
-              <HistoryIcon aria-hidden="true" />对话历史
-            </button>
-            <button type="button" onClick={() => { closeHistory(); createConversation() }}>
-              <PlusIcon aria-hidden="true" />新建对话
-            </button>
-            {historyOpen && <HistoryModal placement="above" onClose={closeHistory} ignoreOutsideClickRef={historyButtonRef} />}
+            {isPoolBuild && (
+              <>
+                <button ref={historyButtonRef} type="button" title="对话历史" aria-expanded={historyOpen} aria-haspopup="dialog" onClick={() => setHistoryOpen(!historyOpen)}>
+                  <HistoryIcon aria-hidden="true" /><span className="sr-only sm:not-sr-only">对话历史</span>
+                </button>
+                <button type="button" title="新建对话" onClick={() => { closeHistory(); createConversation() }}>
+                  <PlusIcon aria-hidden="true" /><span className="sr-only sm:not-sr-only">新建对话</span>
+                </button>
+                {historyOpen && <HistoryModal placement="above" onClose={closeHistory} ignoreOutsideClickRef={historyButtonRef} />}
+              </>
+            )}
+            {activeAgentConversation && (
+              <AgentSkillControl
+                key={activeAgentConversation.id}
+                skill={activeAgentConversation.skill}
+                onChange={(skill) => updateAgentSkill(activeAgentConversation.id, skill)}
+              />
+            )}
           </div>
         )}
         <div ref={cardRef} className={`studio-input-card p-3${promptExpanded ? ' flex min-h-0 flex-1 flex-col' : ''}`}>
           {/* 移动端拖动条 */}
-          <button
+          {!isAgentMode && <button
             ref={handleRef}
             type="button"
             aria-expanded={!mobileCollapsed}
@@ -1851,11 +1888,11 @@ export default function InputBar() {
           >
             {mobileCollapsed ? '展开参数' : '收起参数'}
             <span aria-hidden="true">{mobileCollapsed ? '＋' : '−'}</span>
-          </button>
+          </button>}
 
           {/* 输入图片行（移动端可折叠） */}
           {inputImages.length > 0 && (
-            isMobile ? (
+            isMobile && !isAgentMode ? (
               <>
                 <div className={`collapse-section${mobileCollapsed ? ' collapsed' : ''}`}>
                   <div className="collapse-inner">
@@ -1959,7 +1996,7 @@ export default function InputBar() {
             />
             {prompt.length === 0 && (
               <div aria-hidden="true" className={`studio-prompt-placeholder prompt-placeholder relative col-start-1 row-start-1 pointer-events-none pl-4 pr-10 py-3 leading-relaxed${
-                isMobile && mobileCollapsed ? ' truncate' : ''
+                isMobile && !isAgentMode && mobileCollapsed ? ' truncate' : ''
               }`}>
                 {promptPlaceholder}
               </div>
@@ -2012,19 +2049,19 @@ export default function InputBar() {
 
           {/* 参数 + 按钮 */}
           <div className="mt-3">
+            {isAgentMode && agentParamsOpen && (
+              <div id={agentParamsId} aria-label="生图参数" role="group" className="studio-agent-parameters mb-3">
+                {renderParams('grid-cols-2 sm:grid-cols-3', 'advanced')}
+              </div>
+            )}
             {/* 桌面端布局 */}
-            <div className="studio-composer-controls hidden sm:flex items-end justify-between gap-3">
-              {renderParams(
-                appMode === 'agent'
-                  ? (showImageModelControl
-                      ? 'grid-cols-[minmax(145px,1.8fr)_minmax(160px,2fr)_minmax(68px,0.85fr)_repeat(4,minmax(54px,0.7fr))_minmax(44px,0.55fr)]'
-                      : 'grid-cols-[minmax(165px,2fr)_minmax(72px,0.9fr)_repeat(4,minmax(56px,0.75fr))_minmax(44px,0.55fr)]')
-                  : (showImageModelControl
-                      ? 'grid-cols-[minmax(185px,2.4fr)_minmax(72px,0.95fr)_repeat(4,minmax(60px,0.75fr))_minmax(44px,0.55fr)]'
-                      : 'grid-cols-[repeat(5,minmax(64px,1fr))_minmax(44px,0.6fr)]')
-              )}
+            <div className={`${isAgentMode ? 'studio-agent-controls' : 'studio-composer-controls'} hidden sm:flex items-end justify-between gap-3`}>
+              {isAgentMode ? renderAgentMainParams() : renderParams(showImageModelControl
+                ? 'grid-cols-[minmax(185px,2.4fr)_minmax(72px,0.95fr)_repeat(4,minmax(60px,0.75fr))_minmax(44px,0.55fr)]'
+                : 'grid-cols-[repeat(5,minmax(64px,1fr))_minmax(44px,0.6fr)]')}
 
               <div className="flex items-center gap-2 flex-shrink-0 mb-0.5">
+                {isAgentMode && agentParamsButton}
                 {isSharedProfile ? (
                   <div
                     className="flex items-center self-center px-2.5 py-1.5 rounded-xl border border-emerald-200/60 bg-emerald-50/70 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300 text-xs font-medium shadow-sm whitespace-nowrap select-none"
@@ -2075,7 +2112,7 @@ export default function InputBar() {
                     }`}
                     aria-label={submitButtonAriaLabel}
                   >
-                    <span className="hidden md:inline whitespace-nowrap">{submitButtonAriaLabel}</span>
+                    <span className={`whitespace-nowrap${isAgentMode ? '' : ' hidden md:inline'}`}>{submitButtonAriaLabel}</span>
                     {activeAgentIsRunning ? (
                       <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                         <rect x="7" y="7" width="10" height="10" rx="1.5" />
@@ -2092,14 +2129,14 @@ export default function InputBar() {
 
             {/* 移动端布局 */}
             <div className="sm:hidden flex flex-col gap-2">
-              <div id="studio-mobile-params" inert={mobileCollapsed} className={`collapse-section${mobileCollapsed ? ' collapsed' : ''}`}>
+              {isAgentMode ? renderAgentMainParams() : <div id="studio-mobile-params" inert={mobileCollapsed} className={`collapse-section${mobileCollapsed ? ' collapsed' : ''}`}>
                 <div className="collapse-inner">
                   {renderParams('grid-cols-2')}
                   <div className="h-2" />
                 </div>
-              </div>
+              </div>}
 
-              <div className="flex items-center justify-between gap-2">
+              <div className={`flex items-center justify-between gap-2${isAgentMode ? ' flex-wrap' : ''}`}>
                 {isSharedProfile ? (
                   <div
                     className="flex items-center px-2.5 py-1 rounded-lg bg-emerald-50/80 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-xs font-medium whitespace-nowrap select-none"
@@ -2117,6 +2154,7 @@ export default function InputBar() {
                   </div>
                 ) : null}
                 <div className="flex items-center gap-2 ml-auto">
+                  {isAgentMode && agentParamsButton}
                   <div
                     className="relative"
                     onMouseEnter={() => setAttachHover(true)}
@@ -2144,7 +2182,7 @@ export default function InputBar() {
                           className="fixed inset-0 z-40"
                           onClick={() => setShowMobileUploadMenu(false)}
                         />
-                        <div className="absolute bottom-full left-0 mb-2 w-32 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                        <div className={`absolute bottom-full ${isAgentMode ? 'right-0' : 'left-0'} mb-2 w-32 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden z-50 animate-in fade-in slide-in-from-bottom-2 duration-200`}>
                           <button
                             className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center gap-2 transition-colors"
                             onClick={() => {

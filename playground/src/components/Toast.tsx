@@ -37,10 +37,10 @@ export default function Toast() {
 
   const positionClass = appMode === 'canvas'
     ? 'top-5 z-[30000]'
-    : 'bottom-24 z-[120]'
+    : appMode === 'agent' ? 'top-5 z-[120]' : 'bottom-24 z-[120]'
 
   return (
-    <div className={`fixed ${positionClass} left-1/2 pointer-events-none toast-enter`}>
+    <div role="status" className={`fixed ${positionClass} left-1/2 pointer-events-none toast-enter`}>
       <div className="flex items-center gap-2.5 w-max max-w-[calc(100vw-32px)] sm:max-w-[min(44rem,80vw)] px-5 py-3.5 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border border-gray-200/60 dark:border-white/[0.08] rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)] ring-1 ring-black/5 dark:ring-white/10 text-sm font-medium text-gray-700 dark:text-gray-300">
         <span className="flex-shrink-0">{getIcon()}</span>
         <span className="leading-5 whitespace-pre-line text-center">{toast.message}</span>

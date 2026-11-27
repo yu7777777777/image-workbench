@@ -116,6 +116,24 @@ describe('agent conversation state', () => {
     expect(normalized[0].messages.map((message) => message.id)).toEqual(['user-round-a'])
   })
 
+  it('restores Skills from the preview and drops its retired preset selections', () => {
+    const configuration = { presetId: 'product', skill: { name: ' 产品封面 ', instructions: ' 保留包装文字 ' } }
+    const [restored] = normalizeAgentConversations([{
+      ...conversation([], null),
+      configuration,
+      rounds: [
+        { ...round('previous', null, 1), configuration: { presetId: 'storyboard', skill: { name: '镜头', instructions: '从全景开始' } } },
+        { ...round('invalid', 'previous', 2), configuration: { presetId: 'product' } },
+      ],
+    }])
+
+    expect(restored.skill).toEqual({ name: '产品封面', instructions: '保留包装文字' })
+    expect(restored.rounds[0].skill).toEqual({ name: '镜头', instructions: '从全景开始' })
+    expect(restored.rounds[1].skill).toBeUndefined()
+    expect(restored).not.toHaveProperty('configuration')
+    expect(restored.rounds[0]).not.toHaveProperty('configuration')
+  })
+
   it('filters malformed response output items while preserving unknown typed items', () => {
     const normalized = normalizeAgentConversations([{
       id: 'conversation-a',

@@ -16,7 +16,7 @@ import { fetchThirdPartyApps, updateSelfProfile, type ThirdPartyAppsSettings } f
 import { getValidatedAuthSession } from "@/lib/auth-session";
 import { maskSecretKey } from "@/lib/mask-secret";
 import { clearStoredAuthSession, setStoredAuthSession, type StoredAuthSession } from "@/store/auth";
-import { BookOpen, Bug, Check, Copy, Database, Eye, EyeOff, GalleryHorizontal, Images, KeyRound, LayoutGrid, List, LoaderCircle, LogOut, MessageCircle, Settings, ShieldCheck, Sparkles, User } from "lucide-react";
+import { BookOpen, Bug, Check, Copy, Database, Eye, EyeOff, GalleryHorizontal, Images, KeyRound, LayoutGrid, Library, List, LoaderCircle, LogOut, MessageCircle, Settings, ShieldCheck, Sparkles, User } from "lucide-react";
 import { toast } from "sonner";
 
 const workspaceItems = [
@@ -27,6 +27,7 @@ const workspaceItems = [
 ];
 
 const adminItems = [
+  { href: "/creative", label: "创意广场", icon: Library },
   { href: "/accounts", label: "号池管理", icon: Database },
   { href: "/image-manager", label: "图片管理", icon: GalleryHorizontal },
   { href: "/logs", label: "日志管理", icon: List },

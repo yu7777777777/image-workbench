@@ -7,6 +7,7 @@ import type {
   AgentInputDraft,
   AgentMessage,
   AgentRound,
+  AgentSkill,
   ApiMode,
   ApiProfile,
   AppSettings,
@@ -29,6 +30,7 @@ import { POOL_AGENT_PROFILE_ID, POOL_PROFILE_ID, isPoolBuild, poolSettings } fro
 import { isPoolProfileId } from './lib/poolProfileIds'
 import { enforcePresetConfigPolicy, getPresetConfig, getPresetProfileIds, getPresetProviderIds, isPresetConfigDeletionPrevented, isPresetConfigOnlyEnabled, isPresetConfigParamsLocked, isPresetProfile, isPresetProviderDeletionPrevented } from './lib/presetConfig'
 import { dismissAllTooltips } from './lib/tooltipDismiss'
+import { normalizeAgentSkill } from './lib/agentSkill'
 import { loadGalleryDensity, saveGalleryDensity, type GalleryDensity } from './lib/galleryDensity'
 import { loadGalleryLayoutMode, saveGalleryLayoutMode, type GalleryLayoutMode } from './lib/galleryLayout'
 import { remapImageMentionsForOrder, replaceImageMentionsForApi } from './lib/promptImageMentions'
@@ -1876,7 +1878,7 @@ export async function submitTask(options: {
   return taskId
 }
 
-function getActiveAgentConversation(): AgentConversation {
+export function getActiveAgentConversation(): AgentConversation {
   const state = useStore.getState()
   const existing = state.agentConversations.find((conversation) => conversation.id === state.activeAgentConversationId)
   if (existing) return existing
@@ -1891,6 +1893,16 @@ function updateAgentConversation(conversationId: string, updater: (conversation:
       conversation.id === conversationId ? updater(conversation) : conversation,
     ),
   }))
+}
+
+export function updateAgentSkill(conversationId: string, skill: AgentSkill | undefined) {
+  updateAgentConversation(conversationId, (conversation) => ({
+    ...conversation,
+    skill: normalizeAgentSkill(skill),
+  }))
+  if (agentConversationPersistenceReady) {
+    void flushAgentConversationsToIndexedDB().catch((error) => console.warn('保存 Agent Skill 失败', error))
+  }
 }
 
 function getAgentRoundControllerKey(conversationId: string, roundId: string) {
@@ -2512,6 +2524,7 @@ export async function submitAgentMessage() {
     ...(editingRoundHasErrorAssistantMessage && editingRoundAssistantMessage ? { assistantMessageId: editingRoundAssistantMessage.id } : {}),
     userMessageId,
     prompt: trimmedPrompt,
+    ...(conversation.skill ? { skill: conversation.skill } : {}),
     inputImageIds,
     maskTargetImageId,
     maskImageId,
@@ -2652,6 +2665,7 @@ export async function regenerateAgentAssistantMessage(conversationId: string, ro
     parentRoundId: sourceRound.parentRoundId ?? null,
     userMessageId: newUserMessageId,
     prompt: sourceRound.prompt || sourceUserMessage.content.trim(),
+    ...(sourceRound.skill ? { skill: sourceRound.skill } : {}),
     inputImageIds,
     maskTargetImageId: sourceRound.maskTargetImageId ?? sourceUserMessage.maskTargetImageId ?? null,
     maskImageId: sourceRound.maskImageId ?? sourceUserMessage.maskImageId ?? null,

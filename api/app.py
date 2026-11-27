@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from api import accounts, ai, image_tasks, shared_image_proxy, system
+from api import accounts, ai, creative, image_tasks, shared_image_proxy, system
 from api.errors import install_exception_handlers
 from api.support import resolve_web_asset, start_limited_account_watcher
 from services.backup_service import backup_service
@@ -137,6 +137,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(ai.create_router())
     app.include_router(accounts.create_router())
+    app.include_router(creative.create_router())
     app.include_router(image_tasks.create_router())
     app.include_router(shared_image_proxy.create_router())
     app.include_router(system.create_router(app_version))

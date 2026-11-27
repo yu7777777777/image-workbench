@@ -13,6 +13,7 @@ function PersistentImageWorkspaceInner() {
   const isImageRoute = normalizedPath === "/image";
   const rawMode = searchParams.get("mode");
   const currentMode = rawMode === "agent" ? "agent" : rawMode === "canvas" ? "canvas" : "gallery";
+  const creativeItemId = searchParams.get("creative");
 
   const [session, setSession] = useState<StoredAuthSession | null>(null);
   const [hasVisitedImage, setHasVisitedImage] = useState(isImageRoute);
@@ -62,6 +63,23 @@ function PersistentImageWorkspaceInner() {
       );
     }
   }, [ready, isImageRoute, currentMode]);
+
+  useEffect(() => {
+    const target = frame.current?.contentWindow;
+    if (!ready || !isImageRoute || !creativeItemId || session?.role !== "admin" || !target) return;
+    const requestId = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+    const receive = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || event.source !== target) return;
+      if (event.data?.type !== "creative-item-finished" || event.data.requestId !== requestId) return;
+      router.replace(`/image/?mode=${currentMode}`);
+    };
+    window.addEventListener("message", receive);
+    target.postMessage({ type: "apply-creative-item", requestId, id: creativeItemId, mode: currentMode }, window.location.origin);
+    return () => {
+      window.removeEventListener("message", receive);
+      target.postMessage({ type: "cancel-creative-item", requestId }, window.location.origin);
+    };
+  }, [ready, isImageRoute, creativeItemId, currentMode, session?.role, session?.subjectId, router]);
 
   // Sync theme (dark/light) to iframe
   useEffect(() => {
@@ -133,6 +151,9 @@ function PersistentImageWorkspaceInner() {
       }
       if (event.data?.type === "open-settings" && isImageRoute) {
         router.push("/settings/");
+      }
+      if (event.data?.type === "open-creative-library" && isImageRoute && session.role === "admin") {
+        router.push("/creative/");
       }
     };
 

@@ -12,6 +12,8 @@ import { isPoolBuild } from '../lib/accountPool'
 import { getAgentTextApiProfile, isAgentTextApiProfile } from '../lib/apiProfiles'
 import { callAgentResponsesApi } from '../lib/agentApi'
 import { useCanvasProject } from '../hooks/useCanvasProject'
+import type { CanvasCreativeTransfer } from '../lib/creativeLibrary'
+import { getWorkbenchOwner } from '../lib/workbenchOwner'
 import { CanvasNodeCard } from './canvas/CanvasNodeCard'
 import { CanvasToolbar } from './canvas/CanvasToolbar'
 import { CanvasLibrary } from './canvas/CanvasLibrary'
@@ -42,7 +44,7 @@ const snapshotCanvasNodes = (nodes: CanvasNode[]): CanvasNode[] => nodes.map((no
   }
 })
 
-export default function CanvasWorkspace() {
+export default function CanvasWorkspace({ creativeTransfer }: { creativeTransfer?: CanvasCreativeTransfer | null }) {
   const viewport = useRef<HTMLDivElement>(null)
   const uploadInput = useRef<HTMLInputElement>(null)
   const projectInput = useRef<HTMLInputElement>(null)
@@ -256,12 +258,24 @@ export default function CanvasWorkspace() {
     return node.id
   }
 
-  const addPromptFromLibrary = (prompt: string) => {
+  const addPromptFromLibrary = (prompt: string, title = '提示词') => {
     const id = promptLibraryTarget || addNode('text')
-    useStore.getState().updateCanvasNode(id, { label: '提示词', prompt })
+    useStore.getState().updateCanvasNode(id, { label: title, prompt })
     setPromptLibraryOpen(false)
     setPromptLibraryTarget(null)
   }
+
+  const appliedCreative = useRef<CanvasCreativeTransfer | null>(null)
+  useEffect(() => {
+    if (!creativeTransfer || !loaded || creativeTransfer.signal.aborted || appliedCreative.current === creativeTransfer) return
+    appliedCreative.current = creativeTransfer
+    const id = addNode('text')
+    const state = useStore.getState()
+    state.updateCanvasNode(id, { label: creativeTransfer.item.display_title, prompt: creativeTransfer.item.content })
+    void save().then(() => state.showToast('已创建画布提示词节点', 'success'))
+      .catch(() => state.showToast('提示词已加入画布，保存失败，请重试保存', 'error'))
+      .finally(creativeTransfer.finish)
+  }, [creativeTransfer, loaded, addNode, save])
 
   const importFiles = async (files: File[], point?: Point) => {
     const images = files.filter((file) => file.type.startsWith('image/'))
@@ -789,7 +803,7 @@ export default function CanvasWorkspace() {
     <div className="canvas-help">{selected.length ? `${selected.length} 个已选 · Delete 移除 · 右键更多` : '拖动圆点连接 · 双击连线断开 · V 选择 / H 平移'}</div>
     {selected.length > 0 && <div className="canvas-selection-actions" data-canvas-ui role="toolbar" aria-label="选中节点操作"><strong>{selected.length} 个节点</strong><i /><button title="聚焦选中节点" aria-label="聚焦选中节点" onClick={focusSelected}><CanvasIcon name="focus" /><span>聚焦</span></button><button title="复制选中节点" aria-label="复制选中节点" onClick={duplicateSelected}><span>复制</span></button><button title="给选中节点分组" aria-label="给选中节点分组" disabled={selected.length < 2} onClick={groupSelected}><span>分组</span></button><button title="折叠或展开选中节点所属分组" aria-label="折叠或展开选中节点所属分组" disabled={!selected.some((id) => nodes.find((node) => node.id === id)?.groupId)} onClick={toggleSelectedGroups}><span>收起组</span></button><button title="解散选中节点所属分组" disabled={!selected.some((id) => nodes.find((node) => node.id === id)?.groupId)} onClick={ungroupSelected}>解散组</button><button title="锁定或解锁选中节点" aria-label="锁定或解锁选中节点" onClick={toggleSelectedLocked}><span>锁定</span></button><button className="is-danger" title="删除选中节点" aria-label="删除选中节点" onClick={removeSelected}><span>删除</span></button></div>}
     {libraryOpen && <CanvasLibrary onAdd={addHistoryImage} onClose={() => setLibraryOpen(false)} />}
-    {promptLibraryOpen && <CanvasPromptLibrary onUse={addPromptFromLibrary} onClose={() => setPromptLibraryOpen(false)} />}
+    {promptLibraryOpen && <CanvasPromptLibrary onUse={addPromptFromLibrary} onClose={() => setPromptLibraryOpen(false)} showCreativeLink={getWorkbenchOwner().startsWith('admin:')} />}
     {box && <div className="canvas-selection" style={{ left: Math.min(box.from.x, box.to.x), top: Math.min(box.from.y, box.to.y), width: Math.abs(box.from.x - box.to.x), height: Math.abs(box.from.y - box.to.y) }} />}
     {dropActive && <div className="canvas-drop-overlay"><CanvasIcon name="image" /><strong>松开，将图片放入画布</strong></div>}
     {menu && <div className="canvas-node-menu" data-canvas-ui style={{ left: menu.x, top: menu.y }}>{menuNode ? <>
