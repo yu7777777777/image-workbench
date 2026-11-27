@@ -125,13 +125,31 @@ export function readReplyResources(text: string, resources: ChatResource[] = [])
   return { sources, filenames, citations, inlineSources, sourceDetails, attachments, attachmentPaths };
 }
 
+function readXmlAttr(attrs: string, name: string): string | undefined {
+  const match = new RegExp(`(?:^|\\s)${name}\\s*=\\s*(?:"([^"<>]*)"|'([^'<>]*)')`).exec(attrs);
+  return match ? (match[1] ?? match[2]) : undefined;
+}
+
+function safeHttpUrl(raw: string | undefined): URL | undefined {
+  if (!raw || raw.length > 2048) return undefined;
+  try {
+    const parsed = new URL(raw.trim());
+    if ((parsed.protocol === "http:" || parsed.protocol === "https:") && !parsed.username && !parsed.password) {
+      return parsed;
+    }
+  } catch {
+    // Ignore malformed URLs.
+  }
+  return undefined;
+}
+
 export function prepareReplyMarkdown(
   text: string,
   citations?: ReadonlyMap<string, string>,
   inlineSources?: ReadonlyMap<string, ChatResource>,
 ): string {
   const parts: string[] = [];
-  const tokens = /^ {0,3}(`{3,}|~{3,})[^\r\n]*|(`+)|(?<!\\)\\\(([^\r\n]+?)\\\)|(?<!\\)\\\[([\s\S]+?)\\\]|<LearningViz\b[^<>]*>([\s\S]*?)<\/LearningViz\s*>|(<Cite\s+refs=\{\s*\[\s*(?:"[^"<>]*"\s*,?\s*)+\]\s*\}\s*\/\s*>(?:[ \t]*<Cite\s+refs=\{\s*\[\s*(?:"[^"<>]*"\s*,?\s*)+\]\s*\}\s*\/\s*>)*)|<Link\s+ref="([\w.:-]{1,160})"\s+title="([^"<>]+)"\s*\/\s*>|<icon\s+[^<>]*\/\s*>|<badge(?:\s[^<>]*)?>([^<>]*)<\/badge>|(<divider(?:\s+color=(?:"[a-z]+"|'[a-z]+'))?\s*\/\s*>)/gm;
+  const tokens = /^ {0,3}(`{3,}|~{3,})[^\r\n]*|(`+)|(?<!\\)\\\(([^\r\n]+?)\\\)|(?<!\\)\\\[([\s\S]+?)\\\]|<LearningViz\b[^<>]*>([\s\S]*?)<\/LearningViz\s*>|(<Cite\s+refs=\{\s*\[\s*(?:"[^"<>]*"\s*,?\s*)+\]\s*\}\s*\/\s*>(?:[ \t]*<Cite\s+refs=\{\s*\[\s*(?:"[^"<>]*"\s*,?\s*)+\]\s*\}\s*\/\s*>)*)|<Link\b([^<>]*?)(?:\s*\/\s*>|>([^<>]*)<\/Link\s*>)|<Entity\b([^<>]*?)(?:\s*\/\s*>|>([^<>]*)<\/Entity\s*>)|<icon\s+[^<>]*\/\s*>|<badge(?:\s[^<>]*)?>([^<>]*)<\/badge>|(<divider(?:\s+color=(?:"[a-z]+"|'[a-z]+'))?\s*\/\s*>)/gm;
   let cursor = 0;
   for (let token = tokens.exec(text); token; token = tokens.exec(text)) {
     if (token[1]) {
@@ -150,16 +168,34 @@ export function prepareReplyMarkdown(
     else if (token[5] !== undefined) {
       const latex = token[5].trim();
       if (latex) parts.push(latex.includes("\n") ? `\n\n$$\n${latex}\n$$\n\n` : `$${latex}$`);
-    } else if (token[10]) parts.push("\n\n---\n\n");
-    else if (token[9] !== undefined) parts.push(token[9]);
-    else if (token[7] && token[8]) {
-      const title = escapeReplyMarkdown(token[8]);
-      const url = citations?.get(token[7]);
-      if (url) {
-        const target = inlineSources?.has(token[7]) ? `workbench-cite:${encodeURIComponent(token[7])}` : url;
-        parts.push(`[${title}](<${target}>)`);
+    } else if (token[12]) parts.push("\n\n---\n\n");
+    else if (token[11] !== undefined) parts.push(token[11]);
+    else if (token[9] !== undefined) {
+      const entityText = token[10]?.trim() || readXmlAttr(token[9], "value")?.trim() || "";
+      if (entityText) parts.push(entityText);
+    } else if (token[7] !== undefined) {
+      const ref = readXmlAttr(token[7], "ref")?.trim();
+      const rawUrl = readXmlAttr(token[7], "url") ?? readXmlAttr(token[7], "href");
+      const rawTitle = readXmlAttr(token[7], "title") ?? readXmlAttr(token[7], "label") ?? token[8]?.trim();
+      if (ref && /^[\w.:-]{1,160}$/.test(ref)) {
+        const title = escapeReplyMarkdown(rawTitle || "来源");
+        const url = citations?.get(ref);
+        if (url) {
+          const target = inlineSources?.has(ref) ? `workbench-cite:${encodeURIComponent(ref)}` : url;
+          parts.push(`[${title}](<${target}>)`);
+        } else {
+          const safe = safeHttpUrl(rawUrl);
+          if (safe) parts.push(`[${title}](<${safe.href}>)`);
+          else parts.push(`${title}（来源链接未返回）`);
+        }
       } else {
-        parts.push(`${title}（来源链接未返回）`);
+        const safe = safeHttpUrl(rawUrl);
+        if (safe) {
+          const label = escapeReplyMarkdown(rawTitle || safe.hostname);
+          parts.push(`[${label}](<${safe.href}>)`);
+        } else if (rawTitle) {
+          parts.push(escapeReplyMarkdown(rawTitle));
+        }
       }
     } else if (token[6]) {
       const refs = [...token[6].matchAll(/"([\w.:-]{1,160})"/g)].map((item) => item[1]);

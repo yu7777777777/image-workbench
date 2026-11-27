@@ -3,6 +3,12 @@
 - 统一号池、图片、日志和设置页的顶部留白。日志详情限制弹窗宽高，长字段和原始记录可换行滚动，预览使用日志缩略图。
 - Agent 按实际生图结果反馈成功和失败次数。后续请求出错时，已生成的图片仍可查看。
 
+# 1.16.43
+
+- 独立对话回调桌面阅读列宽至 `72rem` 并增大底部安全留白；封堵 `<details class="chat-widget-unsupported">` 超长源码横向撑爆页面滚动条；修复暗色模式下 `<box theme="light">` 与亮色十六进制背景卡片内「白底白字」及子图表主题错配；非开关 `<checkbox>` 改回 `5px` 圆角方形以区分圆形单选框，新增 `shape="switch"` 胶囊开关样式，细进度条轨道（`height <= 20`）自动零内边距并支持数字高度。
+- 彻底修复行内 `<AsyncImage>` / `<AsyncImageGroup>` 真图绑定失败与 `<Cite>` 偶发未返回：后端补全 `content_references` 图片（`image_v2`/`images`/`image_results`/`matched_text` 及 SSE 元数据补丁）与来源（`grouped_webpages`/`supporting_websites`）提取、清洗 `?utm_source=chatgpt.com` 消除同源歧义并按正文引用优先级保护 24 条上限；前端修复 `exactRefs` 误过滤并实现精确匹配、CJK/英文关键词打分与无显式 query 图片顺序兜底的三级绑定，绑定后自动从底部画廊排重。
+- 补齐线上多轮实测缺失的 GenUI 组件、语法与图标：支持 `<underline>`、`<strikethrough>`、行内格式化标签、`GenUI.copy(...)`、`<checkbox lineThrough={false}>`、`<MapWidgetV2>`、散点图/柱图有限数字字符串、文本插值白名单方法（`.toLocaleString()`/`.toFixed()`/`.split()[i]`/`.trim()`/`.slice()`/`.join()`/`.includes()` 及 `Math.*`/`Number()`/`String()`）、`{@body}` 多语句对象查表常量与多状态 `toggle` 辅助函数、`<segmented-control block>`、`<popover-trigger block>`、`<divider color="subtle"/>`、清洗裸露 `<Entity>` 与 `<Link url=...>`，并补齐 25+ 缺失 Lucide 图标与汉化滑块无障碍标签。
+
 # 1.16.42
 
 - 将共享图片、编辑、文本、Agent 和 fal 队列统一到服务端适配，工作台只读取共享渠道的公开信息。

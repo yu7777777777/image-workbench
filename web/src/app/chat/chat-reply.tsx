@@ -52,6 +52,110 @@ function WritingBlock({ text, streaming, onSave, markdownResources }: {
 }
 
 const emptyResources: ChatResource[] = [];
+const SEARCH_RESULT_REF_RE = /^turn\d+(?:search|web|news|view|image)\d+$/i;
+const STOP_WORDS = new Set([
+  "the", "and", "for", "with", "from", "that", "this", "image", "images", "img",
+  "photo", "picture", "http", "https", "www", "com", "org", "net", "html", "htm",
+]);
+const UTM_PARAMS = new Set(["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"]);
+
+function canonicalSourceUrl(rawUrl: string): string {
+  try {
+    const parsed = new URL(rawUrl);
+    for (const key of [...parsed.searchParams.keys()]) {
+      if (UTM_PARAMS.has(key.toLowerCase())) parsed.searchParams.delete(key);
+    }
+    parsed.hash = "";
+    const pathname = parsed.pathname.length > 1 ? parsed.pathname.replace(/\/+$/, "") : parsed.pathname;
+    const query = parsed.searchParams.toString();
+    return `${parsed.protocol}//${parsed.hostname.toLowerCase()}${parsed.port ? `:${parsed.port}` : ""}${pathname}${query ? `?${query}` : ""}`;
+  } catch {
+    return rawUrl;
+  }
+}
+
+function extractCitedRefs(text: string): string[] {
+  const refs = new Set<string>();
+  for (const match of text.matchAll(/<Cite\s+refs=\{\s*\[([^\]]{1,2048})\]\s*\}\s*\/\s*>/g)) {
+    for (const token of match[1].matchAll(/"([\w.:-]{1,160})"/g)) {
+      refs.add(token[1]);
+    }
+  }
+  for (const match of text.matchAll(/<Link\b[^<>]*?\bref="([\w.:-]{1,160})"/g)) {
+    refs.add(match[1]);
+  }
+  return [...refs];
+}
+
+function extractQueryTokens(queries: readonly string[]): { exact: string[]; bigrams: string[] } {
+  const exact = new Set<string>();
+  const bigrams = new Set<string>();
+  for (const query of queries) {
+    const lower = query.toLowerCase();
+    for (const latin of lower.matchAll(/[a-z0-9]{2,}/g)) {
+      const token = latin[0];
+      if (!STOP_WORDS.has(token)) exact.add(token);
+    }
+    for (const cjk of lower.matchAll(/[\u4e00-\u9fff]{2,}/g)) {
+      const run = cjk[0];
+      exact.add(run);
+      if (run.length >= 4) {
+        for (let i = 0; i <= run.length - 2; i++) {
+          bigrams.add(run.slice(i, i + 2));
+        }
+      }
+    }
+  }
+  return { exact: [...exact], bigrams: [...bigrams] };
+}
+
+function urlPathText(rawUrl?: string): string {
+  if (!rawUrl) return "";
+  try {
+    const pathname = decodeURIComponent(new URL(rawUrl).pathname);
+    return pathname.replace(/[/\-_.]+/g, " ");
+  } catch {
+    return "";
+  }
+}
+
+function widgetImageKey(node: WidgetImage): string {
+  return `${node.group ? "G" : "I"}|${node.ref ?? ""}|${(node.queries ?? []).join("\u001f")}|${node.label ?? ""}`;
+}
+
+function dedupeByImageUrl(items: readonly ChatResource[]): ChatResource[] {
+  const urls = new Set<string>();
+  return items.filter(({ imageUrl }) => {
+    if (!imageUrl || urls.has(imageUrl)) return false;
+    urls.add(imageUrl);
+    return true;
+  });
+}
+
+function scoreKeywordMatches(
+  candidates: readonly ChatResource[],
+  queryList: readonly string[],
+  limit: number,
+): ChatResource[] {
+  const { exact, bigrams } = extractQueryTokens(queryList);
+  if (!exact.length && !bigrams.length) return [];
+  const scored: Array<{ image: ChatResource; score: number; index: number }> = [];
+  for (let index = 0; index < candidates.length; index++) {
+    const image = candidates[index];
+    const haystack = `${image.title ?? ""} ${urlPathText(image.url)}`.toLowerCase().trim();
+    if (!haystack) continue;
+    let score = 0;
+    for (const token of exact) {
+      if (haystack.includes(token)) score += 2;
+    }
+    for (const token of bigrams) {
+      if (haystack.includes(token)) score += 1;
+    }
+    if (score > 0) scored.push({ image, score, index });
+  }
+  scored.sort((a, b) => (b.score - a.score) || (a.index - b.index));
+  return dedupeByImageUrl(scored.map((entry) => entry.image)).slice(0, limit);
+}
 
 export function ChatReply({ text, writingDrafts, resources = emptyResources, owner, streaming, canSend, onSend, onSaveWriting }: {
   text: string;
@@ -65,7 +169,49 @@ export function ChatReply({ text, writingDrafts, resources = emptyResources, own
 }) {
   const blocks = useMemo(() => splitChatReply(text, streaming), [text, streaming]);
   const references = useMemo(() => readReplyResources(text, resources), [text, resources]);
-  const { sources, inlineSources, sourceDetails, citations, filenames, attachments } = references;
+  const { sources, sourceDetails, filenames, attachments } = references;
+  const resolvedCitations = useMemo(() => {
+    const citations = new Map(references.citations);
+    const inlineSources = new Map(references.inlineSources);
+    const byRef = new Map<string, ChatResource[]>();
+    for (const resource of resources) {
+      if (resource.type !== "source" || !resource.url || !resource.ref) continue;
+      const list = byRef.get(resource.ref) ?? [];
+      list.push(resource);
+      byRef.set(resource.ref, list);
+    }
+    for (const [ref, group] of byRef) {
+      if (inlineSources.has(ref)) continue;
+      const canonicalUrls = new Set(group.map((item) => canonicalSourceUrl(item.url!)));
+      if (canonicalUrls.size !== 1) continue;
+      const preferred = group.find((item) => !item.url!.includes("utm_source=") && item.title)
+        ?? group.find((item) => !item.url!.includes("utm_source="))
+        ?? group[0];
+      if (preferred?.url) {
+        inlineSources.set(ref, preferred);
+        citations.set(ref, preferred.url);
+      }
+    }
+    const lowerInlineSources = new Map<string, ChatResource>();
+    const ambiguousLower = new Set<string>();
+    for (const [ref, source] of inlineSources) {
+      const lower = ref.toLowerCase();
+      const existing = lowerInlineSources.get(lower);
+      if (existing && existing.url !== source.url) ambiguousLower.add(lower);
+      else lowerInlineSources.set(lower, source);
+    }
+    for (const lower of ambiguousLower) lowerInlineSources.delete(lower);
+    for (const ref of extractCitedRefs(text)) {
+      if (citations.has(ref)) continue;
+      const matched = lowerInlineSources.get(ref.toLowerCase());
+      if (matched?.url) {
+        inlineSources.set(ref, matched);
+        citations.set(ref, matched.url);
+      }
+    }
+    return { citations, inlineSources, lowerInlineSources };
+  }, [text, resources, references]);
+  const { citations, inlineSources, lowerInlineSources } = resolvedCitations;
   const markdownResources = { citations, inlineSources, filenames, attachments, owner };
   const inlineAssets = useMemo(() => {
     const images: ChatResource[] = [];
@@ -77,40 +223,129 @@ export function ChatReply({ text, writingDrafts, resources = emptyResources, own
     return { images, products };
   }, [resources]);
 
-  const exactRefs = new Set<string>();
-  for (const image of inlineAssets.images) {
-    if (image.ref) exactRefs.add(image.ref);
-  }
-
-  function resolveImages(node: WidgetImage): ChatResource[] {
+  const imageBindings = useMemo(() => {
     const { images, products } = inlineAssets;
-    let matches = node.ref ? images.filter((image) => image.ref === node.ref) : [];
-    if (!matches.length && node.queries) {
-      const queries = node.queries;
-      matches = images.filter((image) => image.queries?.length === queries.length
-        && image.queries.every((query, index) => query === queries[index]));
-      if (!matches.length && node.group) {
-        matches = queries.flatMap((query) => images.find((image) => image.queries?.length === 1 && image.queries[0] === query) ?? []);
+    const widgetImageNodes: WidgetImage[] = [];
+    for (const block of blocks) {
+      if (block.kind === "widget") {
+        widgetImageNodes.push(...chatWidgetInlineImages(block.widget));
       }
-      if (!matches.length) {
-        const tokens = queries.flatMap((q) => q.toLowerCase().split(/[\s,，、/|]+/).filter((t) => t.length >= 2));
-        if (tokens.length) {
-          matches = images.filter((image) => !image.queries?.length && (!image.ref || !exactRefs.has(image.ref)) && Boolean(image.title)
-            && tokens.some((token) => image.title!.toLowerCase().includes(token)));
+    }
+    const widgetRefs = new Set<string>();
+    for (const node of widgetImageNodes) {
+      if (node.ref) widgetRefs.add(node.ref);
+    }
+    const isUnkeyedImage = (image: ChatResource): boolean => (
+      !image.queries?.length
+      && (!image.ref || (!widgetRefs.has(image.ref) && SEARCH_RESULT_REF_RE.test(image.ref)))
+    );
+
+    const assignmentsByNode = new Map<WidgetImage, ChatResource[]>();
+    const assignmentsByKey = new Map<string, ChatResource[]>();
+    const tier1Matched = new Set<WidgetImage>();
+    const claimedIds = new Set<string>();
+    const claimedUrls = new Set<string>();
+
+    const recordAssignment = (node: WidgetImage, matched: ChatResource[]) => {
+      assignmentsByNode.set(node, matched);
+      const key = widgetImageKey(node);
+      if (!assignmentsByKey.has(key)) assignmentsByKey.set(key, matched);
+      for (const item of matched) {
+        if (item.type === "image") {
+          claimedIds.add(item.id);
+          if (item.imageUrl) claimedUrls.add(item.imageUrl);
         }
       }
+    };
+
+    const matchTier1 = (node: WidgetImage): ChatResource[] => {
+      let matches = node.ref ? images.filter((image) => image.ref === node.ref) : [];
+      if (!matches.length && node.queries) {
+        const queries = node.queries;
+        matches = images.filter((image) => image.queries?.length === queries.length
+          && image.queries.every((query, index) => query === queries[index]));
+        if (!matches.length && node.group) {
+          matches = queries.flatMap((query) => images.find((image) => image.queries?.length === 1 && image.queries[0] === query) ?? []);
+        }
+      }
+      if (!matches.length && node.ref && !node.group) {
+        const product = products.get(node.ref);
+        if (product?.imageUrl) return [product];
+      }
+      const deduped = dedupeByImageUrl(matches);
+      return node.group ? deduped : deduped.slice(0, 1);
+    };
+
+    // Tier 1: exact ref / queries / product match
+    for (const node of widgetImageNodes) {
+      const matched = matchTier1(node);
+      if (matched.length) {
+        tier1Matched.add(node);
+        recordAssignment(node, matched);
+      }
     }
-    if (!matches.length && node.ref && !node.group) {
-      const product = products.get(node.ref);
-      if (product?.imageUrl) return [product];
+
+    // Tier 2: improved CJK + Latin keyword overlap against unclaimed unkeyed images
+    for (const node of widgetImageNodes) {
+      if (tier1Matched.has(node)) continue;
+      const queryList = node.queries ?? (node.label ? [node.label] : []);
+      if (!queryList.length) continue;
+      const limit = node.group ? Math.min(4, Math.max(1, node.queries?.length ?? 3)) : 1;
+      const candidates = images.filter((image) => !claimedIds.has(image.id)
+        && Boolean(image.imageUrl) && !claimedUrls.has(image.imageUrl!) && isUnkeyedImage(image));
+      const matched = scoreKeywordMatches(candidates, queryList, limit);
+      if (matched.length) recordAssignment(node, matched);
     }
-    if (!node.group) return matches.slice(0, 1);
-    const urls = new Set<string>();
-    return matches.filter(({ imageUrl }) => {
-      if (!imageUrl || urls.has(imageUrl)) return false;
-      urls.add(imageUrl);
-      return true;
-    });
+
+    // Tier 3: smart sequential fallback for remaining unclaimed unkeyed images
+    const fallbackPool: ChatResource[] = [];
+    const poolUrls = new Set<string>(claimedUrls);
+    for (const image of images) {
+      if (claimedIds.has(image.id) || !image.imageUrl || poolUrls.has(image.imageUrl)) continue;
+      if (!isUnkeyedImage(image)) continue;
+      poolUrls.add(image.imageUrl);
+      fallbackPool.push(image);
+    }
+    let cursor = 0;
+    for (const node of widgetImageNodes) {
+      if (tier1Matched.has(node)) continue;
+      if (node.ref && !node.queries?.length) continue;
+      const existing = assignmentsByNode.get(node) ?? [];
+      const limit = node.group ? Math.min(4, Math.max(1, node.queries?.length ?? 3)) : 1;
+      const need = limit - existing.length;
+      if (need <= 0 || cursor >= fallbackPool.length) continue;
+      const extra = fallbackPool.slice(cursor, cursor + need);
+      cursor += extra.length;
+      if (extra.length) recordAssignment(node, [...existing, ...extra]);
+    }
+
+    return {
+      assignmentsByNode,
+      assignmentsByKey,
+      claimedIds,
+      claimedUrls,
+      remainingPool: fallbackPool.slice(cursor),
+      matchTier1,
+    };
+  }, [blocks, inlineAssets]);
+
+  function resolveImages(node: WidgetImage): ChatResource[] {
+    const exact = imageBindings.assignmentsByNode.get(node);
+    if (exact) return exact;
+    const byKey = imageBindings.assignmentsByKey.get(widgetImageKey(node));
+    if (byKey) return byKey;
+    const tier1 = imageBindings.matchTier1(node);
+    if (tier1.length) return tier1;
+    const limit = node.group ? Math.min(4, Math.max(1, node.queries?.length ?? 3)) : 1;
+    const queryList = node.queries ?? (node.label ? [node.label] : []);
+    if (queryList.length && imageBindings.remainingPool.length) {
+      const tier2 = scoreKeywordMatches(imageBindings.remainingPool, queryList, limit);
+      if (tier2.length) return tier2;
+    }
+    if (!(node.ref && !node.queries?.length) && imageBindings.remainingPool.length) {
+      return imageBindings.remainingPool.slice(0, limit);
+    }
+    return [];
   }
 
   function handleOpenUrl(rawUrl: string) {
@@ -130,15 +365,14 @@ export function ChatReply({ text, writingDrafts, resources = emptyResources, own
     if (safeUrl) window.open(safeUrl, "_blank", "noopener,noreferrer");
   }
 
-  const renderedInline = new Set<string>();
+  const renderedInline = new Set<string>(imageBindings.claimedIds);
+  for (const image of inlineAssets.images) {
+    if (image.imageUrl && imageBindings.claimedUrls.has(image.imageUrl)) {
+      renderedInline.add(image.id);
+    }
+  }
   for (const block of blocks) {
-    if (block.kind === "widget") {
-      for (const image of chatWidgetInlineImages(block.widget)) {
-        for (const asset of resolveImages(image)) {
-          if (asset.type === "image") renderedInline.add(asset.id);
-        }
-      }
-    } else if (attachments.size && (block.kind === "markdown" || block.kind === "writing")) {
+    if (attachments.size && (block.kind === "markdown" || block.kind === "writing")) {
       const markdown = block.kind === "writing" ? writingDrafts?.[block.offset] ?? block.text : block.text;
       for (const path of readReplyResources(markdown).attachmentPaths) {
         const attachment = attachments.get(path);
@@ -148,7 +382,9 @@ export function ChatReply({ text, writingDrafts, resources = emptyResources, own
   }
 
   function renderResource(type: "product" | "source", ref: string, fallback: string, key: string) {
-    const source = type === "product" ? inlineAssets.products.get(ref) : inlineSources.get(ref);
+    const source = type === "product"
+      ? inlineAssets.products.get(ref)
+      : (inlineSources.get(ref) ?? lowerInlineSources.get(ref.toLowerCase()));
     return source?.url ? <ChatResourceLink key={key} resource={source} label={fallback} /> : undefined;
   }
 

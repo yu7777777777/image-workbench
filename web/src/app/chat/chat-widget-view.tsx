@@ -1,25 +1,28 @@
 import { createElement, useId, useMemo, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import {
   Activity, AlarmClock, AlertCircle, AlertTriangle, Archive, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ArrowUpRight,
-  Award, Bell, Book, Bookmark, BookOpen, Box, Briefcase, Calendar, CalendarCheck, CalendarClock, CalendarDays,
-  CalendarPlus, CalendarRange, Camera, Car, ChartColumn, ChartLine, ChartPie, Check, CheckCircle, CheckSquare,
-  ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, CirclePlus, ClipboardCheck, ClipboardList, Clock,
-  Cloud, Code, Coffee, Compass, Copy, CornerDownRight, Cpu, CreditCard, Database, Download, Dumbbell, Ellipsis,
-  EllipsisVertical, ExternalLink, Eye, File, FileSpreadsheet, FileText, Filter, Flag, Flame, Folder, Globe,
-  GraduationCap, Grid2x2, Heart, HelpCircle, History, Home, House, Image as ImageIcon, Inbox, Info, Layers,
-  LayoutDashboard, Leaf, Lightbulb, Link, List, ListChecks, ListTodo, LoaderCircle, Lock, Mail, MapPin, Menu,
-  MessageSquare, Mic, Minus, Moon, MousePointerClick, Package, Palette, PanelLeft, Paperclip, Pause, Pencil,
-  PenTool, Phone, Pin, Plane, Play, Plus, Power, RefreshCw, Repeat, Rocket, RotateCcw, Search, Send, Server,
-  Settings, Share2, Shield, ShoppingBag, SlidersHorizontal, Sparkles, Star, Sun, Table, Tag, Target, Terminal,
-  ThumbsDown, ThumbsUp, Timer, Trash2, TrendingUp, Trophy, Unlock, Upload, User, Users, Utensils, Video, Volume2,
-  Wallet, X, XCircle, Zap,
+  Award, Bed, Bell, Book, Bookmark, BookOpen, Box, Briefcase, BriefcaseBusiness, Building, Building2, Bus, Calendar,
+  CalendarCheck, CalendarClock, CalendarDays, CalendarPlus, CalendarRange, Camera, Car, ChartColumn, ChartLine,
+  ChartNoAxesCombined, ChartPie, Check, CheckCircle, CheckSquare, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
+  Circle, CircleDot, CirclePlus, ClipboardCheck, ClipboardList, Clock, Cloud, Code, Code2, Coffee, Compass, Copy,
+  CornerDownRight, Cpu, CreditCard, Database, Download, Dumbbell, Ellipsis, EllipsisVertical, ExternalLink, Eye, File,
+  FileSpreadsheet, FileText, Filter, Flag, Flame, Folder, FormInput, GitBranch, Globe, GraduationCap, Grid2x2, Heart,
+  HelpCircle, History, Home, House, Image as ImageIcon, Inbox, Info, Landmark, Layers, LayoutDashboard, LayoutPanelTop,
+  Leaf, Lightbulb, Link, List, ListChecks, ListTodo, LoaderCircle, Lock, Mail, Map as MapIcon, MapPin, Menu,
+  MessageSquare, Mic, Minus, Moon, MousePointerClick, Package, Palette, PanelLeft, PanelsTopLeft, Paperclip, Pause,
+  Pencil, PenTool, Phone, PiggyBank, Pin, Plane, Play, Plus, Power, Receipt, RefreshCw, Repeat, Rocket, RotateCcw,
+  Search, Send, Server, Settings, Share2, Shield, ShoppingBag, ShoppingCart, SlidersHorizontal, Sparkles, Star, Sun,
+  Table, Tag, Target, Terminal, TextCursorInput, ThumbsDown, ThumbsUp, Ticket, Timer, ToggleRight, Train, TrainFront,
+  Trash2, TrendingDown, TrendingUp, Trophy, Type, Unlock, Upload, User, Users, Utensils, Video, Volume2, Wallet,
+  Workflow, X, XCircle, Zap,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { escapeReplyMarkdown } from "@/lib/chat-rich-reply";
 import { applyWidgetArrayAction, widgetValue, type ChatWidget, type WidgetImage, type WidgetNode, type WidgetResourceType, type WidgetStateValue } from "@/lib/chat-widget";
 import type { ChatResource } from "@/lib/chat-resources";
-import { CodeBlock, ReplyMarkdown } from "./chat-markdown";
+import { CodeBlock, copyReplyText, ReplyMarkdown } from "./chat-markdown";
 import { ReplyChart } from "./chat-chart";
 import { WidgetCarousel, WidgetMap, WidgetVideo } from "./chat-widget-media";
 import { ChatWidgetImages } from "./chat-resource-view";
@@ -36,22 +39,22 @@ const icons = new Map([
   ["activity", Activity], ["bell", Bell], ["calendar", Calendar],
   ["calendar-days", CalendarDays], ["calendar-range", CalendarRange], ["calendar-check", CalendarCheck],
   ["calendar-clock", CalendarClock], ["calendar-plus", CalendarPlus],
-  ["camera", Camera], ["chart-line", ChartLine],
-  ["cloud", Cloud], ["code", Code], ["folder", Folder], ["heart", Heart], ["home", Home], ["house", House], ["image", ImageIcon],
+  ["camera", Camera], ["chart-line", ChartLine], ["chart-no-axes-combined", ChartNoAxesCombined],
+  ["cloud", Cloud], ["code", Code], ["code-2", Code2], ["folder", Folder], ["heart", Heart], ["home", Home], ["house", House], ["image", ImageIcon],
   ["info", Info], ["mail", Mail], ["mouse-pointer-click", MousePointerClick], ["search", Search], ["settings", Settings],
   ["user", User], ["users", Users],
   ["check", Check], ["chevron-down", ChevronDown], ["chevron-left", ChevronLeft], ["chevron-right", ChevronRight], ["chevron-up", ChevronUp],
-  ["circle", Circle], ["circle-plus", CirclePlus], ["corner-down-right", CornerDownRight], ["file-text", FileText], ["chart-column", ChartColumn],
-  ["layout-dashboard", LayoutDashboard],
-  ["power", Power], ["shopping-bag", ShoppingBag], ["trash-2", Trash2],
+  ["circle", Circle], ["circle-dot", CircleDot], ["circle-plus", CirclePlus], ["corner-down-right", CornerDownRight], ["file-text", FileText], ["chart-column", ChartColumn],
+  ["layout-dashboard", LayoutDashboard], ["layout-panel-top", LayoutPanelTop], ["panels-top-left", PanelsTopLeft],
+  ["power", Power], ["shopping-bag", ShoppingBag], ["shopping-cart", ShoppingCart], ["trash-2", Trash2],
   ["download", Download], ["palette", Palette], ["pen-tool", PenTool], ["file-spreadsheet", FileSpreadsheet],
   ["file", File], ["sparkles", Sparkles], ["cpu", Cpu], ["zap", Zap], ["shield", Shield], ["star", Star],
   ["arrow-right", ArrowRight], ["arrow-left", ArrowLeft], ["arrow-up", ArrowUp], ["arrow-down", ArrowDown], ["arrow-up-right", ArrowUpRight],
   ["external-link", ExternalLink],
-  ["play", Play], ["pause", Pause], ["volume-2", Volume2], ["map-pin", MapPin],
+  ["play", Play], ["pause", Pause], ["volume-2", Volume2], ["map-pin", MapPin], ["map", MapIcon],
   ["sliders-horizontal", SlidersHorizontal], ["check-square", CheckSquare], ["layers", Layers],
   ["bar-chart", ChartColumn], ["bar-chart-2", ChartColumn], ["bar-chart-3", ChartColumn], ["chart", ChartColumn],
-  ["pie-chart", ChartPie], ["chart-pie", ChartPie], ["trending-up", TrendingUp],
+  ["pie-chart", ChartPie], ["chart-pie", ChartPie], ["trending-up", TrendingUp], ["trending-down", TrendingDown],
   ["alert-triangle", AlertTriangle], ["alert-circle", AlertCircle], ["circle-alert", AlertCircle],
   ["x", X], ["x-circle", XCircle], ["copy", Copy], ["pencil", Pencil], ["edit", Pencil], ["eye", Eye],
   ["filter", Filter], ["refresh-cw", RefreshCw], ["database", Database], ["server", Server],
@@ -61,7 +64,7 @@ const icons = new Map([
   ["help-circle", HelpCircle], ["circle-help", HelpCircle],
   ["inbox", Inbox], ["list-todo", ListTodo], ["list-checks", ListChecks],
   ["clipboard-list", ClipboardList], ["clipboard-check", ClipboardCheck],
-  ["briefcase", Briefcase], ["compass", Compass], ["menu", Menu],
+  ["briefcase", Briefcase], ["briefcase-business", BriefcaseBusiness], ["compass", Compass], ["menu", Menu],
   ["ellipsis", Ellipsis], ["ellipsis-vertical", EllipsisVertical], ["panel-left", PanelLeft],
   ["target", Target], ["flag", Flag], ["pin", Pin], ["archive", Archive],
   ["flame", Flame], ["award", Award], ["trophy", Trophy], ["coffee", Coffee],
@@ -70,7 +73,11 @@ const icons = new Map([
   ["lock", Lock], ["unlock", Unlock], ["link", Link], ["paperclip", Paperclip], ["upload", Upload],
   ["lightbulb", Lightbulb], ["rocket", Rocket], ["graduation-cap", GraduationCap], ["book", Book],
   ["phone", Phone], ["video", Video], ["mic", Mic], ["credit-card", CreditCard], ["wallet", Wallet],
-  ["package", Package], ["plane", Plane], ["car", Car], ["utensils", Utensils], ["dumbbell", Dumbbell], ["leaf", Leaf],
+  ["package", Package], ["plane", Plane], ["car", Car], ["bus", Bus], ["train", Train], ["train-front", TrainFront],
+  ["utensils", Utensils], ["dumbbell", Dumbbell], ["leaf", Leaf], ["bed", Bed], ["ticket", Ticket],
+  ["building", Building], ["building-2", Building2], ["landmark", Landmark], ["piggy-bank", PiggyBank],
+  ["receipt", Receipt], ["type", Type], ["form-input", FormInput], ["text-cursor-input", TextCursorInput],
+  ["workflow", Workflow], ["toggle-right", ToggleRight], ["git-branch", GitBranch],
 ]);
 
 const iconAliases = new Map([
@@ -128,9 +135,20 @@ const surfaceTokens: Record<string, string> = {
   transparent: "transparent",
 };
 const semanticColors = new Set([
-  "primary", "emphasis", "secondary", "tertiary", "muted",
+  "primary", "emphasis", "secondary", "tertiary", "muted", "subtle",
   "success", "danger", "error", "warning", "info", "discovery", "neutral",
 ]);
+
+export function isLightHexColor(color: string): boolean {
+  const match = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.exec(color.trim());
+  if (!match) return false;
+  const hex = match[1];
+  const r = parseInt(hex.length === 3 ? hex[0] + hex[0] : hex.slice(0, 2), 16) / 255;
+  const g = parseInt(hex.length === 3 ? hex[1] + hex[1] : hex.slice(2, 4), 16) / 255;
+  const b = parseInt(hex.length === 3 ? hex[2] + hex[2] : hex.slice(4, 6), 16) / 255;
+  const linear = (channel: number) => channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b) > 0.72;
+}
 
 function resolveBackground(options: WidgetLayoutOptions, values?: ReadonlyMap<string, WidgetStateValue>) {
   const raw = options?.background !== undefined && values ? widgetValue(options.background, values) : options?.background;
@@ -139,7 +157,8 @@ function resolveBackground(options: WidgetLayoutOptions, values?: ReadonlyMap<st
   const cssValue = isToken ? surfaceTokens[text] : (text && safeColorPattern.test(text) ? text : undefined);
   const hasBackground = Boolean(cssValue && cssValue !== "transparent");
   const hasSurface = options?.surface === true || (options?.surface !== false && isToken && text !== "transparent");
-  return { cssValue, hasBackground, hasSurface };
+  const isLightSurface = Boolean(cssValue && isLightHexColor(cssValue));
+  return { cssValue, hasBackground, hasSurface, isLightSurface };
 }
 
 function safeLayoutWidth(value: WidgetStateValue | undefined): string | undefined {
@@ -163,7 +182,9 @@ function layoutStyle(
   cssColor?: string,
 ): CSSProperties & { "--chat-widget-columns"?: number } {
   const padding = options?.padding;
-  const inset = typeof padding === "object" || options?.square !== undefined ? 0 : undefined;
+  const heightPx = options?.height ? /^([1-9]\d?)px$/.exec(options.height) : null;
+  const compactBar = Boolean(heightPx && Number(heightPx[1]) <= 20);
+  const inset = typeof padding === "object" || options?.square !== undefined || compactBar ? 0 : undefined;
   const justify = options?.justify === "between" ? "space-between" : options?.justify;
   const { cssValue: customBg } = resolveBackground(options, values);
   const width = options?.width !== undefined && values ? safeLayoutWidth(widgetValue(options.width, values)) : undefined;
@@ -190,8 +211,9 @@ function layoutStyle(
     width,
     minWidth: width ? 0 : undefined,
     background: customBg,
-    minHeight: options?.height === "100%" ? undefined : options?.height,
-    height: options?.height === "100%" ? "100%" : undefined,
+    minHeight: options?.height === "100%" || compactBar ? undefined : options?.height,
+    height: options?.height === "100%" ? "100%" : compactBar ? options?.height : undefined,
+    overflow: compactBar ? "hidden" : undefined,
     aspectRatio: options?.aspectRatio,
     flexWrap: options?.wrap,
     fontVariantNumeric: options?.numeric ? "tabular-nums" : undefined,
@@ -244,6 +266,13 @@ export function ChatWidgetView({ widget, streaming, canSend, onSend, onOpenUrl, 
     else if ("openUrl" in action) {
       const target = String(widgetValue(action.openUrl, values)).trim();
       if (target) onOpenUrl?.(target);
+    } else if ("copy" in action) {
+      const text = String(widgetValue(action.copy, values));
+      if (text) {
+        void copyReplyText(text).then((ok) => {
+          if (ok) toast.success("已复制到剪贴板");
+        });
+      }
     } else if ("set" in action) setValues((current) => applyUpdates(current, [action.set]));
     else if ("updates" in action && action.updates.length) setValues((current) => applyUpdates(current, action.updates));
     else if ("array" in action) {
@@ -286,28 +315,52 @@ export function ChatWidgetView({ widget, streaming, canSend, onSend, onOpenUrl, 
     return {};
   }
 
+  function renderInlineChildren(children: WidgetNode[], key: string): ReactNode {
+    return children.map((child, index) => {
+      if (child.kind === "markdown") {
+        return child.parts.map((part) => typeof part === "string" ? part : String(widgetValue(part.value, values))).join("");
+      }
+      return renderNode(child, `${key}-${index}`);
+    });
+  }
+
   function renderNode(node: WidgetNode, key: string): ReactNode {
     switch (node.kind) {
       case "markdown": {
         const text = node.parts.map((part) => typeof part === "string" ? part : escapeReplyMarkdown(String(widgetValue(part.value, values)))).join("");
         return <div className="chat-widget-markdown" key={key}><ReplyMarkdown text={text} /></div>;
       }
+      case "inline": {
+        const { dataColor, cssColor } = resolveColor(node.color);
+        const className = node.tag === "u" ? "chat-widget-underline" : node.tag === "s" ? "chat-widget-strikethrough" : undefined;
+        return createElement(
+          node.tag,
+          { key, className, "data-color": dataColor, style: cssColor ? { color: cssColor } : undefined },
+          renderInlineChildren(node.children, key),
+        );
+      }
       case "layout": {
         const options = node.options;
         const isTextBlock = node.variant === "title" || node.variant === "text" || node.variant === "caption";
+        const isSurfaceContainer = node.variant === "box" || node.variant === "card";
         const verticalGrid = (node.variant === "box" && options?.direction !== "row") || node.variant === "col" || node.variant === "card" || node.variant === "callout";
-        const { hasBackground, hasSurface } = resolveBackground(options, values);
+        const { hasBackground, hasSurface, isLightSurface } = resolveBackground(options, values);
         const { dataColor, cssColor } = resolveColor(options?.color);
         const style = layoutStyle(options, verticalGrid, values, isTextBlock, cssColor);
         const hasFlex = node.variant === "row" && node.children.length > 0 && node.children.every(
           (child) => (child.kind === "layout" || child.kind === "pressable") && child.options?.flex !== undefined,
         );
+        const inlineFlow = (isTextBlock || node.variant === "badge" || node.variant === "label")
+          && node.children.some((child) => child.kind === "inline")
+          && node.children.every((child) => child.kind === "markdown" || child.kind === "inline" || child.kind === "icon" || child.kind === "link");
         const Container = node.variant === "blockquote" ? "blockquote" : "div";
         return <Container
           className={`chat-widget-${node.variant}`}
           data-border={options?.border === true ? "true" : options?.border === false ? "false" : undefined}
           data-surface={hasSurface ? "true" : undefined}
           data-background={hasBackground ? "true" : undefined}
+          data-theme={isSurfaceContainer ? options?.theme : undefined}
+          data-surface-tone={isSurfaceContainer && isLightSurface ? "light" : undefined}
           data-color={dataColor}
           data-size={options?.size}
           data-weight={options?.weight}
@@ -320,7 +373,7 @@ export function ChatWidgetView({ widget, streaming, canSend, onSend, onOpenUrl, 
           style={style}
           key={key}
         >
-          {node.children.map((child, index) => renderNode(child, `${key}-${index}`))}
+          {inlineFlow ? renderInlineChildren(node.children, key) : node.children.map((child, index) => renderNode(child, `${key}-${index}`))}
         </Container>;
       }
       case "form":
@@ -332,7 +385,7 @@ export function ChatWidgetView({ widget, streaming, canSend, onSend, onOpenUrl, 
         const trailing = !node.icon || node.icon === "chevron-down";
         const glyph = Icon && <Icon size={15} aria-hidden="true" className={trailing ? "chat-widget-popover-chevron" : undefined} />;
         return <Popover key={key}>
-          <PopoverTrigger asChild><Button variant="outline" size="sm" className="chat-widget-popover-trigger" disabled={streaming}>
+          <PopoverTrigger asChild><Button variant="outline" size="sm" className="chat-widget-popover-trigger" data-block={node.block ? "true" : undefined} disabled={streaming}>
             {!trailing && glyph}{node.label}{trailing && glyph}
           </Button></PopoverTrigger>
           <PopoverContent align="start" sideOffset={7} aria-label={node.label} className="chat-markdown chat-widget chat-widget-popover-content">
@@ -351,7 +404,7 @@ export function ChatWidgetView({ widget, streaming, canSend, onSend, onOpenUrl, 
         const { action, options } = node;
         const value = node.pressed !== undefined ? widgetValue(node.pressed, values) : "set" in action ? values.get(action.set.name) : undefined;
         const expanded = node.expanded === undefined ? undefined : Boolean(widgetValue(node.expanded, values));
-        const { hasBackground, hasSurface } = resolveBackground(options, values);
+        const { hasBackground, hasSurface, isLightSurface } = resolveBackground(options, values);
         const style = layoutStyle(options, true, values);
         const disabled = streaming || ("submit" in action && !canSend);
         const ariaPressed = expanded === undefined && typeof value === "boolean" ? value : undefined;
@@ -380,6 +433,8 @@ export function ChatWidgetView({ widget, streaming, canSend, onSend, onOpenUrl, 
           data-border={options.border === true ? "true" : options.border === false ? "false" : undefined}
           data-surface={hasSurface ? "true" : undefined}
           data-background={hasBackground ? "true" : undefined}
+          data-theme={options.theme}
+          data-surface-tone={isLightSurface ? "light" : undefined}
           data-flex={options.flex !== undefined ? "true" : undefined}
           style={style}
         >
@@ -389,8 +444,21 @@ export function ChatWidgetView({ widget, streaming, canSend, onSend, onOpenUrl, 
             onClick={() => applyAction(action)} />
         </div>;
       }
-      case "map":
-        return <WidgetMap label={node.label} markers={node.markers} key={key} />;
+      case "map": {
+        const hasDetails = node.markers.some((item) => item.description || item.group);
+        if (!hasDetails) return <WidgetMap label={node.label} markers={node.markers} key={key} />;
+        return <div className="chat-widget-col" key={key}>
+          <WidgetMap label={node.label} markers={node.markers} />
+          <ul className="chat-widget-list">
+            {node.markers.map((item, index) => (
+              <li className="chat-widget-list-item" key={index}>
+                <strong>{item.label}</strong>
+                {item.description && <span> · {item.description}</span>}
+              </li>
+            ))}
+          </ul>
+        </div>;
+      }
       case "video":
         return <WidgetVideo label={node.label} src={node.src} key={key} />;
       case "icon": {
@@ -400,8 +468,14 @@ export function ChatWidgetView({ widget, streaming, canSend, onSend, onOpenUrl, 
       }
       case "divider": {
         const spacingToken = typeof node.spacing === "string" ? node.spacing : node.spacing === 0 ? "none" : undefined;
-        const spacingStyle = typeof node.spacing === "number"
-          ? (node.orientation === "vertical" ? { marginInline: node.spacing } : { marginBlock: node.spacing })
+        const { dataColor, cssColor } = resolveColor(node.color);
+        const spacingStyle: CSSProperties | undefined = typeof node.spacing === "number" || cssColor
+          ? {
+            ...(typeof node.spacing === "number"
+              ? (node.orientation === "vertical" ? { marginInline: node.spacing } : { marginBlock: node.spacing })
+              : {}),
+            ...(cssColor ? { borderColor: cssColor } : {}),
+          }
           : undefined;
         return (
           <hr
@@ -410,6 +484,7 @@ export function ChatWidgetView({ widget, streaming, canSend, onSend, onOpenUrl, 
             data-spacing={spacingToken}
             data-flush={node.flush === true ? "true" : node.flush === false ? "false" : undefined}
             data-orientation={node.orientation}
+            data-color={dataColor}
             style={spacingStyle}
           />
         );
@@ -454,7 +529,7 @@ export function ChatWidgetView({ widget, streaming, canSend, onSend, onOpenUrl, 
           value={Math.max(0, Math.min(node.max, Number(widgetValue(node.value, values)) || 0))} />;
       case "radio":
         return (
-          <fieldset key={key} className={node.segmented ? "chat-widget-options chat-widget-segmented" : "chat-widget-options"} data-horizontal={node.horizontal} data-block={node.block} disabled={streaming}>
+          <fieldset key={key} className={node.segmented ? "chat-widget-options chat-widget-segmented" : "chat-widget-options"} data-horizontal={node.horizontal} data-block={node.block ? "true" : undefined} disabled={streaming}>
             <legend>{node.label}</legend>
             <div>
               {node.options.map((option) => (
@@ -473,7 +548,7 @@ export function ChatWidgetView({ widget, streaming, canSend, onSend, onOpenUrl, 
             key={key}
             className="chat-widget-slider"
             type="range"
-            aria-label={`调整 ${node.name.toUpperCase()}`}
+            aria-label={node.label?.trim() || "调整滑块"}
             min={node.min}
             max={node.max}
             step={node.step}
@@ -485,14 +560,17 @@ export function ChatWidgetView({ widget, streaming, canSend, onSend, onOpenUrl, 
       case "chart": {
         const filter = node.filter === undefined ? undefined : widgetValue(node.filter, values);
         const rows = node.rows.filter((row) => filter === undefined || row.filter === filter);
-        return <ReplyChart key={key} chartType={node.chartType} label={node.label} series={node.series} description={node.description} min={node.min} rows={rows.map(({ name, x, values: rowValues }) => ({
-          name: String(widgetValue(name, values)),
-          x: x === undefined ? undefined : Number(widgetValue(x, values)),
-          values: rowValues.map((value) => {
-            const number = Number(widgetValue(value, values));
-            return Number.isFinite(number) ? number : 0;
-          }),
-        }))} />;
+        return <ReplyChart key={key} chartType={node.chartType} label={node.label} series={node.series} description={node.description} min={node.min} rows={rows.map(({ name, x, values: rowValues }) => {
+          const parsedX = x === undefined ? undefined : Number(widgetValue(x, values));
+          return {
+            name: String(widgetValue(name, values)),
+            x: parsedX !== undefined && Number.isFinite(parsedX) ? parsedX : undefined,
+            values: rowValues.map((value) => {
+              const number = Number(widgetValue(value, values));
+              return Number.isFinite(number) ? number : 0;
+            }),
+          };
+        })} />;
       }
       case "condition": {
         const children = widgetValue(node.test, values) ? node.children : node.fallback;
@@ -513,8 +591,9 @@ export function ChatWidgetView({ widget, streaming, canSend, onSend, onOpenUrl, 
         const current = values.get(node.name);
         const { item, index } = node;
         const initial = Array.isArray(current) ? (index === undefined ? current.includes(item) : current[index] === true) : current === true;
-        return <label className="chat-widget-checkbox" data-switch={node.switch} data-compact={node.compact} key={key}>
-          <input type="checkbox" role={node.switch ? "switch" : undefined} aria-label={node.compact ? node.label : undefined}
+        const isSwitch = Boolean(node.switch || node.shape === "switch");
+        return <label className="chat-widget-checkbox" data-switch={isSwitch || undefined} data-shape={node.shape === "switch" ? "switch" : undefined} data-compact={node.compact || undefined} data-line-through={node.lineThrough ? "true" : undefined} key={key}>
+          <input type="checkbox" role={isSwitch ? "switch" : undefined} data-shape={node.shape === "switch" ? "switch" : undefined} aria-label={node.compact ? node.label : undefined}
             checked={initial} disabled={streaming} onChange={(event) => {
             const checked = event.currentTarget.checked;
             if (item === undefined && index === undefined) setValue(node.name, checked);
