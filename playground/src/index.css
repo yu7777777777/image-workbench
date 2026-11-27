@@ -806,6 +806,11 @@ input[type="number"] {
   max-height: 20rem;
 }
 
+.studio-task-media-fill {
+  aspect-ratio: auto;
+  height: 100%;
+}
+
 .studio-task-hover-reveal {
   opacity: 0;
   transform: translateY(2px);
