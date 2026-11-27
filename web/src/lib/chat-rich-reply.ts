@@ -1,12 +1,57 @@
 import { chatWidgetStartTags, readChatWidget, type ChatWidget } from "./chat-widget";
 import { attachmentPath, type ChatResource } from "./chat-resources";
 
-type ChatReplyBlock = { offset: number } & (
+export type ChatReplyBlock = { offset: number } & (
   | { kind: "markdown" | "writing"; text: string }
   | { kind: "widget"; widget: ChatWidget }
   | { kind: "unsupported"; text: string }
-  | { kind: "pending" }
+  | { kind: "pending"; chars: number; label: string }
 );
+
+function skipLeadingBodyDirectives(raw: string): string {
+  let cursor = 0;
+  while (raw.slice(cursor).trimStart().startsWith("{@body")) {
+    const start = raw.indexOf("{", cursor);
+    let depth = 0;
+    let quote: string | null = null;
+    let escaped = false;
+    let index = start;
+    for (; index < raw.length; index++) {
+      const ch = raw[index];
+      if (quote) {
+        if (escaped) escaped = false;
+        else if (ch === "\\") escaped = true;
+        else if (ch === quote) quote = null;
+        continue;
+      }
+      if (ch === '"' || ch === "'" || ch === "`") quote = ch;
+      else if (ch === "{") depth++;
+      else if (ch === "}") {
+        depth--;
+        if (depth === 0) {
+          index++;
+          break;
+        }
+      }
+    }
+    if (depth !== 0) return "";
+    cursor = index;
+  }
+  return raw.slice(cursor).trimStart();
+}
+
+export function pendingBlockLabel(raw: string): string {
+  const probe = skipLeadingBodyDirectives(raw);
+  const tag = /^<([A-Za-z][A-Za-z0-9-]*)(?=[\s/>]|$)/.exec(probe)?.[1];
+  if (!tag) return "正在绘制交互卡片";
+  const lower = tag.toLowerCase();
+  if (lower === "chart") return "正在生成图表";
+  if (tag.startsWith("MapWidget") || tag.startsWith("WidgetMap") || lower === "map") return "正在加载地图组件";
+  if (tag === "WritingBlock") return "正在生成文档草稿";
+  if (lower === "table") return "正在生成表格";
+  if (lower === "card" || lower === "form" || lower === "radio-group") return "正在构建交互问卷";
+  return "正在绘制交互卡片";
+}
 
 function findFenceEnd(text: string, from: number, fence: string): number | undefined {
   const closing = new RegExp(`^ {0,3}${fence[0]}{${fence.length},}[ \\t]*\\r?$`, "gm");
@@ -269,7 +314,11 @@ export function splitChatReply(text: string, streaming = false): ChatReplyBlock[
         const content = (hidePartial ? body.slice(0, partial) : body).replace(/^[ \t]*\r?\n|\r?\n[ \t]*$/g, "");
         blocks.push({ kind: "writing", offset, text: content });
       } else {
-        blocks.push(streaming ? { kind: "pending", offset } : { kind: "unsupported", offset, text: rest });
+        blocks.push(
+          streaming
+            ? { kind: "pending", offset, chars: rest.length, label: pendingBlockLabel(rest) }
+            : { kind: "unsupported", offset, text: rest },
+        );
       }
     } else {
       const parsed = readChatWidget(rest);
@@ -277,7 +326,9 @@ export function splitChatReply(text: string, streaming = false): ChatReplyBlock[
       cursor = closing === undefined ? text.length : offset + closing;
       const raw = text.slice(offset, cursor);
       if (parsed?.widget) blocks.push({ kind: "widget", offset, widget: parsed.widget });
-      else if (streaming && !closing) blocks.push({ kind: "pending", offset });
+      else if (streaming && !closing) {
+        blocks.push({ kind: "pending", offset, chars: raw.length, label: pendingBlockLabel(raw) });
+      }
       else blocks.push({ kind: "unsupported", offset, text: raw });
     }
     markers.lastIndex = cursor;

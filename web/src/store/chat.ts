@@ -9,6 +9,7 @@ import { mergeChatResources, readChatResources, type ChatResource } from "@/lib/
 import {
   createChatId,
   readChatResponse,
+  type ChatStreamStatus,
   type RequestMessage,
 } from "@/lib/chat-stream";
 import {
@@ -20,6 +21,14 @@ import {
 } from "@/lib/standalone-chat-settings";
 
 export type ChatImage = { id: string; name: string; url: string };
+export type ChatMessageThinking = {
+  stage?: ChatStreamStatus["stage"];
+  label?: string;
+  detail?: string;
+  thoughts?: string[];
+  durationSec?: number;
+  done?: boolean;
+};
 export type ChatMessage = {
   id: string;
   role: "user" | "assistant";
@@ -30,6 +39,8 @@ export type ChatMessage = {
   model?: string;
   status?: "streaming" | "done" | "stopped" | "error";
   error?: string;
+  startedAt?: number;
+  thinking?: ChatMessageThinking;
 };
 export type ChatThread = {
   id: string;
@@ -146,11 +157,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const defaults = readStandaloneChatSettings(owner);
       const threads: ChatThread[] = (saved?.threads || []).map((thread) => ({
         ...thread,
-        messages: thread.messages.map((message) => ({
-          ...message,
-          status: message.status === "streaming" ? "stopped" as const : message.status,
-          ...(message.resources !== undefined ? { resources: readChatResources(message.resources) } : {}),
-        })),
+        messages: thread.messages.map((message) => {
+          const interrupted = message.status === "streaming";
+          const thinking = message.thinking
+            ? (interrupted && !message.thinking.done ? { ...message.thinking, done: true } : message.thinking)
+            : undefined;
+          return {
+            ...message,
+            status: interrupted ? ("stopped" as const) : message.status,
+            ...(thinking !== undefined ? { thinking } : {}),
+            ...(message.resources !== undefined ? { resources: readChatResources(message.resources) } : {}),
+          };
+        }),
       }));
       if (!threads.length) {
         threads.push(makeThread(defaults.model, defaults.effort));
@@ -237,12 +255,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
         { id: createChatId(), role: "user", text: text.trim(), images },
       ];
     }
+    const startedAt = Date.now();
+    const isDeepEffort =
+      thread.effort === "high"
+      || thread.effort === "xhigh"
+      || thread.effort === "extended"
+      || thread.effort === "max";
+    let thinking: ChatMessageThinking | undefined = thread.effort
+      ? {
+          stage: "thinking",
+          label: isDeepEffort ? "正在深度思考" : "正在思考",
+        }
+      : undefined;
     const answer: ChatMessage = {
       id: createChatId(),
       role: "assistant",
       text: "",
       model: thread.model,
       status: "streaming",
+      startedAt,
+      ...(thinking ? { thinking } : {}),
     };
     const ticket = generation;
     const abort = new AbortController();
@@ -316,12 +348,43 @@ export const useChatStore = create<ChatState>((set, get) => ({
       });
       let output = "";
       let resources: ChatResource[] = [];
+      let thinkingFinalized = false;
+      const mergeThoughts = (
+        prev: readonly string[] | undefined,
+        next: readonly string[] | undefined,
+      ): string[] | undefined => {
+        if (!next?.length) return prev?.length ? [...prev] : undefined;
+        const merged: string[] = [];
+        const seen = new Set<string>();
+        for (const item of [...(prev ?? []), ...next]) {
+          if (!seen.has(item)) {
+            seen.add(item);
+            merged.push(item);
+          }
+        }
+        return merged.slice(-12);
+      };
       await readChatResponse(
         response,
         (delta) => {
           if (abort.signal.aborted) return;
+          const isFirst = !output;
           output += delta;
-          patchAnswer({ text: output });
+          const patch: Partial<ChatMessage> = { text: output };
+          if (isFirst && !thinkingFinalized) {
+            thinkingFinalized = true;
+            const elapsedSec = Math.round((Date.now() - startedAt) / 1000);
+            if (thinking || elapsedSec >= 3) {
+              thinking = {
+                ...thinking,
+                stage: "answering",
+                done: true,
+                durationSec: thinking?.durationSec ?? Math.max(1, elapsedSec),
+              };
+              patch.thinking = thinking;
+            }
+          }
+          patchAnswer(patch);
           saveSoon();
         },
         (incoming) => {
@@ -330,11 +393,59 @@ export const useChatStore = create<ChatState>((set, get) => ({
           patchAnswer({ resources });
           saveSoon();
         },
+        (status) => {
+          if (abort.signal.aborted) return;
+          const prevThoughts = thinking?.thoughts;
+          const nextThoughts = mergeThoughts(prevThoughts, status.thoughts);
+          const thoughtsChanged =
+            nextThoughts?.length !== prevThoughts?.length
+            || Boolean(nextThoughts?.some((item, idx) => item !== prevThoughts?.[idx]));
+          const stageChanged = status.stage !== thinking?.stage;
+          const nextDetail =
+            status.detail !== undefined
+              ? status.detail
+              : stageChanged
+                ? undefined
+                : thinking?.detail;
+          thinking = {
+            ...thinking,
+            stage: status.stage,
+            label: status.label ?? (stageChanged ? undefined : thinking?.label),
+            ...(nextDetail !== undefined ? { detail: nextDetail } : { detail: undefined }),
+            ...(nextThoughts ? { thoughts: nextThoughts } : {}),
+            ...(status.thoughtDurationSec !== undefined
+              ? { durationSec: status.thoughtDurationSec }
+              : {}),
+            ...(thinking?.done ? { done: true } : {}),
+          };
+          patchAnswer({ thinking });
+          if (thoughtsChanged) saveSoon();
+        },
       );
-      patchAnswer({ status: "done" });
+      if (thinking && !thinking.done) {
+        thinking = {
+          ...thinking,
+          done: true,
+          durationSec:
+            thinking.durationSec ?? Math.max(1, Math.round((Date.now() - startedAt) / 1000)),
+        };
+      }
+      patchAnswer({
+        status: "done",
+        ...(thinking ? { thinking } : {}),
+      });
     } catch (error) {
+      if (thinking && !thinking.done) {
+        const elapsedSec = Math.round((Date.now() - startedAt) / 1000);
+        thinking = {
+          ...thinking,
+          done: true,
+          durationSec: thinking.durationSec ?? elapsedSec,
+        };
+      }
       patchAnswer({
         status: abort.signal.aborted ? "stopped" : "error",
+        ...(thinking ? { thinking } : {}),
         error: abort.signal.aborted
           ? undefined
           : error instanceof Error

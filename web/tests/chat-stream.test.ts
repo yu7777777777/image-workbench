@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { isChatModel, readChatResponse } from "../src/lib/chat-stream";
+import {
+  isChatModel,
+  readChatResponse,
+  readChatStreamStatus,
+  type ChatStreamStatus,
+} from "../src/lib/chat-stream";
 import { mergeChatResources, type ChatResource } from "../src/lib/chat-resources";
 
 function streamResponse(text: string, slice = 1) {
@@ -104,6 +109,115 @@ describe("chat response stream", () => {
     await expect(
       readChatResponse(streamResponse("data: [DONE]\n\n"), () => {}),
     ).rejects.toThrow("没有返回内容");
+  });
+  test("parses and clamps workbench status frames without satisfying hasContent", async () => {
+    expect(readChatStreamStatus(null)).toBeUndefined();
+    expect(readChatStreamStatus({ stage: "unknown" })).toBeUndefined();
+    expect(
+      readChatStreamStatus({
+        stage: "thinking",
+        label: "  正在深度思考  ",
+        detail: "  规划卡片结构  ",
+        thoughts: [
+          "  要点 1  ",
+          "",
+          123,
+          "x".repeat(400),
+          ...Array.from({ length: 15 }, (_, idx) => `想法 ${idx + 2}`),
+        ],
+        thoughtDurationSec: 42,
+      }),
+    ).toEqual({
+      stage: "thinking",
+      label: "正在深度思考",
+      detail: "规划卡片结构",
+      thoughts: [
+        "要点 1",
+        "x".repeat(280),
+        ...Array.from({ length: 10 }, (_, idx) => `想法 ${idx + 2}`),
+      ],
+      thoughtDurationSec: 42,
+    });
+    expect(
+      readChatStreamStatus({
+        stage: "searching",
+        thoughtDurationSec: -5,
+      }),
+    ).toEqual({ stage: "searching" });
+    expect(
+      readChatStreamStatus({
+        stage: "tool",
+        thoughtDurationSec: 1.5,
+      }),
+    ).toEqual({ stage: "tool" });
+
+    const frame = (data: unknown) => `data: ${JSON.stringify(data)}\n\n`;
+    const statuses: ChatStreamStatus[] = [];
+    let output = "";
+    await readChatResponse(
+      streamResponse(
+        frame({
+          choices: [{ index: 0, delta: {}, finish_reason: null }],
+          workbench: {
+            status: {
+              stage: "thinking",
+              label: "正在深度思考",
+              detail: "正在规划日程卡片结构…",
+              thoughts: ["思考摘要 1", "思考摘要 2"],
+              thoughtDurationSec: 18,
+            },
+          },
+        })
+          + frame({
+            choices: [{ index: 0, delta: { content: "最终回答" }, finish_reason: "stop" }],
+            workbench: {
+              status: { stage: "answering", thoughtDurationSec: 21 },
+            },
+          })
+          + "data: [DONE]\n\n",
+      ),
+      (delta) => {
+        output += delta;
+      },
+      undefined,
+      (status) => {
+        statuses.push(status);
+      },
+    );
+    expect(output).toBe("最终回答");
+    expect(statuses).toEqual([
+      {
+        stage: "thinking",
+        label: "正在深度思考",
+        detail: "正在规划日程卡片结构…",
+        thoughts: ["思考摘要 1", "思考摘要 2"],
+        thoughtDurationSec: 18,
+      },
+      {
+        stage: "answering",
+        thoughtDurationSec: 21,
+      },
+    ]);
+
+    const statusOnly: ChatStreamStatus[] = [];
+    await expect(
+      readChatResponse(
+        streamResponse(
+          frame({
+            choices: [{ index: 0, delta: {}, finish_reason: null }],
+            workbench: {
+              status: { stage: "thinking", label: "正在思考" },
+            },
+          }) + "data: [DONE]\n\n",
+        ),
+        () => {},
+        undefined,
+        (status) => {
+          statusOnly.push(status);
+        },
+      ),
+    ).rejects.toThrow("模型没有返回内容，请重试或更换模型");
+    expect(statusOnly).toEqual([{ stage: "thinking", label: "正在思考" }]);
   });
   test("excludes known non-chat models", () => {
     for (const id of [

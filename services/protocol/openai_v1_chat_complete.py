@@ -21,6 +21,7 @@ from services.protocol.conversation import (
     normalize_messages,
     stream_image_outputs_with_pool,
     stream_text_deltas,
+    stream_text_items,
     text_backend,
 )
 from services.protocol.web_search_tool import (
@@ -132,9 +133,34 @@ def stream_text_chat_completion(
     created = int(time.time())
     sent_role = False
     request = ConversationRequest(model=model, messages=messages, thinking_effort=thinking_effort)
-    callbacks = {"on_event": rich_content.observe, "on_complete": rich_content.finish} if rich_content else {}
-    deltas = stream_text_deltas(backend, request, **callbacks)
-    for delta_text in deltas:
+    if rich_content is None:
+        for delta_text in stream_text_deltas(backend, request):
+            if not sent_role:
+                sent_role = True
+                yield completion_chunk(model, {"role": "assistant", "content": delta_text}, None, completion_id, created)
+            else:
+                yield completion_chunk(model, {"content": delta_text}, None, completion_id, created)
+        if not sent_role:
+            yield completion_chunk(model, {"role": "assistant", "content": ""}, None, completion_id, created)
+        yield completion_chunk(model, {}, "stop", completion_id, created)
+        return
+
+    items = stream_text_items(
+        backend,
+        request,
+        on_event=rich_content.observe,
+        on_complete=rich_content.finish,
+        rich_content=rich_content,
+    )
+    for kind, value in items:
+        if kind == "status":
+            chunk = completion_chunk(model, {}, None, completion_id, created)
+            chunk["workbench"] = {"status": value}
+            yield chunk
+            continue
+        delta_text = str(value or "")
+        if not delta_text:
+            continue
         if not sent_role:
             sent_role = True
             yield completion_chunk(model, {"role": "assistant", "content": delta_text}, None, completion_id, created)
@@ -143,8 +169,14 @@ def stream_text_chat_completion(
     if not sent_role:
         yield completion_chunk(model, {"role": "assistant", "content": ""}, None, completion_id, created)
     stop = completion_chunk(model, {}, "stop", completion_id, created)
-    if rich_content and rich_content.blocks:
-        stop["workbench"] = {"blocks": rich_content.blocks}
+    workbench: dict[str, Any] = {}
+    if rich_content.blocks:
+        workbench["blocks"] = rich_content.blocks
+    final_status = rich_content.final_thinking_summary()
+    if final_status:
+        workbench["status"] = final_status
+    if workbench:
+        stop["workbench"] = workbench
     yield stop
 
 

@@ -527,6 +527,180 @@ _PATCH_DICT_KEYS = {
     "/message/metadata/model_dil_v2": "model_dil_v2",
     "/message/metadata/opGenui": "opGenui",
 }
+_MAX_THOUGHTS = 12
+_MAX_THOUGHT_LEN = 280
+_MAX_DETAIL_LEN = 160
+_MAX_QUERY_DETAIL_LEN = 120
+_REASONING_CHANNELS = {"analysis", "thought", "reasoning"}
+_PRIVATE_ANNOTATION = re.compile(r"\ue200[^\ue201]*\ue201|\ue200[^\ue201]*$")
+_PRIVATE_USE_CHARS = re.compile(r"[\ue200-\ue20f]")
+_CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+_DURATION_HOURS = re.compile(r"(\d+)\s*(?:hours?|hrs?|h|小时|时)", re.IGNORECASE)
+_DURATION_MINUTES = re.compile(r"(\d+)\s*(?:minutes?|mins?|m(?!s\b)|分钟|分)", re.IGNORECASE)
+_DURATION_SECONDS = re.compile(r"(\d+)\s*(?:seconds?|secs?|s|秒钟|秒)", re.IGNORECASE)
+_THOUGHT_INDEX_PATH = re.compile(r"^/message/content/thoughts/(\d+)$")
+_THOUGHT_FIELD_PATH = re.compile(r"^/message/content/thoughts/(\d+)/(summary|content)$")
+_THOUGHT_CHUNKS_PATH = re.compile(r"^/message/content/thoughts/(\d+)/chunks(?:/(\d+))?$")
+_SEARCH_CALL_RE = re.compile(r'\b(?:search|web_search|query)\s*\(\s*("(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\')')
+_PARTIAL_JSON_QUERY_RE = re.compile(r'"(?:q|query)"\s*:\s*"((?:[^"\\]|\\.){1,160})"')
+_PARTIAL_JSON_QUERIES_RE = re.compile(r'"queries"\s*:\s*\[\s*"((?:[^"\\]|\\.){1,160})"')
+
+
+def _strip_annotations(text: str) -> str:
+    cleaned = _PRIVATE_ANNOTATION.sub("", text)
+    cleaned = _PRIVATE_USE_CHARS.sub("", cleaned)
+    return _CONTROL_CHARS.sub("", cleaned)
+
+
+def _clean_status_text(value: object, limit: int = _MAX_DETAIL_LEN) -> str:
+    if not isinstance(value, str):
+        return ""
+    cleaned = re.sub(r"\s+", " ", _strip_annotations(value)).strip()
+    if len(cleaned) > limit:
+        return cleaned[:limit].rstrip()
+    return cleaned
+
+
+def _clean_markdown_line(line: str) -> str:
+    cleaned = re.sub(r"^\s*(?:#{1,6}\s*|\*\*|[-*•]\s+)", "", line).strip()
+    cleaned = re.sub(r"\*\*\s*$", "", cleaned).strip()
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def _first_clean_sentence(value: object, limit: int = _MAX_THOUGHT_LEN) -> str:
+    if not isinstance(value, str):
+        return ""
+    for raw_line in _strip_annotations(value).splitlines():
+        line = _clean_markdown_line(raw_line)
+        if not line:
+            continue
+        if len(line) > limit:
+            match = re.match(rf"^(.{{12,{limit}}}?[。！？.!?])(?:\s|$)", line)
+            if match:
+                return match.group(1).strip()
+            return line[:limit].rstrip()
+        return line
+    return ""
+
+
+def _latest_clean_line(value: object, limit: int = _MAX_DETAIL_LEN) -> str:
+    if not isinstance(value, str):
+        return ""
+    lines = [_clean_markdown_line(raw_line) for raw_line in _strip_annotations(value).splitlines()]
+    non_empty = [line for line in lines if line]
+    if not non_empty:
+        return ""
+    candidate = non_empty[-1]
+    if len(candidate) > limit:
+        return candidate[:limit].rstrip()
+    return candidate
+
+
+def _parse_duration_seconds(value: object) -> int | None:
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        secs = int(round(value))
+        return secs if secs > 0 else None
+    if not isinstance(value, str):
+        return None
+    text = _clean_status_text(value, _MAX_DETAIL_LEN)
+    if not text:
+        return None
+    total = 0
+    matched = False
+    for pattern, multiplier in ((_DURATION_HOURS, 3600), (_DURATION_MINUTES, 60), (_DURATION_SECONDS, 1)):
+        match = pattern.search(text)
+        if match:
+            total += int(match.group(1)) * multiplier
+            matched = True
+    return total if matched and total > 0 else None
+
+
+def _classify_tool(recipient: str, author_name: str, metadata: dict[str, Any]) -> tuple[str, str] | None:
+    async_task = str(metadata.get("async_task_type") or "").strip().lower()
+    if any(token in async_task for token in ("image_gen", "async_image", "dalle", "t2uay3k")):
+        return ("tool", "正在检索或生成配图")
+    targets = [target for target in (recipient.strip().lower(), author_name.strip().lower()) if target and target != "all"]
+    for target in targets:
+        if any(token in target for token in ("t2uay3k", "dalle", "image_gen", "async_image")):
+            return ("tool", "正在检索或生成配图")
+    for target in targets:
+        if target in {"web", "web.run", "web.search", "web_search", "search", "browser", "browser.search"} or target.startswith(
+            ("web.", "browser.", "web_search", "search.")
+        ):
+            return ("searching", "正在联网检索")
+    for target in targets:
+        if target in {"python", "ipython", "python.exec", "code_interpreter"} or target.startswith(
+            ("python.", "code_interpreter")
+        ):
+            return ("tool", "正在运行分析工具")
+    return None
+
+
+def _query_from_value(value: object) -> str:
+    if isinstance(value, str):
+        return _clean_status_text(value, _MAX_QUERY_DETAIL_LEN)
+    if isinstance(value, list):
+        for item in value[:8]:
+            found = _query_from_value(item)
+            if found:
+                return found
+    if isinstance(value, dict):
+        for key in ("queries", "search_query", "query", "q"):
+            if key in value:
+                found = _query_from_value(value.get(key))
+                if found:
+                    return found
+    return ""
+
+
+def _decode_json_string(raw_quoted: str) -> str:
+    if raw_quoted.startswith("'") and raw_quoted.endswith("'"):
+        return raw_quoted[1:-1].replace("\\'", "'")
+    try:
+        decoded = json.loads(raw_quoted)
+        return decoded if isinstance(decoded, str) else ""
+    except ValueError:
+        return raw_quoted.strip("\"'")
+
+
+def _extract_search_query(metadata: dict[str, Any], content_text: str) -> str:
+    for meta_key in ("search_model_queries", "search_queries", "queries", "query"):
+        found = _query_from_value(metadata.get(meta_key))
+        if found:
+            return found
+    stripped = content_text.strip()
+    if not stripped:
+        return ""
+    if stripped.startswith(("{", "[")):
+        try:
+            parsed = json.loads(stripped)
+            return _query_from_value(parsed)
+        except ValueError:
+            for pattern in (_PARTIAL_JSON_QUERY_RE, _PARTIAL_JSON_QUERIES_RE):
+                match = pattern.search(stripped)
+                if match:
+                    decoded = _decode_json_string(f'"{match.group(1)}"')
+                    cleaned = _clean_status_text(decoded, _MAX_QUERY_DETAIL_LEN)
+                    if cleaned:
+                        return cleaned
+            return ""
+    call_match = _SEARCH_CALL_RE.search(stripped)
+    if call_match:
+        decoded = _decode_json_string(call_match.group(1))
+        cleaned = _clean_status_text(decoded, _MAX_QUERY_DETAIL_LEN)
+        if cleaned:
+            return cleaned
+    if re.match(r"^[a-zA-Z_][a-zA-Z0-9_.]*\s*\(", stripped):
+        return ""
+    return _clean_status_text(stripped, _MAX_QUERY_DETAIL_LEN)
+
+
+def _apply_str_patch(current: str, action: object, value: str) -> str:
+    if action == "append":
+        return current + value
+    if action in ("replace", "add"):
+        return value
+    return current
 
 
 class ChatRichContent:
@@ -541,6 +715,394 @@ class ChatRichContent:
         self._blocked = False
         self._messages: dict[str, dict[str, Any]] = {}
         self._last_message_id = ""
+        self._last_emitted_status: dict[str, Any] | None = None
+        self._status_stage = ""
+        self._status_label = ""
+        self._status_detail = ""
+        self._thought_entries: dict[tuple[str, int], dict[str, str]] = {}
+        self._thought_duration_sec: int | None = None
+        self._active_stream_role = ""
+        self._active_stream_channel = ""
+        self._active_stream_content_type = ""
+        self._active_stream_recipient = ""
+        self._active_stream_author_name = ""
+        self._active_thoughts_msg_id = ""
+        self._active_reasoning_msg_id = ""
+        self._active_reasoning_text = ""
+        self._active_recap_text = ""
+        self._active_tool_stage = ""
+        self._active_tool_label = ""
+        self._active_tool_text = ""
+        self._last_patch_path = ""
+        self._anon_thought_seq = 0
+
+    @property
+    def thought_duration_sec(self) -> int | None:
+        return self._thought_duration_sec
+
+    def _reset_attempt_status(self) -> None:
+        self._status_stage = ""
+        self._status_label = ""
+        self._status_detail = ""
+        self._thought_entries.clear()
+        self._thought_duration_sec = None
+        self._active_stream_role = ""
+        self._active_stream_channel = ""
+        self._active_stream_content_type = ""
+        self._active_stream_recipient = ""
+        self._active_stream_author_name = ""
+        self._active_thoughts_msg_id = ""
+        self._active_reasoning_msg_id = ""
+        self._active_reasoning_text = ""
+        self._active_recap_text = ""
+        self._active_tool_stage = ""
+        self._active_tool_label = ""
+        self._active_tool_text = ""
+        self._last_patch_path = ""
+        self._anon_thought_seq = 0
+
+    def record_status(self, stage: str, label: str, detail: str = "") -> None:
+        clean_stage = stage.strip()
+        clean_label = _clean_status_text(label, 80)
+        if not clean_stage or not clean_label:
+            return
+        self._status_stage = clean_stage
+        self._status_label = clean_label
+        self._status_detail = _clean_status_text(detail, _MAX_DETAIL_LEN)
+
+    def _current_thoughts(self) -> list[str]:
+        collected: list[str] = []
+        for entry in self._thought_entries.values():
+            text = _clean_status_text(entry.get("summary", ""), _MAX_THOUGHT_LEN)
+            if not text:
+                text = _first_clean_sentence(entry.get("content", ""), _MAX_THOUGHT_LEN)
+            if text and (not collected or collected[-1] != text):
+                collected.append(text)
+        return collected[-_MAX_THOUGHTS:]
+
+    def _latest_thought_detail(self) -> str:
+        for entry in reversed(list(self._thought_entries.values())):
+            summary = _clean_status_text(entry.get("summary", ""), _MAX_DETAIL_LEN)
+            if summary:
+                return summary
+            content = _latest_clean_line(entry.get("content", ""), _MAX_DETAIL_LEN)
+            if content:
+                return content
+        return ""
+
+    def _build_status_payload(self) -> dict[str, Any] | None:
+        if not self._status_stage or not self._status_label:
+            return None
+        payload: dict[str, Any] = {
+            "stage": self._status_stage,
+            "label": self._status_label,
+        }
+        if self._status_detail:
+            payload["detail"] = self._status_detail
+        if self._status_stage != "retrying":
+            thoughts = self._current_thoughts()
+            if thoughts:
+                payload["thoughts"] = thoughts
+            if self._thought_duration_sec is not None:
+                payload["thoughtDurationSec"] = self._thought_duration_sec
+        return payload
+
+    def pop_status(self) -> dict[str, Any] | None:
+        payload = self._build_status_payload()
+        if payload is None or payload == self._last_emitted_status:
+            return None
+        self._last_emitted_status = {
+            **payload,
+            **({"thoughts": list(payload["thoughts"])} if "thoughts" in payload else {}),
+        }
+        return payload
+
+    def final_thinking_summary(self) -> dict[str, Any] | None:
+        thoughts = self._current_thoughts()
+        if not thoughts and self._thought_duration_sec is None:
+            return None
+        summary: dict[str, Any] = {
+            "stage": "answering",
+            "label": "正在生成回复",
+        }
+        if thoughts:
+            summary["thoughts"] = thoughts
+        if self._thought_duration_sec is not None:
+            summary["thoughtDurationSec"] = self._thought_duration_sec
+        return summary
+
+    def _set_thought_entry(self, msg_id: str, index: int, raw_entry: object) -> None:
+        key = (msg_id, index)
+        existing = self._thought_entries.get(key) or {"summary": "", "content": ""}
+        if isinstance(raw_entry, dict):
+            summary = raw_entry.get("summary")
+            if isinstance(summary, str):
+                existing["summary"] = summary
+            content = raw_entry.get("content")
+            if isinstance(content, str):
+                existing["content"] = content
+            elif isinstance(raw_entry.get("chunks"), list):
+                chunks_text = "".join(part for part in raw_entry["chunks"] if isinstance(part, str))
+                if chunks_text:
+                    existing["content"] = chunks_text
+        elif isinstance(raw_entry, str):
+            existing["content"] = raw_entry
+        self._thought_entries[key] = existing
+
+    def _next_thought_index(self, msg_id: str) -> int:
+        indices = [idx for key_msg_id, idx in self._thought_entries if key_msg_id == msg_id]
+        return (max(indices) + 1) if indices else 0
+
+    def _sync_reasoning_thoughts(self, msg_id: str, text: str) -> None:
+        prefix = f"reasoning:{msg_id}"
+        lines = [_clean_markdown_line(raw_line) for raw_line in _strip_annotations(text).splitlines()]
+        non_empty = [line for line in lines if line]
+        for idx, line in enumerate(non_empty[-_MAX_THOUGHTS:]):
+            self._thought_entries[(prefix, idx)] = {"summary": "", "content": line}
+
+    def _update_duration(self, value: object) -> bool:
+        parsed = _parse_duration_seconds(value)
+        if parsed is None or parsed == self._thought_duration_sec:
+            return False
+        self._thought_duration_sec = parsed
+        return True
+
+    def _observe_status_message(self, message: dict[str, Any]) -> None:
+        author = _obj(message.get("author"))
+        role = str(author.get("role") or "").strip().lower()
+        author_name = str(author.get("name") or "").strip()
+        content = _obj(message.get("content"))
+        content_type = str(content.get("content_type") or "").strip().lower()
+        channel = str(message.get("channel") or "").strip().lower()
+        recipient = str(message.get("recipient") or "").strip().lower()
+        metadata = _obj(message.get("metadata"))
+
+        duration_updated = self._update_duration(metadata.get("finished_duration_sec"))
+
+        self._active_stream_role = role
+        self._active_stream_channel = channel
+        self._active_stream_content_type = content_type
+        self._active_stream_recipient = recipient
+        self._active_stream_author_name = author_name
+        self._last_patch_path = ""
+
+        if role in {"user", "system"}:
+            self._active_tool_stage = ""
+            self._active_tool_label = ""
+            self._active_tool_text = ""
+            return
+
+        if content_type == "thoughts":
+            self._active_tool_stage = ""
+            self._active_tool_label = ""
+            self._active_tool_text = ""
+            raw_id = message.get("id")
+            if isinstance(raw_id, str) and raw_id.strip():
+                msg_id = raw_id.strip()
+            else:
+                self._anon_thought_seq += 1
+                msg_id = f"thoughts-{self._anon_thought_seq}"
+            self._active_thoughts_msg_id = msg_id
+            for idx, entry in enumerate(_items(content.get("thoughts"))[:64]):
+                self._set_thought_entry(msg_id, idx, entry)
+            self.record_status("thinking", "正在深度思考", self._latest_thought_detail())
+            return
+
+        if content_type == "reasoning_recap":
+            self._active_tool_stage = ""
+            self._active_tool_label = ""
+            self._active_tool_text = ""
+            recap_raw = content.get("content")
+            if not isinstance(recap_raw, str) or not recap_raw:
+                recap_raw = assistant_message_text(message)
+            self._active_recap_text = recap_raw if isinstance(recap_raw, str) else ""
+            self._update_duration(self._active_recap_text)
+            if self._status_stage == "answering":
+                self.record_status("answering", "正在生成回复")
+            else:
+                self.record_status("thinking", "正在深度思考", self._latest_thought_detail())
+            return
+
+        if role == "assistant" and (channel in _REASONING_CHANNELS or content_type == "thought"):
+            self._active_tool_stage = ""
+            self._active_tool_label = ""
+            self._active_tool_text = ""
+            raw_id = message.get("id")
+            if isinstance(raw_id, str) and raw_id.strip():
+                msg_id = raw_id.strip()
+            else:
+                self._anon_thought_seq += 1
+                msg_id = f"reasoning-{self._anon_thought_seq}"
+            self._active_reasoning_msg_id = msg_id
+            raw_text = assistant_message_text(message)
+            if not raw_text and isinstance(content.get("content"), str):
+                raw_text = content["content"]
+            self._active_reasoning_text = raw_text
+            if raw_text:
+                self._sync_reasoning_thoughts(msg_id, raw_text)
+            self.record_status("thinking", "正在深度思考", _latest_clean_line(raw_text, _MAX_DETAIL_LEN))
+            return
+
+        tool_info = _classify_tool(recipient, author_name, metadata)
+        if tool_info is not None:
+            stage, label = tool_info
+            self._active_tool_stage = stage
+            self._active_tool_label = label
+            tool_text = assistant_message_text(message)
+            self._active_tool_text = tool_text
+            detail = _extract_search_query(metadata, tool_text) if stage == "searching" else ""
+            self.record_status(stage, label, detail)
+            return
+
+        self._active_tool_stage = ""
+        self._active_tool_label = ""
+        self._active_tool_text = ""
+        if duration_updated and not self._status_stage:
+            self.record_status("thinking", "正在深度思考")
+
+    def _apply_status_patch(self, op: dict[str, Any]) -> None:
+        path = op.get("p")
+        action = op.get("o")
+        value = op.get("v")
+        if not isinstance(path, str):
+            return
+        self._last_patch_path = path
+
+        if path == "/message/content/thoughts":
+            self._active_stream_content_type = "thoughts"
+            if not self._active_thoughts_msg_id:
+                self._anon_thought_seq += 1
+                self._active_thoughts_msg_id = f"thoughts-{self._anon_thought_seq}"
+            msg_id = self._active_thoughts_msg_id
+            if action == "append":
+                entries = value if isinstance(value, list) else [value]
+                for entry in entries[:64]:
+                    idx = self._next_thought_index(msg_id)
+                    self._set_thought_entry(msg_id, idx, entry)
+            elif action in ("replace", "add"):
+                for key in [k for k in self._thought_entries if k[0] == msg_id]:
+                    self._thought_entries.pop(key, None)
+                entries = value if isinstance(value, list) else [value]
+                for idx, entry in enumerate(entries[:64]):
+                    self._set_thought_entry(msg_id, idx, entry)
+            self.record_status("thinking", "正在深度思考", self._latest_thought_detail())
+            return
+
+        field_match = _THOUGHT_FIELD_PATH.match(path)
+        if field_match:
+            self._active_stream_content_type = "thoughts"
+            if not self._active_thoughts_msg_id:
+                self._anon_thought_seq += 1
+                self._active_thoughts_msg_id = f"thoughts-{self._anon_thought_seq}"
+            msg_id = self._active_thoughts_msg_id
+            idx, field = int(field_match.group(1)), field_match.group(2)
+            key = (msg_id, idx)
+            entry = self._thought_entries.get(key) or {"summary": "", "content": ""}
+            if isinstance(value, str):
+                entry[field] = _apply_str_patch(entry.get(field, ""), action, value)
+                self._thought_entries[key] = entry
+                self.record_status("thinking", "正在深度思考", self._latest_thought_detail())
+            return
+
+        idx_match = _THOUGHT_INDEX_PATH.match(path)
+        if idx_match:
+            self._active_stream_content_type = "thoughts"
+            if not self._active_thoughts_msg_id:
+                self._anon_thought_seq += 1
+                self._active_thoughts_msg_id = f"thoughts-{self._anon_thought_seq}"
+            self._set_thought_entry(self._active_thoughts_msg_id, int(idx_match.group(1)), value)
+            self.record_status("thinking", "正在深度思考", self._latest_thought_detail())
+            return
+
+        chunks_match = _THOUGHT_CHUNKS_PATH.match(path)
+        if chunks_match:
+            self._active_stream_content_type = "thoughts"
+            if not self._active_thoughts_msg_id:
+                self._anon_thought_seq += 1
+                self._active_thoughts_msg_id = f"thoughts-{self._anon_thought_seq}"
+            msg_id = self._active_thoughts_msg_id
+            idx = int(chunks_match.group(1))
+            key = (msg_id, idx)
+            entry = self._thought_entries.get(key) or {"summary": "", "content": ""}
+            if isinstance(value, str):
+                entry["content"] = _apply_str_patch(entry.get("content", ""), action, value)
+                self._thought_entries[key] = entry
+                self.record_status("thinking", "正在深度思考", self._latest_thought_detail())
+            elif isinstance(value, list):
+                joined = "".join(part for part in value if isinstance(part, str))
+                if joined:
+                    entry["content"] = _apply_str_patch(entry.get("content", ""), action, joined)
+                    self._thought_entries[key] = entry
+                    self.record_status("thinking", "正在深度思考", self._latest_thought_detail())
+            return
+
+        if path == "/message/metadata/finished_duration_sec":
+            if self._update_duration(value) and not self._status_stage:
+                self.record_status("thinking", "正在深度思考")
+            return
+
+        if path == "/message/metadata/search_model_queries":
+            query = _query_from_value(value)
+            if query:
+                self.record_status("searching", "正在联网检索", query)
+            return
+
+        if path == "/message/metadata" and isinstance(value, dict):
+            if self._update_duration(value.get("finished_duration_sec")) and not self._status_stage:
+                self.record_status("thinking", "正在深度思考")
+            query = _query_from_value(value.get("search_model_queries"))
+            if query:
+                self.record_status("searching", "正在联网检索", query)
+            return
+
+        if path in {"/message/content/parts/0", "/message/content/text", "/message/content/content"} and isinstance(value, str):
+            if self._active_stream_content_type == "reasoning_recap":
+                self._active_recap_text = _apply_str_patch(self._active_recap_text, action, value)
+                self._update_duration(self._active_recap_text)
+                if self._status_stage == "answering":
+                    self.record_status("answering", "正在生成回复")
+                else:
+                    self.record_status("thinking", "正在深度思考", self._latest_thought_detail())
+                return
+            if self._active_stream_role == "assistant" and (
+                self._active_stream_channel in _REASONING_CHANNELS or self._active_stream_content_type == "thought"
+            ):
+                self._active_reasoning_text = _apply_str_patch(self._active_reasoning_text, action, value)
+                if not self._active_reasoning_msg_id:
+                    self._anon_thought_seq += 1
+                    self._active_reasoning_msg_id = f"reasoning-{self._anon_thought_seq}"
+                self._sync_reasoning_thoughts(self._active_reasoning_msg_id, self._active_reasoning_text)
+                self.record_status("thinking", "正在深度思考", _latest_clean_line(self._active_reasoning_text, _MAX_DETAIL_LEN))
+                return
+            if self._active_tool_stage == "searching":
+                self._active_tool_text = _apply_str_patch(self._active_tool_text, action, value)
+                query = _extract_search_query({}, self._active_tool_text)
+                if query:
+                    self.record_status("searching", "正在联网检索", query)
+                return
+
+    def _observe_status(self, event: dict[str, Any], raw: dict[str, Any]) -> None:
+        source = raw if raw else event
+        seen_messages: set[int] = set()
+        candidates = (raw, _obj(raw.get("v")), event, _obj(event.get("v"))) if raw else (event, _obj(event.get("v")))
+        for container in candidates:
+            message = _obj(container.get("message"))
+            if message and id(message) not in seen_messages:
+                seen_messages.add(id(message))
+                self._observe_status_message(message)
+
+        if isinstance(source.get("p"), str):
+            self._apply_status_patch(source)
+        elif isinstance(source.get("v"), list):
+            for patch_op in source["v"][:64]:
+                if isinstance(patch_op, dict) and isinstance(patch_op.get("p"), str):
+                    self._apply_status_patch(patch_op)
+        elif isinstance(source.get("v"), str) and not source.get("p") and not source.get("o") and self._last_patch_path:
+            self._apply_status_patch({"p": self._last_patch_path, "o": "append", "v": source["v"]})
+
+        if event.get("type") == "conversation.delta" and event.get("delta"):
+            if self._status_stage and self._status_stage != "answering":
+                self.record_status("answering", "正在生成回复")
 
     def _apply_metadata_patch(self, op: dict[str, Any]) -> None:
         if not self._last_message_id or self._last_message_id not in self._messages:
@@ -597,6 +1159,7 @@ class ChatRichContent:
             self._blocked = False
             self._messages.clear()
             self._last_message_id = ""
+            self._reset_attempt_status()
         self._blocked |= event.get("blocked") is True
         text = event.get("text")
         if isinstance(text, str):
@@ -623,6 +1186,7 @@ class ChatRichContent:
             for patch_op in raw["v"][:64]:
                 if isinstance(patch_op, dict) and isinstance(patch_op.get("p"), str):
                     self._apply_metadata_patch(patch_op)
+        self._observe_status(event, raw)
 
     def _supplement_detail(self, backend: OpenAIBackendAPI, timeout: float) -> None:
         try:

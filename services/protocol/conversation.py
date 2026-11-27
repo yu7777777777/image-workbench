@@ -7,7 +7,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
-from typing import Any, Callable, Iterable, Iterator
+from typing import Any, Callable, Iterable, Iterator, Protocol
 
 import tiktoken
 
@@ -414,6 +414,7 @@ class ConversationState:
     blocked: bool = False
     tool_invoked: bool | None = None
     turn_use_case: str = ""
+    active_message_visible: bool = True
 
 
 @dataclass
@@ -498,6 +499,12 @@ def is_visible_assistant_message(message: dict[str, Any]) -> bool:
     channel = str(message.get("channel") or "").strip().lower()
     if channel and channel != "final":
         return False
+
+    content = message.get("content") or {}
+    if isinstance(content, dict):
+        content_type = str(content.get("content_type") or "").strip().lower()
+        if content_type in {"thoughts", "thought", "reasoning_recap"}:
+            return False
 
     return True
 
@@ -741,6 +748,16 @@ def conversation_base_event(event_type: str, state: ConversationState, **extra: 
     }
 
 
+def _event_message(event: dict[str, Any]) -> dict[str, Any] | None:
+    for candidate in (event, event.get("v")):
+        if not isinstance(candidate, dict):
+            continue
+        message = candidate.get("message")
+        if isinstance(message, dict):
+            return message
+    return None
+
+
 def iter_conversation_payloads(payloads: Iterator[str], history_text: str = "",
                                history_messages: list[str] | None = None,
                                *, preserve_citations: bool = False) -> Iterator[dict[str, Any]]:
@@ -769,7 +786,13 @@ def iter_conversation_payloads(payloads: Iterator[str], history_text: str = "",
             state.raw_text = ""
             state.text = ""
             continue
-        next_raw_text = assistant_raw_text(event, state.raw_text, history_text)
+        event_message = _event_message(event)
+        if event_message is not None:
+            state.active_message_visible = is_visible_assistant_message(event_message)
+        if state.active_message_visible:
+            next_raw_text = assistant_raw_text(event, state.raw_text, history_text)
+        else:
+            next_raw_text = state.raw_text
         next_text = sanitize_output_text(next_raw_text, preserve_citations=preserve_citations)
         state.raw_text = next_raw_text
         if next_text != state.text:
@@ -893,6 +916,110 @@ def stream_text_deltas(
                         model=request.model,
                     )
                 if token:
+                    continue
+                raise RuntimeError("模型账号认证失效，暂时没有可用账号。请管理员检查账号授权后重试；账号未删除。") from exc
+            raise
+        finally:
+            if active_backend is not None:
+                active_backend.close()
+
+
+class _StatusRichContent(Protocol):
+    def observe(self, backend: OpenAIBackendAPI, event: dict[str, Any]) -> None: ...
+    def finish(self, backend: OpenAIBackendAPI) -> None: ...
+    def pop_status(self) -> dict[str, Any] | None: ...
+    def record_status(self, stage: str, label: str, detail: str = "") -> None: ...
+
+
+def stream_text_items(
+    backend: OpenAIBackendAPI,
+    request: ConversationRequest,
+    *,
+    on_event: Callable[[OpenAIBackendAPI, dict[str, Any]], None] | None = None,
+    on_complete: Callable[[OpenAIBackendAPI], None] | None = None,
+    rich_content: _StatusRichContent | None = None,
+) -> Iterator[tuple[str, Any]]:
+    effective_on_event = on_event if on_event is not None else (rich_content.observe if rich_content is not None else None)
+    effective_on_complete = on_complete if on_complete is not None else (rich_content.finish if rich_content is not None else None)
+    attempted_tokens: set[str] = set()
+    token = getattr(backend, "access_token", "")
+    emitted = False
+    upload_limit_retries = 0
+    auth_retries = 0
+    while True:
+        if token and token in attempted_tokens:
+            raise RuntimeError("no available text account")
+        if token:
+            attempted_tokens.add(token)
+        active_backend = None
+        try:
+            active_backend = OpenAIBackendAPI(access_token=token)
+            for event in conversation_events(
+                active_backend,
+                messages=request.messages,
+                model=request.model,
+                prompt=request.prompt,
+                thinking_effort=request.thinking_effort,
+                **({"preserve_citations": True} if effective_on_event is not None else {}),
+            ):
+                if effective_on_event is not None:
+                    effective_on_event(active_backend, event)
+                if rich_content is not None:
+                    status = rich_content.pop_status()
+                    if status is not None:
+                        yield ("status", status)
+                if event.get("type") != "conversation.delta":
+                    continue
+                delta = str(event.get("delta") or "")
+                if delta:
+                    emitted = True
+                    yield ("delta", delta)
+            account_service.mark_text_used(token)
+            if effective_on_complete is not None:
+                effective_on_complete(active_backend)
+            return
+        except Exception as exc:
+            error_message = str(exc)
+            if token and not emitted and is_file_upload_limit(error_message):
+                mark_upload_limited(token, error_message)
+                upload_limit_retries += 1
+                if upload_limit_retries <= 3:
+                    token = account_service.get_text_access_token(
+                        excluded_tokens=attempted_tokens | upload_limited_tokens(), model=request.model,
+                    )
+                    if token:
+                        if rich_content is not None:
+                            rich_content.record_status("retrying", "正在切换可用账号重试")
+                            retry_status = rich_content.pop_status()
+                            if retry_status is not None:
+                                yield ("status", retry_status)
+                        continue
+                raise ImageGenerationError(UPLOAD_LIMIT_MESSAGE, status_code=429,
+                                           error_type="rate_limit_error", code="file_upload_limit") from exc
+            expired = "token_expired" in error_message.lower() or "authentication token is expired" in error_message.lower()
+            if not emitted and (is_token_invalid_error(error_message) or expired):
+                auth_retries += 1
+                if not token or auth_retries >= 3:
+                    raise RuntimeError("模型账号认证失效，自动重试后仍不可用。请管理员检查账号授权后重试；账号未删除。") from exc
+                try:
+                    refreshed_token = account_service.refresh_access_token(token, force=True, event="text_stream")
+                except Exception:
+                    refreshed_token = ""
+                if refreshed_token and refreshed_token != token and refreshed_token not in attempted_tokens:
+                    token = refreshed_token
+                else:
+                    # Authentication expiry is not permission to delete an account.
+                    # Exclude it for this request only, preserving credentials/data.
+                    token = account_service.get_text_access_token(
+                        excluded_tokens=set(attempted_tokens),
+                        model=request.model,
+                    )
+                if token:
+                    if rich_content is not None:
+                        rich_content.record_status("retrying", "正在切换可用账号重试")
+                        retry_status = rich_content.pop_status()
+                        if retry_status is not None:
+                            yield ("status", retry_status)
                     continue
                 raise RuntimeError("模型账号认证失效，暂时没有可用账号。请管理员检查账号授权后重试；账号未删除。") from exc
             raise

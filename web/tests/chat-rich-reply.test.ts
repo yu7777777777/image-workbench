@@ -5,6 +5,7 @@ import { prepareReplyMarkdown, readReplyResources, splitChatReply } from "../src
 import { readChatResources } from "../src/lib/chat-resources";
 import { widgetValue } from "../src/lib/chat-widget";
 import { ReplyMarkdown } from "../src/app/chat/chat-markdown";
+import { ChatReply } from "../src/app/chat/chat-reply";
 import observed from "./fixtures/chat-observed-replies.json";
 import extended from "./fixtures/chat-extended-replies.json";
 
@@ -219,4 +220,61 @@ test("splits MapWidgetV2 blocks cleanly into interactive map widgets", () => {
       { label: "第 2 天 · 岚山竹林", address: "京都市右京区嵯峨天龙寺", group: "第 2 天" },
     ],
   });
+});
+
+test("emits pending block metadata for streaming widgets and renders streaming card skeleton in ChatReply", () => {
+  const unclosedBox = '<box border padding={3}>\n<title>京都三日行程</title>\n<text>第一天';
+  expect(splitChatReply(unclosedBox, true)).toEqual([
+    { kind: "pending", offset: 0, chars: unclosedBox.length, label: "正在绘制交互卡片" },
+  ]);
+
+  const unclosedChart = '<Chart type="bar" title="销量" data={[{"name":"A","value":1';
+  expect(splitChatReply(unclosedChart, true)).toEqual([
+    { kind: "pending", offset: 0, chars: unclosedChart.length, label: "正在生成图表" },
+  ]);
+
+  const unclosedMap = '<MapWidgetV2 id="kyoto" title="京都地图" points={[{"title":"清水寺"';
+  expect(splitChatReply(unclosedMap, true)).toEqual([
+    { kind: "pending", offset: 0, chars: unclosedMap.length, label: "正在加载地图组件" },
+  ]);
+
+  const unclosedForm = '{@body const [plan, setPlan] = DIL.useState("A")}\n<form><radio-group name="plan"';
+  expect(splitChatReply(unclosedForm, true)).toEqual([
+    { kind: "pending", offset: 0, chars: unclosedForm.length, label: "正在构建交互问卷" },
+  ]);
+
+  const unclosedTable = '<table aria-label="预算"><tr><td>项目</td>';
+  expect(splitChatReply(unclosedTable, true)).toEqual([
+    { kind: "pending", offset: 0, chars: unclosedTable.length, label: "正在生成表格" },
+  ]);
+
+  const unclosedWriting = "<WritingBlock id=";
+  expect(splitChatReply(unclosedWriting, true)).toEqual([
+    { kind: "pending", offset: 0, chars: unclosedWriting.length, label: "正在生成文档草稿" },
+  ]);
+
+  const streamingHtml = renderToStaticMarkup(createElement(ChatReply, {
+    text: "先给你做一个卡片：\n\n" + unclosedBox,
+    owner: "user:test",
+    streaming: true,
+    canSend: false,
+    onSend: () => {},
+    onSaveWriting: async () => {},
+  }));
+  expect(streamingHtml).toContain('class="chat-widget-pending"');
+  expect(streamingHtml).toContain('role="status"');
+  expect(streamingHtml).toContain("正在绘制交互卡片");
+  expect(streamingHtml).toContain(`已接收 ${unclosedBox.length} 字`);
+
+  const largePending = "<Chart type=\"line\" data={\"" + "a".repeat(1200);
+  const largeHtml = renderToStaticMarkup(createElement(ChatReply, {
+    text: largePending,
+    owner: "user:test",
+    streaming: true,
+    canSend: false,
+    onSend: () => {},
+    onSaveWriting: async () => {},
+  }));
+  expect(largeHtml).toContain("正在生成图表");
+  expect(largeHtml).toContain(`已接收 ${(largePending.length / 1000).toFixed(1)} KB`);
 });

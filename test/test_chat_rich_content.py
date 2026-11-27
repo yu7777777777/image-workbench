@@ -509,3 +509,466 @@ def test_observe_captures_streamed_metadata_patches_when_detail_unavailable() ->
     assert len(images) == 1
     assert images[0]["queries"] == ["海边日落"]
     assert images[0]["imageUrl"] == "https://images.openai.com/sunset.jpg"
+
+
+def _patch_fake_backend(monkeypatch: pytest.MonkeyPatch, payloads_by_token: dict[str, list[str] | Exception]) -> None:
+    class FakeBackend:
+        def __init__(self, access_token: str = "") -> None:
+            self.access_token = access_token
+
+        def stream_conversation(self, **kwargs: object):
+            entry = payloads_by_token[self.access_token]
+            if isinstance(entry, Exception):
+                raise entry
+            return iter(entry)
+
+        def _get_editable_conversation_detail(self, *args: object, **kwargs: object) -> dict:
+            return {"mapping": {}}
+
+        def close(self) -> None:
+            pass
+
+    monkeypatch.setattr(conversation, "OpenAIBackendAPI", FakeBackend)
+    monkeypatch.setattr(conversation.account_service, "mark_text_used", Mock())
+
+
+def test_thoughts_and_incremental_patches_emit_status_before_first_delta(monkeypatch: pytest.MonkeyPatch) -> None:
+    payloads = [
+        json.dumps({
+            "conversation_id": "conv-think",
+            "v": {
+                "message": {
+                    "id": "thought-1",
+                    "author": {"role": "assistant"},
+                    "recipient": "all",
+                    "content": {"content_type": "thoughts", "thoughts": []},
+                }
+            },
+        }),
+        json.dumps({
+            "o": "patch",
+            "v": [
+                {
+                    "p": "/message/content/thoughts",
+                    "o": "append",
+                    "v": [{"summary": "分析日程", "content": "先检查\ue200cite\ue202turn0search0\ue201字段"}],
+                }
+            ],
+        }),
+        json.dumps({
+            "o": "patch",
+            "v": [
+                {"p": "/message/content/thoughts/0/summary", "o": "append", "v": "卡片结构\ue200cite\ue202turn0search1\ue201"},
+            ],
+        }),
+        # Duplicate content patch when summary already set should be deduplicated
+        json.dumps({
+            "o": "patch",
+            "v": [
+                {"p": "/message/content/thoughts/0/content", "o": "append", "v": "补充细节"},
+            ],
+        }),
+        json.dumps({
+            "conversation_id": "conv-think",
+            "v": {
+                "message": {
+                    "id": "answer-1",
+                    "author": {"role": "assistant"},
+                    "channel": "final",
+                    "recipient": "all",
+                    "content": {"content_type": "text", "parts": ["这是最终日程建议。"]},
+                }
+            },
+        }),
+        "[DONE]",
+    ]
+    _patch_fake_backend(monkeypatch, {"tok-1": payloads})
+
+    rich = ChatRichContent("owner-a")
+    chunks = list(
+        openai_v1_chat_complete.stream_text_chat_completion(
+            SimpleNamespace(access_token="tok-1"),
+            [{"role": "user", "content": "帮我设计日程卡片"}],
+            "gpt-5",
+            rich_content=rich,
+        )
+    )
+
+    first_delta_idx = next(
+        idx for idx, chunk in enumerate(chunks)
+        if chunk["choices"][0]["delta"].get("content")
+    )
+    status_before_delta = [
+        chunk["workbench"]["status"]
+        for chunk in chunks[:first_delta_idx]
+        if "workbench" in chunk and "status" in chunk["workbench"]
+    ]
+
+    assert first_delta_idx >= 3
+    assert [s["stage"] for s in status_before_delta[:3]] == ["thinking", "thinking", "thinking"]
+    assert status_before_delta[1]["detail"] == "分析日程"
+    assert status_before_delta[2]["detail"] == "分析日程卡片结构"
+    assert status_before_delta[2]["thoughts"] == ["分析日程卡片结构"]
+    # Verify private-use annotation markers are completely stripped
+    for status in status_before_delta:
+        serialized = json.dumps(status, ensure_ascii=False)
+        assert "\ue200" not in serialized and "\ue201" not in serialized and "\ue202" not in serialized
+    # Status chunks before answer have empty delta and finish_reason None
+    for chunk in chunks[:first_delta_idx]:
+        assert chunk["choices"][0]["delta"] == {}
+        assert chunk["choices"][0]["finish_reason"] is None
+
+    assert openai_v1_chat_complete.collect_chat_content(chunks) == "这是最终日程建议。"
+    assert chunks[-1]["choices"][0]["finish_reason"] == "stop"
+    assert chunks[-1]["workbench"]["status"]["thoughts"] == ["分析日程卡片结构"]
+
+
+def test_analysis_channel_reasoning_emits_thinking_without_leaking_to_content(monkeypatch: pytest.MonkeyPatch) -> None:
+    payloads = [
+        json.dumps({
+            "conversation_id": "conv-analysis",
+            "v": {
+                "message": {
+                    "id": "analysis-1",
+                    "author": {"role": "assistant"},
+                    "channel": "analysis",
+                    "recipient": "all",
+                    "content": {"content_type": "text", "parts": [""]},
+                }
+            },
+        }),
+        json.dumps({"p": "/message/content/parts/0", "o": "append", "v": "**梳理需求**\n"}),
+        json.dumps({"p": "/message/content/parts/0", "o": "append", "v": "校验输出格式与边界"}),
+        json.dumps({
+            "conversation_id": "conv-analysis",
+            "v": {
+                "message": {
+                    "id": "final-1",
+                    "author": {"role": "assistant"},
+                    "channel": "final",
+                    "recipient": "all",
+                    "content": {"content_type": "text", "parts": [""]},
+                }
+            },
+        }),
+        json.dumps({"p": "/message/content/parts/0", "o": "append", "v": "最终回答内容。"}),
+        "[DONE]",
+    ]
+    _patch_fake_backend(monkeypatch, {"tok-1": payloads})
+
+    rich = ChatRichContent("owner-a")
+    chunks = list(
+        openai_v1_chat_complete.stream_text_chat_completion(
+            SimpleNamespace(access_token="tok-1"),
+            [{"role": "user", "content": "解释一下"}],
+            "gpt-5",
+            rich_content=rich,
+        )
+    )
+
+    content = openai_v1_chat_complete.collect_chat_content(chunks)
+    assert content == "最终回答内容。"
+    assert "梳理需求" not in content
+    assert "校验输出格式与边界" not in content
+
+    thinking_statuses = [
+        chunk["workbench"]["status"]
+        for chunk in chunks
+        if "workbench" in chunk and chunk["workbench"].get("status", {}).get("stage") == "thinking"
+    ]
+    assert thinking_statuses
+    assert any(status.get("detail") == "梳理需求" for status in thinking_statuses)
+    assert any(status.get("detail") == "校验输出格式与边界" for status in thinking_statuses)
+
+
+def test_web_search_python_and_image_tools_emit_realtime_status(monkeypatch: pytest.MonkeyPatch) -> None:
+    payloads = [
+        json.dumps({
+            "conversation_id": "conv-tools",
+            "v": {
+                "message": {
+                    "id": "call-web",
+                    "author": {"role": "assistant"},
+                    "recipient": "web",
+                    "content": {"content_type": "code", "text": ""},
+                }
+            },
+        }),
+        json.dumps({
+            "o": "patch",
+            "v": [
+                {"p": "/message/content/text", "o": "append", "v": '{"search_query":[{"q":"2026年南京天气预报"}]}'},
+            ],
+        }),
+        json.dumps({
+            "conversation_id": "conv-tools",
+            "v": {
+                "message": {
+                    "id": "call-py",
+                    "author": {"role": "assistant"},
+                    "recipient": "python",
+                    "content": {"content_type": "code", "text": "print(1 + 1)"},
+                }
+            },
+        }),
+        json.dumps({
+            "conversation_id": "conv-tools",
+            "v": {
+                "message": {
+                    "id": "call-img",
+                    "author": {"role": "assistant"},
+                    "recipient": "t2uay3k.sj1i4kz",
+                    "content": {"content_type": "text", "parts": [""]},
+                    "metadata": {"async_task_type": "image_gen"},
+                }
+            },
+        }),
+        json.dumps({
+            "conversation_id": "conv-tools",
+            "v": {
+                "message": {
+                    "id": "ans-tools",
+                    "author": {"role": "assistant"},
+                    "channel": "final",
+                    "recipient": "all",
+                    "content": {"content_type": "text", "parts": ["查询完成。"]},
+                }
+            },
+        }),
+        "[DONE]",
+    ]
+    _patch_fake_backend(monkeypatch, {"tok-1": payloads})
+
+    rich = ChatRichContent("owner-a")
+    chunks = list(
+        openai_v1_chat_complete.stream_text_chat_completion(
+            SimpleNamespace(access_token="tok-1"),
+            [{"role": "user", "content": "查一下天气并画图"}],
+            "gpt-5",
+            rich_content=rich,
+        )
+    )
+
+    statuses = [
+        chunk["workbench"]["status"]
+        for chunk in chunks
+        if "workbench" in chunk and "status" in chunk["workbench"]
+    ]
+    assert any(s["stage"] == "searching" and s["label"] == "正在联网检索" and s.get("detail") == "2026年南京天气预报" for s in statuses)
+    assert any(s["stage"] == "tool" and s["label"] == "正在运行分析工具" for s in statuses)
+    assert any(s["stage"] == "tool" and s["label"] == "正在检索或生成配图" for s in statuses)
+    assert openai_v1_chat_complete.collect_chat_content(chunks) == "查询完成。"
+
+
+@pytest.mark.parametrize(
+    ("recap_text", "meta", "expected"),
+    [
+        ("Thought for 1m 7s", {}, 67),
+        ("Thought for 42 seconds", {}, 42),
+        ("思考了 1m 7s", {}, 67),
+        ("思考了 25 秒", {}, 25),
+        ("", {"finished_duration_sec": 38.6}, 39),
+    ],
+)
+def test_reasoning_recap_parses_thought_duration_sec(recap_text: str, meta: dict, expected: int) -> None:
+    backend = Mock()
+    rich = ChatRichContent("owner-a")
+    recap_msg = {
+        "id": "recap-1",
+        "author": {"role": "assistant"},
+        "recipient": "all",
+        "content": {"content_type": "reasoning_recap", "content": recap_text},
+        "metadata": meta,
+    }
+    rich.observe(backend, {"conversation_id": "conv-recap", "raw": {"v": {"message": recap_msg}}})
+    status = rich.pop_status()
+    assert status is not None
+    assert status["thoughtDurationSec"] == expected
+    assert rich.thought_duration_sec == expected
+    summary = rich.final_thinking_summary()
+    assert summary is not None and summary["thoughtDurationSec"] == expected
+
+
+def test_account_retry_emits_retrying_status_before_next_account(monkeypatch: pytest.MonkeyPatch) -> None:
+    answer_payloads = [
+        json.dumps({
+            "conversation_id": "conv-retry",
+            "v": {
+                "message": {
+                    "id": "ans-retry",
+                    "author": {"role": "assistant"},
+                    "channel": "final",
+                    "recipient": "all",
+                    "content": {"content_type": "text", "parts": ["切换账号后成功返回"]},
+                }
+            },
+        }),
+        "[DONE]",
+    ]
+    _patch_fake_backend(
+        monkeypatch,
+        {
+            "expired-tok": RuntimeError("chat_requirements_prepare status=401 token_expired"),
+            "healthy-tok": answer_payloads,
+        },
+    )
+    monkeypatch.setattr(conversation.account_service, "refresh_access_token", Mock(return_value=""))
+    monkeypatch.setattr(conversation.account_service, "get_text_access_token", Mock(return_value="healthy-tok"))
+
+    rich = ChatRichContent("owner-a")
+    chunks = list(
+        openai_v1_chat_complete.stream_text_chat_completion(
+            SimpleNamespace(access_token="expired-tok"),
+            [{"role": "user", "content": "你好"}],
+            "gpt-5",
+            rich_content=rich,
+        )
+    )
+
+    retrying_chunks = [
+        chunk for chunk in chunks
+        if chunk.get("workbench", {}).get("status", {}).get("stage") == "retrying"
+    ]
+    assert len(retrying_chunks) == 1
+    assert retrying_chunks[0]["workbench"]["status"] == {
+        "stage": "retrying",
+        "label": "正在切换可用账号重试",
+    }
+    assert retrying_chunks[0]["choices"][0]["delta"] == {}
+    assert openai_v1_chat_complete.collect_chat_content(chunks) == "切换账号后成功返回"
+
+
+def test_generic_stream_without_rich_content_emits_zero_workbench_and_zero_reasoning(monkeypatch: pytest.MonkeyPatch) -> None:
+    payloads = [
+        json.dumps({
+            "conversation_id": "conv-plain",
+            "v": {
+                "message": {
+                    "id": "t1",
+                    "author": {"role": "assistant"},
+                    "recipient": "all",
+                    "content": {"content_type": "thoughts", "thoughts": [{"summary": "内部思考"}]},
+                }
+            },
+        }),
+        json.dumps({
+            "conversation_id": "conv-plain",
+            "v": {
+                "message": {
+                    "id": "a1",
+                    "author": {"role": "assistant"},
+                    "channel": "analysis",
+                    "recipient": "all",
+                    "content": {"content_type": "text", "parts": [""]},
+                }
+            },
+        }),
+        json.dumps({"p": "/message/content/parts/0", "o": "append", "v": "隐藏推理文本"}),
+        json.dumps({
+            "conversation_id": "conv-plain",
+            "v": {
+                "message": {
+                    "id": "w1",
+                    "author": {"role": "assistant"},
+                    "recipient": "web",
+                    "content": {"content_type": "code", "text": 'search("query")'},
+                }
+            },
+        }),
+        json.dumps({
+            "conversation_id": "conv-plain",
+            "v": {
+                "message": {
+                    "id": "r1",
+                    "author": {"role": "assistant"},
+                    "recipient": "all",
+                    "content": {"content_type": "reasoning_recap", "content": "Thought for 1m 7s"},
+                }
+            },
+        }),
+        json.dumps({
+            "conversation_id": "conv-plain",
+            "v": {
+                "message": {
+                    "id": "f1",
+                    "author": {"role": "assistant"},
+                    "channel": "final",
+                    "recipient": "all",
+                    "content": {"content_type": "text", "parts": ["公开回答"]},
+                }
+            },
+        }),
+        "[DONE]",
+    ]
+    _patch_fake_backend(monkeypatch, {"tok-1": payloads})
+
+    chunks = list(
+        openai_v1_chat_complete.stream_text_chat_completion(
+            SimpleNamespace(access_token="tok-1"),
+            [{"role": "user", "content": "hello"}],
+            "gpt-5",
+            rich_content=None,
+        )
+    )
+
+    assert all("workbench" not in chunk for chunk in chunks)
+    assert openai_v1_chat_complete.collect_chat_content(chunks) == "公开回答"
+    assert chunks[-1]["choices"][0]["finish_reason"] == "stop"
+
+
+def test_status_caps_lengths_thoughts_count_and_search_model_queries() -> None:
+    backend = Mock()
+    rich = ChatRichContent("owner-a")
+
+    many_thoughts = [{"summary": f"步骤{i:02d}-" + ("长" * 320)} for i in range(15)]
+    rich.observe(
+        backend,
+        {
+            "conversation_id": "conv-cap",
+            "raw": {
+                "v": {
+                    "message": {
+                        "id": "t-cap",
+                        "author": {"role": "assistant"},
+                        "recipient": "all",
+                        "content": {"content_type": "thoughts", "thoughts": many_thoughts},
+                    }
+                }
+            },
+        },
+    )
+    status = rich.pop_status()
+    assert status is not None
+    assert len(status["thoughts"]) == 12
+    assert status["thoughts"][0].startswith("步骤03-")
+    assert status["thoughts"][-1].startswith("步骤14-")
+    assert all(len(item) <= 280 for item in status["thoughts"])
+    assert len(status["detail"]) <= 160
+    # Calling pop_status again without changes must deduplicate
+    assert rich.pop_status() is None
+
+    # Test metadata.search_model_queries cap at 120 chars and annotation stripping
+    long_query = "检索关键词\ue200cite\ue202turn0search0\ue201" + ("x" * 200)
+    rich.observe(
+        backend,
+        {
+            "conversation_id": "conv-cap",
+            "raw": {
+                "v": {
+                    "message": {
+                        "id": "s-cap",
+                        "author": {"role": "tool", "name": "web.run"},
+                        "recipient": "all",
+                        "content": {"content_type": "text", "parts": [""]},
+                        "metadata": {"search_model_queries": {"queries": [long_query]}},
+                    }
+                }
+            },
+        },
+    )
+    search_status = rich.pop_status()
+    assert search_status is not None
+    assert search_status["stage"] == "searching"
+    assert search_status["label"] == "正在联网检索"
+    assert len(search_status["detail"]) <= 120
+    assert "\ue200" not in search_status["detail"]
